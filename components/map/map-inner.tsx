@@ -508,7 +508,7 @@ export default function MapInner({
         )}
 
         {/* 3. AFFECTED STORES (Selalu Menyala & Berdenyut di SEMUA Level Zoom!) */}
-        {showStoresLayer && activeLayer !== "flood" && affectedStores.map((store) => {
+        {showStoresLayer && affectedStores.map((store) => {
           const isDanger = store.status === "danger";
           const isSelected = store.id === selectedStore?.id;
 
