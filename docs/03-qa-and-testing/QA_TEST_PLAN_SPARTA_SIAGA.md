@@ -1,7 +1,7 @@
-# QA TEST PLAN & VERIFICATION CHECKLIST: SPARTA SENTINEL
+# QA TEST PLAN & VERIFICATION CHECKLIST: SPARTA SIAGA
 **Dokumen Pengujian Kualitas, Integritas Data, dan Keandalan Sistem**
 
-- **Modul:** SPARTA Sentinel (`sparta-sentinel`)
+- **Modul:** SPARTA Siaga (`sparta-siaga`)
 - **Fokus Sistem:** Disaster & Branch Interactive Map Monitoring System
 - **Ecosystem:** SPARTA Portal (Monorepo Ecosystem)
 - **Target Port Dev:** `http://localhost:3004`

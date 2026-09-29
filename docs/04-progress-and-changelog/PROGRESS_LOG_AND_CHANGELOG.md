@@ -1,7 +1,7 @@
-# 📋 Progress Log & Riwayat Perubahan Sistem: SPARTA Sentinel
+# 📋 Progress Log & Riwayat Perubahan Sistem: SPARTA Siaga
 **Dokumen Pelacakan Teknis, Log Perubahan Kode, dan Resolusi Isu**
 
-- **Modul:** SPARTA Sentinel (`sparta-sentinel`)
+- **Modul:** SPARTA Siaga (`sparta-siaga`)
 - **Port / URL Dev:** `http://localhost:3004`
 - **Versi Terkini:** `v1.2.11` (Stabil & Terverifikasi - Comprehensive Mobile & Desktop Responsive Overhaul, Collapsible Map Controls, Touch-Friendly Mobile Store Verification Cards)
 - **Terakhir Diperbarui:** 2026-09-25 (Shift Siang/Sore: 06:00 – 18:00 WIB)
