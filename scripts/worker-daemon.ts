@@ -1,6 +1,6 @@
 import { startServerDaemon } from '../lib/server-daemon';
 
-console.log('Starting standalone SPARTA Sentinel Worker Daemon...');
+console.log('Starting standalone SPARTA Siaga Worker Daemon...');
 startServerDaemon();
 
 // Keep process alive indefinitely

@@ -1,6 +1,6 @@
 import { IncidentRecord, IncidentStats, DamageReport, MaintenanceTicket } from "@/types/incident";
 
-const LOCAL_STORAGE_KEY = "sparta_sentinel_incidents_v2";
+const LOCAL_STORAGE_KEY = "sparta_siaga_incidents_v2";
 
 export const INITIAL_INCIDENTS: IncidentRecord[] = [
   {
@@ -32,7 +32,7 @@ export const INITIAL_INCIDENTS: IncidentRecord[] = [
       workDescription: "Pengeringan area toko menggunakan pompa alkon, pengecekan instalasi kabel chiller dan MCB.",
     },
     timeline: [
-      { stage: "Laporan Masuk", label: "Peringatan Banjir BPBD", timestamp: "1 Sep 06:30", actor: "Sistem Sentinel" },
+      { stage: "Laporan Masuk", label: "Peringatan Banjir BPBD", timestamp: "1 Sep 06:30", actor: "Sistem Siaga" },
       { stage: "Verifikasi", label: "Toko Dikonfirmasi Rusak Sedang", timestamp: "1 Sep 07:15", actor: "SM Toko Cibubur", notes: "Air 40 cm, toko tutup sementara" },
       { stage: "Perbaikan", label: "Tiket Maintenance Aktif (60%)", timestamp: "1 Sep 09:30", actor: "Teknisi Rahmat", notes: "Penyedotan air selesai, inspeksi kabel AC" },
     ],
@@ -72,7 +72,7 @@ export const INITIAL_INCIDENTS: IncidentRecord[] = [
       workDescription: "Penguatan baut anchor gondola ke lantai beton dan pemasangan rangka plafon baru.",
     },
     timeline: [
-      { stage: "Laporan Masuk", label: "Gempa M 6.1 BMKG Terdeteksi", timestamp: "8 Sep 11:22", actor: "Sistem Sentinel InaTEWS" },
+      { stage: "Laporan Masuk", label: "Gempa M 6.1 BMKG Terdeteksi", timestamp: "8 Sep 11:22", actor: "Sistem Siaga InaTEWS" },
       { stage: "Verifikasi", label: "SM Konfirmasi Rak Roboh & Plafon Copot", timestamp: "8 Sep 11:45", actor: "SM Claudio Paat" },
       { stage: "Perbaikan", label: "Perbaikan Rangka Plafon 50%", timestamp: "8 Sep 15:00", actor: "Teknisi Vicky Kalalo" },
     ],

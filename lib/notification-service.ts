@@ -75,7 +75,7 @@ export function generateEmergencyEmailHtml(params: {
     <div style="background: linear-gradient(90deg, #dc2626 0%, #991b1b 100%); padding: 18px 24px; color: #ffffff;">
       <div style="display: flex; align-items: center; justify-content: space-between;">
         <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 6px;">
-          SPARTA SENTINEL - EMERGENCY BROADCAST
+          SPARTA SIAGA - EMERGENCY BROADCAST
         </span>
         <span style="font-size: 12px; font-family: monospace; font-weight: bold;">
           ${params.ticketNumber}
@@ -122,7 +122,7 @@ export function generateEmergencyEmailHtml(params: {
           ${storeRows}
         </tbody>
       </table>
-      ${params.affectedCount > 10 ? `<p style="font-size: 12px; color: #94a3b8; margin: -16px 0 20px 0; font-style: italic;">* Menampilkan 10 dari total ${params.affectedCount} gerai. Buka SPARTA Sentinel Dashboard untuk rincian lengkap.</p>` : ''}
+      ${params.affectedCount > 10 ? `<p style="font-size: 12px; color: #94a3b8; margin: -16px 0 20px 0; font-style: italic;">* Menampilkan 10 dari total ${params.affectedCount} gerai. Buka SPARTA Siaga Dashboard untuk rincian lengkap.</p>` : ''}
 
       <!-- Action Protocol -->
       <div style="background-color: #1e293b; padding: 16px 18px; border-radius: 8px; margin-bottom: 24px; border: 1px solid #334155;">
@@ -142,7 +142,7 @@ export function generateEmergencyEmailHtml(params: {
       </div>
 
       <p style="margin: 0; font-size: 11px; color: #64748b; text-align: center; line-height: 1.4;">
-        Notifikasi ini diterbitkan secara otomatis oleh SPARTA Sentinel Incident Worker.<br>
+        Notifikasi ini diterbitkan secara otomatis oleh SPARTA Siaga Incident Worker.<br>
         Waktu Kirim: ${params.sentAt} | Server ID: SPARTA-WORKER-01 | Kepatuhan UU PDP No. 27/2022
       </p>
     </div>

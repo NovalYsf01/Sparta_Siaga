@@ -184,7 +184,7 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
 
         const weatherRes = await fetch(weatherUrl, {
           next: { revalidate: 300 },
-          headers: { 'User-Agent': 'SpartaSentinel-Daemon/1.0' },
+          headers: { 'User-Agent': 'SpartaSiaga-Daemon/1.0' },
         });
 
         if (weatherRes.ok) {
@@ -268,7 +268,7 @@ export function startServerDaemon(): void {
 
   globalScope.__sparta_daemon_started = true;
   console.log('------------------------------------------------------------');
-  console.log('🚀 [SPARTA SENTINEL] 24/7 AUTONOMOUS SERVER DAEMON ACTIVATED');
+  console.log('🚀 [SPARTA SIAGA] 24/7 AUTONOMOUS SERVER DAEMON ACTIVATED');
   console.log('   Continuous monitoring: BMKG Quakes (60s), RainViewer & Open-Meteo');
   console.log('   Auto-dispatching: Email to DC Cabang + PWA Push Notifications');
   console.log('------------------------------------------------------------');
