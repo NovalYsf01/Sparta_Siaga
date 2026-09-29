@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans, system-ui, -apple-system, sans-serif);
+  --font-mono: var(--font-geist-mono, monospace);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: oklch(0.985 0.002 247);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.55 0.22 25); /* Alfamart Crimson Accent */
+  --primary-foreground: oklch(0.985 0.002 247);
+  --secondary: oklch(0.95 0.005 240);
+  --secondary-foreground: oklch(0.2 0.01 240);
+  --muted: oklch(0.95 0.005 240);
+  --muted-foreground: oklch(0.48 0.015 240);
+  --accent: oklch(0.93 0.01 240);
+  --accent-foreground: oklch(0.15 0.01 240);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0.002 247);
+  --border: oklch(0.88 0.008 240);
+  --input: oklch(0.88 0.008 240);
+  --ring: oklch(0.55 0.22 25);
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: oklch(0.12 0.015 250);
+  --foreground: oklch(0.98 0.005 240);
+  --card: oklch(0.16 0.015 250);
+  --card-foreground: oklch(0.98 0.005 240);
+  --popover: oklch(0.16 0.015 250);
+  --popover-foreground: oklch(0.98 0.005 240);
+  --primary: oklch(0.62 0.24 25);
+  --primary-foreground: oklch(0.98 0.005 240);
+  --secondary: oklch(0.22 0.02 250);
+  --secondary-foreground: oklch(0.95 0.005 240);
+  --muted: oklch(0.2 0.015 250);
+  --muted-foreground: oklch(0.65 0.01 240);
+  --accent: oklch(0.22 0.02 250);
+  --accent-foreground: oklch(0.98 0.005 240);
+  --destructive: oklch(0.6 0.25 27);
+  --destructive-foreground: oklch(0.98 0.005 240);
+  --border: oklch(0.25 0.02 250);
+  --input: oklch(0.25 0.02 250);
+  --ring: oklch(0.62 0.24 25);
+}
+
+/* Pulsing radar animation for danger beacons & disaster epicenters */
+@keyframes beaconPulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  70% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 16px rgba(220, 38, 38, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+  }
+}
+
+.pulse-beacon {
+  animation: beaconPulse 1.8s infinite ease-in-out;
+}
+
+/* Leaflet Container & Popup styling adjustments */
+.leaflet-container {
+  font-family: inherit !important;
+  background-color: #0b0f19 !important;
+}
+
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border-radius: 12px !important;
+}
+
+.custom-leaflet-popup .leaflet-popup-content {
+  margin: 0 !important;
+  line-height: normal !important;
+}
+
+.custom-leaflet-popup .leaflet-popup-tip {
+  background: #1e293b !important;
+}
