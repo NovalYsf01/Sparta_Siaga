@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { StoreStatus } from "@/types/store";
 
-interface SentinelHeaderProps {
+interface SiagaHeaderProps {
   dangerCount: number;
   warningCount: number;
   safeCount: number;
@@ -42,7 +42,7 @@ interface SentinelHeaderProps {
   onLogout?: () => void;
 }
 
-export function SentinelHeader({
+export function SiagaHeader({
   dangerCount,
   warningCount,
   safeCount,
@@ -63,7 +63,7 @@ export function SentinelHeader({
   onToggleTheme,
   userEmail = "operator.sparta@sat.co.id",
   onLogout,
-}: SentinelHeaderProps) {
+}: SiagaHeaderProps) {
   const isDark = theme === "dark";
 
   return (
