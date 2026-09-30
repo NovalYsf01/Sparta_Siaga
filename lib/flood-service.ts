@@ -1,13 +1,18 @@
+import { DataFreshness } from "@/types/disaster";
+
 export interface StoreFloodInfo {
-  riskLevel: "normal" | "waspada" | "siaga" | "bahaya";
-  waterLevelCm: number;
+  riskLevel: "normal" | "waspada" | "siaga" | "bahaya" | "unknown";
+  waterLevelCm?: number;
+  riverDischarge?: number;
+  dischargeUnit?: "m3/s";
   nearbyReportCount: number;
   description: string;
   source: string;
+  freshness: DataFreshness;
 }
 
 const floodCache = new Map<string, { data: StoreFloodInfo; timestamp: number }>();
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours for GloFAS hydrological model
 
 export async function fetchStoreFloodRisk(lat: number, lng: number): Promise<StoreFloodInfo> {
   const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
@@ -30,40 +35,40 @@ export async function fetchStoreFloodRisk(lat: number, lng: number): Promise<Sto
     const discharge = data.daily?.river_discharge?.[0] ?? 0;
 
     let riskLevel: "normal" | "waspada" | "siaga" | "bahaya" = "normal";
-    let waterLevelCm = 0;
-    let description = "Tidak terdeteksi genangan air atau kenaikan debit sungai.";
+    let description = "Tidak terdeteksi luapan sungai yang signifikan.";
 
     if (discharge > 800) {
       riskLevel = "bahaya";
-      waterLevelCm = 60;
       description = "Debit sungai kritis! Potensi luapan tinggi di sekitar gerai.";
     } else if (discharge > 400) {
       riskLevel = "siaga";
-      waterLevelCm = 30;
       description = "Peringatan Siaga: Debit aliran air meningkat di saluran drainase utama.";
     } else if (discharge > 150) {
       riskLevel = "waspada";
-      waterLevelCm = 15;
       description = "Waspada: Curah hujan hulu tinggi, pantau saluran air depan toko.";
     }
 
     const result: StoreFloodInfo = {
       riskLevel,
-      waterLevelCm,
+      waterLevelCm: undefined,
+      riverDischarge: discharge,
+      dischargeUnit: "m3/s",
       nearbyReportCount: riskLevel !== "normal" ? 1 : 0,
       description,
-      source: "Petabencana.id & Copernicus GloFAS",
+      source: "Copernicus GloFAS",
+      freshness: "fresh",
     };
 
     floodCache.set(cacheKey, { data: result, timestamp: Date.now() });
     return result;
   } catch {
     const fallback: StoreFloodInfo = {
-      riskLevel: "normal",
-      waterLevelCm: 0,
+      riskLevel: "unknown",
+      waterLevelCm: undefined,
       nearbyReportCount: 0,
-      description: "Data pantauan genangan aman (Jalur drainase normal).",
-      source: "Petabencana.id Sentinel Fallback",
+      description: "Data risiko banjir sementara tidak tersedia. Status risiko belum dapat ditentukan.",
+      source: "Copernicus GloFAS",
+      freshness: "unavailable",
     };
     return fallback;
   }

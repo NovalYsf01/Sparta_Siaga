@@ -40,7 +40,7 @@ import {
 } from "@/lib/desktop-notification";
 import { Loader2, Plus, Sparkles } from "lucide-react";
 
-export default function SentinelDashboardPage() {
+export default function SpartaSiagaDashboardPage() {
   const [rawStores, setRawStores] = useState<Store[]>([]);
   const [disasterData, setDisasterData] = useState<DisasterFeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -90,7 +90,7 @@ export default function SentinelDashboardPage() {
       .then((json) => {
         if (json.data) setIncidents(json.data);
       })
-      .catch((err) => console.error("[Sentinel] Failed to load incidents from DB:", err));
+      .catch((err) => console.error("[Sparta Siaga] Failed to load incidents from DB:", err));
   }, []);
 
   // Sync incidents: POST new, PATCH existing
@@ -116,7 +116,7 @@ export default function SentinelDashboardPage() {
           });
         }
       } catch (err) {
-        console.error(`[Sentinel] Failed to sync incident ${inc.id}:`, err);
+        console.error(`[Sparta Siaga] Failed to sync incident ${inc.id}:`, err);
       }
     }
   }, [incidents]);
@@ -232,7 +232,7 @@ export default function SentinelDashboardPage() {
         floodReports, // Attach to disasterData
       });
     } catch (err) {
-      console.error("[Sentinel Dashboard] Error fetching initial data:", err);
+      console.error("[Sparta Siaga Dashboard] Error fetching initial data:", err);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -316,9 +316,10 @@ export default function SentinelDashboardPage() {
     });
   }, [computedStores]);
 
-  // Automated background polling
+  // Read-only Background Polling (Browser is a consumer, not a worker)
   useEffect(() => {
-    const runWorkerCycle = async () => {
+    // 1. Notification State & Earthquake Feed (60 seconds)
+    const fetchFastFeeds = async () => {
       try {
         const logsRes = await fetch("/api/notifications/logs?limit=50");
         if (logsRes.ok) {
@@ -327,40 +328,76 @@ export default function SentinelDashboardPage() {
             ? localStorage.getItem("sparta_last_read_at")
             : null;
           const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
-
           const unreadLogs = (logsJson.logs || []).filter((l: any) => {
             const sentTime = new Date(l.sent_at).getTime();
             return sentTime > lastReadTime && l.status !== "acknowledged";
           });
-
+          
+          if (unreadLogs.length > notificationCount) {
+             playEmergencyChime(); // Play sound if new notification arrived
+          }
           setNotificationCount(unreadLogs.length);
         }
 
-        const workerRes = await fetch("/api/notifications/worker", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ forceSimulation: false }),
-        });
-        if (workerRes.ok) {
-          const workerJson = await workerRes.json();
-          if (workerJson.dispatched_count > 0) {
-            setNotificationCount((prev) => prev + workerJson.dispatched_count);
-            playEmergencyChime();
-          }
+        const disastersRes = await fetch("/api/disasters/earthquakes?refresh=true");
+        if (disastersRes.ok) {
+           const disastersJson = await disastersRes.json();
+           setDisasterData(prev => prev ? ({
+             ...disastersJson,
+             floodReports: prev.floodReports || []
+           }) : disastersJson);
         }
       } catch (err) {
-        console.warn("[Background Worker Cycle] Error:", err);
+        console.warn("[Fast Feeds Polling] Error:", err);
       }
     };
 
-    const initialTimer = setTimeout(runWorkerCycle, 3000);
-    const interval = setInterval(runWorkerCycle, 60000);
+    // 2. Flood & Field Reports (3 minutes = 180s)
+    const fetchFloodFeeds = async () => {
+      try {
+        const floodsRes = await fetch("/api/disasters/floods");
+        if (floodsRes.ok) {
+           const floodsJson = await floodsRes.json();
+           setDisasterData(prev => {
+             if (!prev) return prev;
+             return { ...prev, floodReports: floodsJson.data || [] };
+           });
+        }
+      } catch (err) {
+        console.warn("[Flood Feeds Polling] Error:", err);
+      }
+    };
+
+    // 3. Radar Metadata (5 minutes = 300s)
+    const fetchRadarFeeds = async () => {
+      try {
+        const radarRes = await fetch("/api/weather/radar");
+        if (radarRes.ok) {
+          const radarJson = await radarRes.json();
+          setRadarData(radarJson);
+        }
+      } catch (err) {
+        console.warn("[Radar Feeds Polling] Error:", err);
+      }
+    };
+
+    const fastTimer = setTimeout(fetchFastFeeds, 3000);
+    const floodTimer = setTimeout(fetchFloodFeeds, 5000);
+    const radarTimer = setTimeout(fetchRadarFeeds, 7000);
+
+    const fastInterval = setInterval(fetchFastFeeds, 60000);
+    const floodInterval = setInterval(fetchFloodFeeds, 180000);
+    const radarInterval = setInterval(fetchRadarFeeds, 300000);
 
     return () => {
-      clearTimeout(initialTimer);
-      clearInterval(interval);
+      clearTimeout(fastTimer);
+      clearTimeout(floodTimer);
+      clearTimeout(radarTimer);
+      clearInterval(fastInterval);
+      clearInterval(floodInterval);
+      clearInterval(radarInterval);
     };
-  }, [playEmergencyChime]);
+  }, [playEmergencyChime, notificationCount]);
 
   // Risk metrics calculation
   const { dangerCount, warningCount, affectedStores } = useMemo(() => {
@@ -723,7 +760,7 @@ export default function SentinelDashboardPage() {
                 await fetch(`/api/incidents/${id}`, { method: "DELETE" });
                 setIncidents((prev) => prev.filter((inc) => inc.id !== id));
               } catch (err) {
-                console.error("[Sentinel] Failed to delete incident:", err);
+                console.error("[Sparta Siaga] Failed to delete incident:", err);
               }
             }}
           />

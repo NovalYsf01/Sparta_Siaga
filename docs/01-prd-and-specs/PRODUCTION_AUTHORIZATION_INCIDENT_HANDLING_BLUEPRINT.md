@@ -1,8 +1,8 @@
 # 🛡️ Blueprint Otorisasi Penanganan Insiden & Rencana Deployment Server Pusat
-**SPARTA Sentinel - Production Security & Role-Based Access Control (RBAC) Specification**
+**SPARTA Siaga - Production Security & Role-Based Access Control (RBAC) Specification**
 
 > **Tujuan Dokumen:**  
-> Menjadi panduan arsitektur keamanan dan cetak biru teknis saat sistem SPARTA Sentinel dinaikkan ke **Server Pusat (Production)**, memastikan aksi konfirmasi darurat (`Konfirmasi Terima & Tangani`) **hanya dapat dilakukan oleh Duty Officer cabang yang terdampak atau Tim HO Pusat**, tanpa mengganggu fleksibilitas pengujian di lingkungan lokal saat ini.
+> Menjadi panduan arsitektur keamanan dan cetak biru teknis saat sistem SPARTA Siaga dinaikkan ke **Server Pusat (Production)**, memastikan aksi konfirmasi darurat (`Konfirmasi Terima & Tangani`) **hanya dapat dilakukan oleh Duty Officer cabang yang terdampak atau Tim HO Pusat**, tanpa mengganggu fleksibilitas pengujian di lingkungan lokal saat ini.
 
 ---
 
@@ -52,7 +52,7 @@ $$\text{Hak Konfirmasi} = (\text{role} \in \{\text{'HO_SUPERADMIN'}, \text{'HO_C
 
 ## 💻 4. Rencana Implementasi Teknis (Production Ready Blueprint)
 
-### A. Proteksi Backend API ([`/api/notifications/ack/route.ts`](file:///c:/buildingprocess25/sparta-sentinel/app/api/notifications/ack/route.ts))
+### A. Proteksi Backend API ([`/api/notifications/ack/route.ts`](file:///c:/buildingprocess25/sparta-siaga/app/api/notifications/ack/route.ts))
 
 Saat environment variable `NODE_ENV === 'production'` atau `ENFORCE_BRANCH_AUTH === 'true'`, backend memvalidasi token sesi pengguna:
 
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
 ---
 
-### B. Tampilan Antarmuka Frontend ([`notification-center-sheet.tsx`](file:///c:/buildingprocess25/sparta-sentinel/components/notifications/notification-center-sheet.tsx))
+### B. Tampilan Antarmuka Frontend ([`notification-center-sheet.tsx`](file:///c:/buildingprocess25/sparta-siaga/components/notifications/notification-center-sheet.tsx))
 
 Pada tampilan kartu insiden di Notification Center, tombol aksi akan beradaptasi secara dinamis sesuai akun pengguna:
 
@@ -135,6 +135,6 @@ Agar proses *go-live* berjalan mulus tanpa merusak konfigurasi lokal:
 ## 📑 6. Kesimpulan & Status Dokumen
 
 Dokumen ini disimpan secara aman sebagai acuan baku pada:  
-📂 **[`docs/01-prd-and-specs/PRODUCTION_AUTHORIZATION_INCIDENT_HANDLING_BLUEPRINT.md`](file:///c:/buildingprocess25/sparta-sentinel/docs/01-prd-and-specs/PRODUCTION_AUTHORIZATION_INCIDENT_HANDLING_BLUEPRINT.md)**
+📂 **[`docs/01-prd-and-specs/PRODUCTION_AUTHORIZATION_INCIDENT_HANDLING_BLUEPRINT.md`](file:///c:/buildingprocess25/sparta-siaga/docs/01-prd-and-specs/PRODUCTION_AUTHORIZATION_INCIDENT_HANDLING_BLUEPRINT.md)**
 
 Dengan adanya cetak biru ini, kode di lingkungan pengembangan tetap leluasa untuk uji coba, dan tim teknis memiliki SOP tertulis yang terstruktur rapi saat integrasi ke server pusat Alfamart.

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { fetchDisasterFeed } from '@/lib/disaster-service';
 import { calculateHaversineDistance, calculateBmkgImpactRadius } from '@/lib/haversine';
 import { getDbPool } from '@/lib/db';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
 import { 
-  hasRecentNotification, 
+  hasEventAlreadyBeenProcessed,
+  isNotificationCooldownActive,
   recordNotificationLog, 
   generateEmergencyEmailHtml 
 } from '@/lib/notification-service';
@@ -13,7 +15,49 @@ import { AffectedStoreSummary, NotificationLog } from '@/types/notification';
 
 export const dynamic = 'force-dynamic';
 
+let isWorkerRunning = false;
+let lastWorkerRunTime = 0;
+const WORKER_COOLDOWN_MS = 30000;
+
+function validateInternalWorkerSecret(request: Request, secret: string): boolean {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return false;
+  
+  const token = authHeader.substring(7);
+  if (token.length !== secret.length) return false;
+  
+  try {
+    return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  const secret = process.env.SPARTA_INTERNAL_WORKER_SECRET;
+  if (!secret) {
+    return NextResponse.json({ success: false, error: 'Server misconfiguration' }, { status: 503 });
+  }
+
+  if (!validateInternalWorkerSecret(request, secret)) {
+    console.warn('[SPARTA SIAGA][Worker] unauthorized request blocked');
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const now = Date.now();
+  if (now - lastWorkerRunTime < WORKER_COOLDOWN_MS) {
+    console.warn('[SPARTA SIAGA][Worker] request rate-limited');
+    return NextResponse.json({ success: false, error: 'Rate limited' }, { status: 429, headers: { 'Retry-After': '30' } });
+  }
+
+  if (isWorkerRunning) {
+    console.warn('[SPARTA SIAGA][Worker] already running');
+    return NextResponse.json({ success: false, error: 'Worker already running' }, { status: 409 });
+  }
+
+  isWorkerRunning = true;
+  console.log('[SPARTA SIAGA][Worker] manual worker started');
+
   try {
     let forceSimulation = false;
     try {
@@ -54,10 +98,13 @@ export async function POST(request: Request) {
     }
     const dispatchedLogs: NotificationLog[] = [];
 
+    const isEligibleForAlert = forceSimulation || (disasterFeed.dataFreshness !== 'stale' && disasterFeed.dataFreshness !== 'unavailable');
+
     // 3. Evaluate each earthquake
-    for (const eq of earthquakes) {
-      // Calculate scientific radius
-      const { dangerRadiusKm, warningRadiusKm } = calculateBmkgImpactRadius(eq.magnitude, eq.depthKm);
+    if (isEligibleForAlert) {
+      for (const eq of earthquakes) {
+        // Calculate scientific radius
+        const { dangerRadiusKm, warningRadiusKm } = calculateBmkgImpactRadius(eq.magnitude, eq.depthKm);
 
       // Collect affected stores
       const affectedByBranch = new Map<string, AffectedStoreSummary[]>();
@@ -89,14 +136,17 @@ export async function POST(request: Request) {
         
         // Dispatch alert if there are stores in danger, or high magnitude, or forced simulation
         if (dangerStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0) || forceSimulation) {
-          const isSent = !forceSimulation && await hasRecentNotification(eq.id, 'earthquake', branch);
+          const isProcessed = !forceSimulation && await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
+          const inCooldown = !forceSimulation && await isNotificationCooldownActive('earthquake', branch);
 
-          if (!isSent) {
+          if (!isProcessed && !inCooldown) {
             // Sort stores by distance
             branchStores.sort((a, b) => a.distance_km - b.distance_km);
 
             const ticketNumber = `ESC-${branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-            const disasterTitle = `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
+            const disasterTitle = forceSimulation
+              ? `[SIMULATION] ⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`
+              : `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
             const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Radius bahaya terhitung ${dangerRadiusKm} km. ${dangerStores.length} gerai toko cabang Anda berada di zona bahaya guncangan.`;
 
             const instructions = [
@@ -118,7 +168,7 @@ export async function POST(request: Request) {
             });
 
             const log = await recordNotificationLog({
-              disasterId: eq.id,
+              disasterId: forceSimulation ? `sim_eq_${eq.id}_${Date.now()}` : eq.id,
               disasterType: 'earthquake',
               channel: 'email_and_pwa',
               branch,
@@ -135,6 +185,7 @@ export async function POST(request: Request) {
         }
       }
     }
+    } // Close if (isEligibleForAlert)
 
     // 4. Evaluate Heavy Rain / Flood Potential Simulation if requested or if rain exists
     if (forceSimulation && dispatchedLogs.length === 0) {
@@ -156,8 +207,8 @@ export async function POST(request: Request) {
         channel: 'pwa_only',
         branch: sampleBranch,
         recipientContact: `pwa://dc-${sampleBranch.toLowerCase()}`,
-        title: `🌧️ SIAGA HUJAN EKSTREM & BANJIR: Cabang ${sampleBranch}`,
-        message: `Radar satelit cuaca mendeteksi presipitasi hujan ekstrem (intensitas > 25 mm/jam) di atas gerai cabang ${sampleBranch}. Segera aktifkan SOP peninggian barang dagang dan pasang tanggul banjir gerai.`,
+        title: `[SIMULATION] 🌧️ SIAGA HUJAN EKSTREM & BANJIR: Cabang ${sampleBranch}`,
+        message: `Model cuaca menunjukkan indikasi presipitasi hujan ekstrem (intensitas > 25 mm/jam) di atas gerai cabang ${sampleBranch}. Segera aktifkan SOP peninggian barang dagang dan pasang tanggul banjir gerai.`,
         affectedStores: sampleStores,
       });
       dispatchedLogs.push(floodLog);
@@ -178,7 +229,10 @@ export async function POST(request: Request) {
     console.error('[Notification Worker Error]:', error);
     return NextResponse.json({
       success: false,
-      error: error.message || 'Worker execution failed'
+      error: 'Worker execution failed' // Mask error details for security
     }, { status: 500 });
+  } finally {
+    lastWorkerRunTime = Date.now();
+    isWorkerRunning = false;
   }
 }

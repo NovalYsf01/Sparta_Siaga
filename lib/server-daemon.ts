@@ -2,7 +2,8 @@ import { getDbPool } from './db';
 import { fetchDisasterFeed } from './disaster-service';
 import { calculateHaversineDistance, calculateBmkgImpactRadius } from './haversine';
 import { 
-  hasRecentNotification, 
+  hasEventAlreadyBeenProcessed,
+  isNotificationCooldownActive,
   recordNotificationLog, 
   generateEmergencyEmailHtml 
 } from './notification-service';
@@ -94,7 +95,10 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
     let dispatchedRainAlerts = 0;
 
     // 3. Evaluate Earthquakes against 21,550 stores
-    if (stores.length > 0 && earthquakes.length > 0) {
+    // Guard: Do not create new operational alerts if data is stale or unavailable
+    const isEligibleForAlert = disasterFeed.dataFreshness !== 'stale' && disasterFeed.dataFreshness !== 'unavailable';
+
+    if (isEligibleForAlert && stores.length > 0 && earthquakes.length > 0) {
       for (const eq of earthquakes) {
         const { dangerRadiusKm, warningRadiusKm } = calculateBmkgImpactRadius(eq.magnitude, eq.depthKm);
 
@@ -126,9 +130,10 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
           const dangerStores = branchStores.filter(s => s.status === 'danger');
 
           if (dangerStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0)) {
-            const isAlreadySent = await hasRecentNotification(eq.id, 'earthquake', branch);
+            const isProcessed = await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
+            const inCooldown = await isNotificationCooldownActive('earthquake', branch);
 
-            if (!isAlreadySent) {
+            if (!isProcessed && !inCooldown) {
               branchStores.sort((a, b) => a.distance_km - b.distance_km);
 
               const ticketNumber = `ESC-${branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -201,9 +206,10 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
             if (precipitation >= 20.0 || weatherCode >= 95) {
               const todayStr = new Date().toISOString().slice(0, 10);
               const floodEventId = `flood_${b.cabang.toLowerCase()}_${todayStr}`;
-              const isAlreadyAlerted = await hasRecentNotification(floodEventId, 'heavy_rain', b.cabang);
+              const isProcessed = await hasEventAlreadyBeenProcessed(floodEventId, 'heavy_rain', b.cabang);
+              const inCooldown = await isNotificationCooldownActive('heavy_rain', b.cabang);
 
-              if (!isAlreadyAlerted) {
+              if (!isProcessed && !inCooldown) {
                 // Find stores in this branch
                 const branchStores = stores.filter(s => s.cabang === b.cabang).slice(0, 10).map(s => ({
                   kode_toko: s.kode_toko,
@@ -217,7 +223,7 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
 
                 const ticketNumber = `FL-${b.cabang.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
                 const rainTitle = `🌧️ SIAGA HUJAN EKSTREM & BANJIR: Cabang ${b.cabang}`;
-                const rainMessage = `Radar satelit cuaca mendeteksi curah hujan lebat (${precipitation.toFixed(1)} mm/jam) di sekitar gerai cabang ${b.cabang}. Segera aktifkan SOP peninggian barang dagang ke atas pallet dan pasang tanggul air gerai.`;
+                const rainMessage = `Model cuaca menunjukkan indikasi curah hujan lebat (${precipitation.toFixed(1)} mm/jam) di sekitar gerai cabang ${b.cabang}. Segera aktifkan SOP peninggian barang dagang ke atas pallet dan pasang tanggul air gerai.`;
 
                 await recordNotificationLog({
                   disasterId: floodEventId,

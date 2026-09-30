@@ -1,6 +1,6 @@
 # PRD & DDD Lengkap: Modul Pelaporan Bencana & Manajemen Insiden Terpadu
 
-Dokumen ini merupakan *Product Requirements Document* (PRD) dan *Detailed Design Document* (DDD) komprehensif untuk Sistem Pelaporan Darurat Sparta Sentinel. Dokumen ini menjadi *Source of Truth* (sumber acuan utama) untuk fase pengembangan (coding).
+Dokumen ini merupakan *Product Requirements Document* (PRD) dan *Detailed Design Document* (DDD) komprehensif untuk Sistem Pelaporan Darurat SPARTA Siaga. Dokumen ini menjadi *Source of Truth* (sumber acuan utama) untuk fase pengembangan (coding).
 
 ---
 

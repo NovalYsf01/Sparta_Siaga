@@ -1,7 +1,7 @@
-# 🏢 Dokumen Proses Bisnis & Logika Sistem: SPARTA Sentinel
+# 🏢 Dokumen Proses Bisnis & Logika Sistem: SPARTA Siaga
 **Dokumen Acuan Alur Bisnis (Single Source of Truth) untuk Sistem Pemantauan Cabang & Mitigasi Bencana**
 
-- **Modul:** SPARTA Sentinel (`sparta-sentinel`)
+- **Modul:** SPARTA Siaga (`sparta-siaga`)
 - **Organisasi:** Alfamart (PT Sumber Alfaria Trijaya Tbk) - SPARTA Ecosystem
 - **Versi Dokumen:** 1.2.0 (Stabil & Terverifikasi dengan Data Riil 21.550 Toko)
 - **Status:** Active / In-Production Operation Reference
@@ -16,13 +16,13 @@ Alfamart mengoperasikan lebih dari 21.550 gerai toko fisik di 28 kantor cabang d
 - Tsunami di wilayah pesisir
 - Cuaca ekstrem, curah hujan lebat, dan banjir lokal
 
-### 1.1 Masalah dalam Proses Bisnis Konvensional (Sebelum SPARTA Sentinel)
+### 1.1 Masalah dalam Proses Bisnis Konvensional (Sebelum SPARTA Siaga)
 1. **Keterlambatan Deteksi:** Manajemen pusat dan cabang sering terlambat mengetahui toko mana saja yang terdampak gempa bumi karena laporan lapangan memerlukan waktu berjam-jam secara berjenjang.
 2. **Ketiadaan Data Spasial Real-Time:** Tidak ada peta terpadu yang memetakan korelasi jarak antara koordinat episentrum gempa dengan koordinat fisik seluruh 21.550 toko.
 3. **Kelemahan Penentuan Radius Manual:** Penggunaan slider radius manual tidak memiliki landasan ilmiah dan dapat menghasilkan data palsu (*false positive* / *false negative*) karena guncangan gempa bergantung pada magnitudo dan kedalaman hiposentrum.
 4. **Pelanggaran Kode Etik Privasi Karyawan (UU PDP):** Menghubungi langsung nomor ponsel pribadi kasir/kru toko saat jam panik bencana melanggar kode etik perusahaan dan ketentuan UU Perlindungan Data Pribadi (UU PDP No. 27/2022).
 
-### 1.2 Tujuan Bisnis SPARTA Sentinel v1.2.0
+### 1.2 Tujuan Bisnis SPARTA Siaga v1.2.0
 Menyediakan sistem intelijen spasial berbasis web terintegrasi yang:
 - Mengidentifikasi secara otomatis toko-toko yang berada di zona bahaya guncangan dalam hitungan detik setelah BMKG/USGS merilis parameter gempa.
 - Menghitung zona dampak bahaya dan waspada secara **ilmiah dan otomatis** mengikuti hukum atenuasi seismik BMKG (berdasarkan energi magnitudo $M$ dan redaman kedalaman hiposentrum).
@@ -31,13 +31,13 @@ Menyediakan sistem intelijen spasial berbasis web terintegrasi yang:
 - Menjaga kenyamanan visual dan performa peta tetap 60 FPS pada 21.550 toko dengan **Mode Fokus Krisis Otomatis** sebagai tampilan bawaan (*default view*).
 
 > 💡 **KESIMPULAN BAGIAN 1:**  
-> SPARTA Sentinel v1.2.0 hadir sebagai pusat intelijen mitigasi bencana berskala enterprise yang mengawasi 21.550 toko secara ilmiah berbasis formula atenuasi BMKG, serta menjamin kepatuhan UU PDP dengan mengalihkan jalur eskalasi ke Duty Officer DC Cabang resmi.
+> SPARTA Siaga v1.2.0 hadir sebagai pusat intelijen mitigasi bencana berskala enterprise yang mengawasi 21.550 toko secara ilmiah berbasis formula atenuasi BMKG, serta menjamin kepatuhan UU PDP dengan mengalihkan jalur eskalasi ke Duty Officer DC Cabang resmi.
 
 ---
 
 ## 🔄 2. Peta Alur Bisnis End-to-End (End-to-End Workflow)
 
-Berikut diagram alur proses bisnis operasional SPARTA Sentinel:
+Berikut diagram alur proses bisnis operasional SPARTA Siaga:
 
 ```text
 ┌─────────────────────────────┐         ┌─────────────────────────────┐
@@ -169,7 +169,7 @@ Berikut diagram alur proses bisnis operasional SPARTA Sentinel:
 ---
 
 ## 📝 5. Kesimpulan Utama Dokumen
-Dokumen ini menetapkan standar baku operasional SPARTA Sentinel v1.2.0. Seluruh sistem kini beroperasi dengan data riil 21.550 toko, kalkulasi ilmiah otomatis BMKG, kepatuhan etika privasi UU PDP, dan performa tinggi 60 FPS.
+Dokumen ini menetapkan standar baku operasional SPARTA Siaga v1.2.0. Seluruh sistem kini beroperasi dengan data riil 21.550 toko, kalkulasi ilmiah otomatis BMKG, kepatuhan etika privasi UU PDP, dan performa tinggi 60 FPS.
 
 > 💡 **KESIMPULAN BAGIAN 5:**  
-> SPARTA Sentinel telah mencapai tingkat kesiapan produksi (*production-ready*) dengan pengujian fungsional dan visual 100% tervalidasi.
+> SPARTA Siaga telah mencapai tingkat kesiapan produksi (*production-ready*) dengan pengujian fungsional dan visual 100% tervalidasi.

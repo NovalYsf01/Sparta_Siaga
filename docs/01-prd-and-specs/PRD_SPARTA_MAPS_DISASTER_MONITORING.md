@@ -1,4 +1,4 @@
-# PRD & BLUEPRINT: SPARTA SENTINEL (DISASTER & BRANCH MAPS MONITORING SYSTEM)
+# PRD & BLUEPRINT: SPARTA SIAGA (DISASTER & BRANCH MAPS MONITORING SYSTEM)
 
 **Status:** Draft / Blueprint untuk Diskusi  
 **Modul:** SPARTA Disaster & Branch Monitoring (Tentative ID: `sparta-maps` / `sparta-disaster`)  
@@ -184,11 +184,11 @@ sparta-maps/
 Berdasarkan diskusi dan kesepakatan bersama:
 
 ### 1. Nama & Identitas Modul
-- **Nama Resmi:** **SPARTA Sentinel**
-- **Short Name:** `Sentinel`
-- **Module ID:** `sentinel`
-- **Nama Folder:** `sparta-sentinel`
-- **Makna & Filosofi:** Dalam tradisi Sparta, *Sentinel* adalah prajurit pengawal benteng yang senantiasa mengawasi potensi bahaya dari kejauhan (bencana, cuaca buruk) dan melindungi seluruh aset wilayah (cabang dan toko).
+- **Nama Resmi:** **SPARTA Siaga**
+- **Short Name:** `Siaga`
+- **Module ID:** `siaga`
+- **Nama Folder:** `sparta-siaga`
+- **Makna & Filosofi:** SPARTA Siaga adalah modul kesiapsiagaan darurat dan pemantauan bencana yang senantiasa mengawasi potensi bahaya (gempa bumi, banjir, cuaca ekstrem) serta melindungi seluruh aset operasional retail (cabang dan toko).
 - **Aksen Warna Tema:**
   - Status Normal / Safe: `#10b981` (Emerald)
   - Status Waspada / Warning: `#f59e0b` (Amber)

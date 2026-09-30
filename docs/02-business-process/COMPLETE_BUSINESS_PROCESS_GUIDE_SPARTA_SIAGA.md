@@ -1,7 +1,7 @@
-# 🏢 Panduan Lengkap Proses Bisnis & Alur Operasional: SPARTA Sentinel
+# 🏢 Panduan Lengkap Proses Bisnis & Alur Operasional: SPARTA Siaga
 **Dokumen Referensi Arsitektur Bisnis, Logika Sistem, Detail Perhitungan Matematis, dan SOP Tanggap Bencana**
 
-- **Modul:** SPARTA Sentinel (`sparta-sentinel`)
+- **Modul:** SPARTA Siaga (`sparta-siaga`)
 - **Organisasi:** Alfamart (PT Sumber Alfaria Trijaya Tbk) - SPARTA Ecosystem
 - **Cakupan Aset:** 21.550 Gerai Toko Fisik & 28 Kantor Cabang / Distribution Center (DC)
 - **Status Operasional:** Active / Production Reference
@@ -33,8 +33,8 @@ Alfamart mengoperasikan **21.550 gerai toko fisik** yang disuplai oleh **28 Kant
 - **Tsunami Pesisir:** Gelombang laut destruktif akibat gempa dangkal dasar laut.
 - **Cuaca Ekstrem & Banjir:** Curah hujan lebat mendadak yang merendam inventori stok dagang di lantai dasar toko dan memutus rute truk pasokan DC.
 
-### 1.2 Nilai Bisnis & Solusi SPARTA Sentinel
-SPARTA Sentinel bertindak sebagai **Pusat Intelijen Spasial & Tanggap Bencana Otomatis** yang:
+### 1.2 Nilai Bisnis & Solusi SPARTA Siaga
+SPARTA Siaga bertindak sebagai **Pusat Intelijen Spasial & Tanggap Bencana Otomatis** yang:
 - Mengidentifikasi toko terdampak dalam hitungan detik setelah BMKG merilis parameter gempa.
 - Menggunakan kalkulasi ilmiah atenuasi BMKG (berdasarkan magnitudo dan kedalaman hiposentrum) menggantikan perkiraan manual.
 - Mengoperasikan *background worker* otomatis untuk mengeskalasi peringatan darurat ke Duty Officer DC Cabang.
@@ -101,7 +101,7 @@ Sistem mengadopsi siklus penarikan data berkala (*continuous automated polling*)
 
 ## 4. Detail Rumus Perhitungan & Contoh Kasus Nyata
 
-Sistem SPARTA Sentinel menerapkan kalkulasi matematis presisi tanpa tebakan manual. Berikut rincian rumus lengkap beserta contoh langkah demi langkah:
+Sistem SPARTA Siaga menerapkan kalkulasi matematis presisi tanpa tebakan manual. Berikut rincian rumus lengkap beserta contoh langkah demi langkah:
 
 ### 4.1 Perhitungan Jarak Spasial (Haversine Formula) & Contoh
 
@@ -313,7 +313,7 @@ $$\text{Duplikat} = \begin{cases}
 ## 7. Standard Operating Procedure (SOP) Langkah Demi Langkah
 
 ### 🟢 FASE 0: Periode Normal (Pemantauan Siaga 24/7)
-1. Dashboard SPARTA Sentinel beroperasi di Command Center dalam **Mode Fokus Krisis**.
+1. Dashboard SPARTA Siaga beroperasi di Command Center dalam **Mode Fokus Krisis**.
 2. Background worker memeriksa feed BMKG dan radar cuaca setiap 60 detik.
 3. Seluruh 21.550 toko terpantau aman (0 gerai di zona bahaya).
 

@@ -36,11 +36,11 @@
 | [x] | **TC-WEA-01** | Cuaca | Drawer Informasi Toko | Klik toko memunculkan drawer info toko & tombol kontak PIC | **Pass** |
 | [x] | **TC-WEA-02** | Cuaca | Prakiraan Cuaca 7 Hari | Menampilkan suhu, hujan, dan cuaca dari Open-Meteo | **Pass** |
 | [x] | **TC-WEA-03** | Cuaca | Loading Skeleton | Tampil skeleton loader rapi saat data cuaca sedang dimuat | **Pass** |
-| [x] | **TC-SSO-01** | Autentikasi | Launching dari Portal | Klik kartu Sentinel di `login-sparta` mengarah ke modul | **Pass** |
+| [x] | **TC-SSO-01** | Autentikasi | Launching dari Portal | Klik kartu Siaga di `login-sparta` mengarah ke modul | **Pass** |
 | [x] | **TC-SSO-02** | Autentikasi | Pertukaran Token SSO | Token ditukar ke SPARTA API & menghasilkan session login | **Pass** |
 | [x] | **TC-SSO-03** | Autentikasi | Token Expired Handling | Token usang (>2 menit) menampilkan pesan error ramah | **Pass** |
 | [x] | **TC-SSO-04** | Autentikasi | Middleware Route Guard | Akses langsung tanpa login otomatis di-redirect ke portal | **Pass** |
-| [x] | **TC-SSO-05** | Autentikasi | Logout Terpadu | Logout di Sentinel membersihkan sesi & kembali ke portal | **Pass** |
+| [x] | **TC-SSO-05** | Autentikasi | Logout Terpadu | Logout di Siaga membersihkan sesi & kembali ke portal | **Pass** |
 | [x] | **TC-PERF-01** | Performa | Loading Awal Cepat | Tampilan peta siap interaksi dalam waktu **< 2 detik** | **Pass** |
 | [x] | **TC-PERF-02** | Performa | Kelancaran Navigasi Peta | Pan & zoom peta dengan 1,000+ marker stabil di **$\ge 55$ FPS** | **Pass** |
 | [x] | **TC-PERF-03** | Performa | Uji Kebocoran Memori | Buka-tutup popup 30x tidak membuat browser lemot / bocor | **Pass** |
@@ -139,7 +139,7 @@ Berikut penjelasan detail langkah demi langkah untuk setiap poin kasus uji di at
 
 ### Kategori F: Autentikasi SSO SPARTA Portal
 * **TC-SSO-01 (Launching dari Portal):**
-  * *Langkah:* Login di `http://localhost:5173`, buka Module Launcher, lalu klik modul **Sentinel**.
+  * *Langkah:* Login di `http://localhost:5173`, buka Module Launcher, lalu klik modul **Siaga**.
   * *Verifikasi:* Browser otomatis membuka tab/redirect ke `http://localhost:3004/auth/sso/callback?token=...`.
 * **TC-SSO-02 (Pertukaran Token SSO):**
   * *Langkah:* Endpoint callback menerima parameter token dan menukarnya ke backend SPARTA (`http://localhost:10000/v1/sso/exchange`).
@@ -151,7 +151,7 @@ Berikut penjelasan detail langkah demi langkah untuk setiap poin kasus uji di at
   * *Langkah:* Buka `http://localhost:3004` langsung di tab baru (Incognito) tanpa login terlebih dahulu.
   * *Verifikasi:* Middleware mencegat akses dan mengarahkan pengguna ke halaman login portal utama.
 * **TC-SSO-05 (Logout Terpadu):**
-  * *Langkah:* Klik tombol Logout pada menu profil SPARTA Sentinel.
+  * *Langkah:* Klik tombol Logout pada menu profil SPARTA Siaga.
   * *Verifikasi:* Sesi login lokal dibersihkan dan pengguna diarahkan kembali ke portal `login-sparta`.
 
 ---
@@ -179,7 +179,7 @@ Berikut penjelasan detail langkah demi langkah untuk setiap poin kasus uji di at
 
 ## 4. Kriteria Kelulusan Rilis (Definition of Done / DoD)
 
-Modul **SPARTA Sentinel** dinyatakan lulus QA dan siap dirilis jika:
+Modul **SPARTA Siaga** dinyatakan lulus QA dan siap dirilis jika:
 1. [ ] Seluruh kasus uji pada **Tabel Ceklis** berstatus **Pass**.
 2. [ ] Tidak ada error console `Uncaught TypeError` atau layar putih saat membuka peta.
 3. [ ] Alur SSO dari portal utama `login-sparta` berfungsi dengan mulus.

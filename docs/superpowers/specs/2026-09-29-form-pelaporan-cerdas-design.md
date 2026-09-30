@@ -1,7 +1,7 @@
 # Spesifikasi Desain: Form Pelaporan Darurat Cerdas & Sistem Timeline
 
 ## 1. Pendahuluan
-Dokumen ini mendefinisikan desain teknis untuk perombakan sistem pelaporan darurat di Sparta Sentinel. Berdasarkan diskusi dengan mentor dan analisis alur grup WhatsApp, sistem harus beralih dari form statis menjadi sistem pelaporan dinamis (Smart Templates) berbasis Timeline (Thread-based updates) dengan identitas otomatis (Auto-Magic Identity).
+Dokumen ini mendefinisikan desain teknis untuk perombakan sistem pelaporan darurat di SPARTA Siaga. Berdasarkan diskusi dengan mentor dan analisis alur grup WhatsApp, sistem harus beralih dari form statis menjadi sistem pelaporan dinamis (Smart Templates) berbasis Timeline (Thread-based updates) dengan identitas otomatis (Auto-Magic Identity).
 
 ## 2. Arsitektur Komponen (UI)
 

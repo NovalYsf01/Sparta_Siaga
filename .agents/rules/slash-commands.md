@@ -1,6 +1,6 @@
 # Custom Slash Commands Execution Rule
 
-Rule ini berlaku untuk seluruh interaksi chat di workspace `sparta-sentinel`.
+Rule ini berlaku untuk seluruh interaksi chat di workspace `sparta-siaga`.
 
 ## Penanganan Perintah dengan Awalan Slash (`/`)
 

@@ -1,6 +1,36 @@
+export type DataFreshness = "live" | "fresh" | "stale" | "unavailable";
+
+export type InformationType =
+  | "official_alert"
+  | "official_event"
+  | "observation"
+  | "forecast"
+  | "field_report"
+  | "model";
+
+export type VerificationStatus =
+  | "unverified"
+  | "system_detected"
+  | "corroborated"
+  | "official"
+  | "official_external"
+  | "community_report"
+  | "field_confirmed";
+
+export interface SourceHealth {
+  source: string;
+  status: "healthy" | "degraded" | "offline";
+  lastSuccessAt?: string;
+  lastAttemptAt: string;
+  error?: string;
+  freshness: DataFreshness;
+}
+
 export interface Earthquake {
   id: string;
-  source: "BMKG" | "USGS";
+  source: string;
+  informationType?: InformationType;
+  verificationStatus?: VerificationStatus;
   title: string;
   magnitude: number;
   depth: string; // e.g. "10 km"
@@ -24,4 +54,6 @@ export interface DisasterFeedResponse {
   lastUpdated: string;
   totalActive: number;
   floodReports?: any[];
+  dataFreshness?: DataFreshness;
+  sourcesHealth?: SourceHealth[];
 }

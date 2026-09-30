@@ -1,6 +1,6 @@
-# FITUR INOVASI & PENGEMBANGAN LANJUTAN: SPARTA SENTINEL
+# FITUR INOVASI & PENGEMBANGAN LANJUTAN: SPARTA SIAGA
 
-Dokumen ini memuat detail spesifikasi fungsional, alur teknis, dan rancangan antarmuka (UI/UX) untuk fitur-fitur inovasi operasional pada **SPARTA Sentinel (Disaster & Branch Maps Monitoring System)**.
+Dokumen ini memuat detail spesifikasi fungsional, alur teknis, dan rancangan antarmuka (UI/UX) untuk fitur-fitur inovasi operasional pada **SPARTA SIAGA (Disaster & Branch Maps Monitoring System)**.
 
 ---
 
@@ -30,7 +30,7 @@ Menyediakan tombol **"Salin SitRep WhatsApp"** dan **"Unduh Tangkapan Peta (PNG)
 
 ### 1.4 Format Teks SitRep WhatsApp
 ```text
-🚨 *[SITREP DARURAT - SPARTA SENTINEL]*
+🚨 *[SITREP DARURAT - SPARTA SIAGA]*
 Laporan Situasi Bencana & Dampak Jaringan Toko
 
 📅 *Waktu Kejadian:* 23 September 2026, 16:42:15 WIB
@@ -67,13 +67,13 @@ Laporan Situasi Bencana & Dampak Jaringan Toko
 ℹ️ *Instruksi Tindak Lanjut:*
 Area Coordinator (AC) & Area Manager (AM) terkait diinstruksikan segera mengecek kondisi fisik bangunan, kelistrikan PLN/Genset, dan keselamatan personil toko.
 
-_Generated automatically by SPARTA Sentinel - Real-Time Store Disaster Monitoring_
+_Generated automatically by SPARTA SIAGA - Real-Time Store Disaster Monitoring_
 ```
 
 ### 1.5 Fitur Ekspor Gambar Peta (Map Snapshot)
 - Menggunakan library `html-to-image` / Canvas snapshot.
 - Mengambil tangkapan layar peta yang mencakup titik pusat gempa, lingkaran radius, dan seluruh pin toko di sekitarnya.
-- Diberi watermark otomatis: Logo SPARTA Sentinel, tanggal/jam kejadian, dan parameter gempa.
+- Diberi watermark otomatis: Logo SPARTA SIAGA, tanggal/jam kejadian, dan parameter gempa.
 
 ---
 

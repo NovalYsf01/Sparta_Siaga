@@ -1,8 +1,8 @@
-# SPARTA Sentinel: Refined Incident Management & GIS Architecture Implementation Plan
+# SPARTA Siaga: Refined Incident Management & GIS Architecture Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Overhaul SPARTA Sentinel to resolve all identified shortcomings: implement branch-level aggregation on zoom-out (titik percabang), compact & minimizable floating map controls, an interactive "Daftar 17 Gempa Terkini" modal, dynamic linking of live BMKG earthquakes into the active incident queue, and a completely cohesive responsive theme (desktop & mobile).
+**Goal:** Overhaul SPARTA Siaga to resolve all identified shortcomings: implement branch-level aggregation on zoom-out (titik percabang), compact & minimizable floating map controls, an interactive "Daftar 17 Gempa Terkini" modal, dynamic linking of live BMKG earthquakes into the active incident queue, and a completely cohesive responsive theme (desktop & mobile).
 
 **Architecture:** Next.js 16 App Router client-side multi-view hub. GIS enhanced with branch centroid clustering for zoom $\le 7$ and individual store rendering for zoom $\ge 8$. Earthquake alert ticker upgraded with a dedicated national earthquake list modal. UI polished with corporate slate navy theme matching the RetailCare reference.
 

@@ -153,23 +153,39 @@ export function generateEmergencyEmailHtml(params: {
 }
 
 /**
- * Check if a notification for this disaster and branch was already dispatched recently (e.g. within 2 hours)
+ * Check if a notification for this exact disaster and branch was already processed ever
  */
-export async function hasRecentNotification(disasterId: string, disasterType: DisasterNotificationType, branch: string): Promise<boolean> {
+export async function hasEventAlreadyBeenProcessed(disasterId: string, disasterType: DisasterNotificationType, branch: string): Promise<boolean> {
   try {
     const pool = getDbPool();
-    // 1. Exact match on disaster_id within 2 hours
-    // 2. Branch cooldown: within 15 minutes for the same branch and disaster type (prevents aftershock storm spam)
     const result = await pool.query(
       `SELECT id FROM notification_logs 
-       WHERE ((disaster_id = $1 AND disaster_type = $2 AND branch = $3 AND sent_at > NOW() - INTERVAL '2 hours')
-          OR (branch = $3 AND disaster_type = $2 AND sent_at > NOW() - INTERVAL '15 minutes'))
+       WHERE disaster_id = $1 AND disaster_type = $2 AND branch = $3
        LIMIT 1`,
       [disasterId, disasterType, branch]
     );
     return (result.rowCount ?? 0) > 0;
   } catch (error) {
-    console.warn('[Notification Service] Warning checking recent notification, fallback false:', error);
+    console.warn('[Notification Service] Warning checking processed event:', error);
+    return false;
+  }
+}
+
+/**
+ * Check if the branch is currently in a cooldown period for the given disaster type (15 minutes)
+ */
+export async function isNotificationCooldownActive(disasterType: DisasterNotificationType, branch: string): Promise<boolean> {
+  try {
+    const pool = getDbPool();
+    const result = await pool.query(
+      `SELECT id FROM notification_logs 
+       WHERE branch = $1 AND disaster_type = $2 AND sent_at > NOW() - INTERVAL '15 minutes'
+       LIMIT 1`,
+      [branch, disasterType]
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    console.warn('[Notification Service] Warning checking cooldown:', error);
     return false;
   }
 }

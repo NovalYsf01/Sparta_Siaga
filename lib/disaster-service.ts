@@ -1,10 +1,13 @@
-import { Earthquake, DisasterFeedResponse } from "@/types/disaster";
+import { Earthquake, DisasterFeedResponse, SourceHealth, DataFreshness } from "@/types/disaster";
 import { calculateBmkgImpactRadius } from "./haversine";
 
 // Cache in-memory for 1 minute
 let cachedDisasters: DisasterFeedResponse | null = null;
 let lastFetchTime = 0;
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds for BMKG auto
+
+let bmkgHealth: SourceHealth = { source: "BMKG", status: "offline", lastAttemptAt: new Date().toISOString(), freshness: "unavailable" };
+let usgsHealth: SourceHealth = { source: "USGS", status: "offline", lastAttemptAt: new Date().toISOString(), freshness: "unavailable" };
 
 export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<DisasterFeedResponse> {
   const now = Date.now();
@@ -15,11 +18,12 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
   const earthquakes: Earthquake[] = [];
   let latestBmkgEarthquake: Earthquake | undefined;
 
+  bmkgHealth.lastAttemptAt = new Date().toISOString();
   // 1. Fetch BMKG AutoGempa (Gempa M5.0+ terbaru / berpotensi tsunami)
   try {
     const bmkgAutoRes = await fetch("https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json", {
-      next: { revalidate: 60 },
-      headers: { "User-Agent": "SpartaSentinel/1.0" },
+      next: { revalidate: 30 },
+      headers: { "User-Agent": "SpartaSiaga/1.0" },
     });
 
     if (bmkgAutoRes.ok) {
@@ -37,6 +41,8 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
           latestBmkgEarthquake = {
             id: `bmkg-auto-${g.DateTime || Date.now()}`,
             source: "BMKG",
+            informationType: "official_event",
+            verificationStatus: "official",
             title: `M ${g.Magnitude} - ${g.Wilayah}`,
             magnitude: mag,
             depth: g.Kedalaman || "10 km",
@@ -55,18 +61,27 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
           };
 
           earthquakes.push(latestBmkgEarthquake);
+          bmkgHealth.status = "healthy";
+          bmkgHealth.lastSuccessAt = new Date().toISOString();
+          bmkgHealth.freshness = "live";
+          bmkgHealth.error = undefined;
         }
       }
+    } else {
+      bmkgHealth.status = "degraded";
+      bmkgHealth.error = "Non-200 response";
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("[Disaster Service] Error fetching BMKG autogempa:", err);
+    bmkgHealth.status = "degraded";
+    bmkgHealth.error = err.message || "Fetch failed";
   }
 
   // 2. Fetch BMKG 15 Gempa Terkini
   try {
     const bmkgListRes = await fetch("https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json", {
       next: { revalidate: 60 },
-      headers: { "User-Agent": "SpartaSentinel/1.0" },
+      headers: { "User-Agent": "SpartaSiaga/1.0" },
     });
 
     if (bmkgListRes.ok) {
@@ -92,6 +107,8 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
             earthquakes.push({
               id: `bmkg-list-${item.DateTime || Math.random()}`,
               source: "BMKG",
+              informationType: "official_event",
+              verificationStatus: "official",
               title: `M ${item.Magnitude} - ${item.Wilayah}`,
               magnitude: mag,
               depth: item.Kedalaman || "10 km",
@@ -114,13 +131,14 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
     console.error("[Disaster Service] Error fetching BMKG gempaterkini:", err);
   }
 
+  usgsHealth.lastAttemptAt = new Date().toISOString();
   // 3. Fetch USGS Real-time Feed (M4.5+ in the past day or recent significant events)
   try {
     const usgsRes = await fetch(
       "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson",
       {
         next: { revalidate: 60 },
-        headers: { "User-Agent": "SpartaSentinel/1.0" },
+        headers: { "User-Agent": "SpartaSiaga/1.0" },
       }
     );
 
@@ -146,6 +164,8 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
             earthquakes.push({
               id: `usgs-${feat.id}`,
               source: "USGS",
+              informationType: "official_event",
+              verificationStatus: "official_external",
               title: feat.properties.title || `M ${mag} - ${feat.properties.place}`,
               magnitude: mag,
               depth: `${depthKm} km`,
@@ -165,35 +185,44 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
           }
         }
       }
+      usgsHealth.status = "healthy";
+      usgsHealth.lastSuccessAt = new Date().toISOString();
+      usgsHealth.freshness = "live";
+      usgsHealth.error = undefined;
+    } else {
+      usgsHealth.status = "degraded";
+      usgsHealth.error = "Non-200 response";
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("[Disaster Service] Error fetching USGS feed:", err);
+    usgsHealth.status = "degraded";
+    usgsHealth.error = err.message || "Fetch failed";
   }
 
-  // Fallback default sample if offline/no internet
   if (earthquakes.length === 0) {
-    const fallbackMag = 5.3;
-    const fallbackDepth = 10;
-    const { dangerRadiusKm, warningRadiusKm } = calculateBmkgImpactRadius(fallbackMag, fallbackDepth);
-    const fallbackEarthquake: Earthquake = {
-      id: "bmkg-mock-fallback",
-      source: "BMKG",
-      title: "M 5.3 - 84 km BaratDaya BAYAH-BANTEN",
-      magnitude: fallbackMag,
-      depth: `${fallbackDepth} km`,
-      depthKm: fallbackDepth,
-      latitude: -7.56,
-      longitude: 105.98,
-      time: "Hari ini, 06:45 WIB",
-      timestamp: Date.now() - 3600 * 1000,
-      potensiTsunami: false,
-      potensiText: "Tidak berpotensi TSUNAMI",
-      isSignificant: true,
-      dangerRadiusKm,
-      warningRadiusKm,
-    };
-    latestBmkgEarthquake = fallbackEarthquake;
-    earthquakes.push(fallbackEarthquake);
+    // If we have cached data, use it as stale, otherwise unavailable
+    if (cachedDisasters && cachedDisasters.recentEarthquakes.length > 0) {
+      console.log("[Disaster Service] Providers degraded. Using stale cache as last-known-good.");
+      bmkgHealth.freshness = "stale";
+      usgsHealth.freshness = "stale";
+      return {
+        ...cachedDisasters,
+        dataFreshness: "stale",
+        sourcesHealth: [bmkgHealth, usgsHealth],
+      };
+    } else {
+      console.log("[Disaster Service] Providers offline. No cache available.");
+      bmkgHealth.freshness = "unavailable";
+      usgsHealth.freshness = "unavailable";
+      return {
+        latestBmkgEarthquake: undefined,
+        recentEarthquakes: [],
+        lastUpdated: new Date().toISOString(),
+        totalActive: 0,
+        dataFreshness: "unavailable",
+        sourcesHealth: [bmkgHealth, usgsHealth],
+      };
+    }
   }
 
   // Sort earthquakes by timestamp descending
@@ -204,6 +233,8 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
     recentEarthquakes: earthquakes,
     lastUpdated: new Date().toISOString(),
     totalActive: earthquakes.length,
+    dataFreshness: "fresh",
+    sourcesHealth: [bmkgHealth, usgsHealth],
   };
 
   cachedDisasters = response;

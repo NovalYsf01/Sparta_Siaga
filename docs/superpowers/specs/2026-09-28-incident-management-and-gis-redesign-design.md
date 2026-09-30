@@ -1,17 +1,17 @@
-# SPARTA Sentinel: Incident Management & GIS Redesign Specification
+# SPARTA Siaga: Incident Management & GIS Redesign Specification
 
 **Date:** 2026-09-28  
 **Status:** Approved by User  
-**Target Module:** SPARTA Sentinel (`sparta-sentinel`)  
-**Ecosystem:** SPARTA Retail Suite (`login-sparta`, `sparta-sentinel`, `sparta-maintenance`)
+**Target Module:** SPARTA Siaga (`sparta-siaga`)  
+**Ecosystem:** SPARTA Retail Suite (`login-sparta`, `sparta-siaga`, `sparta-maintenance`)
 
 ---
 
 ## 1. Executive Summary
 
-SPARTA Sentinel is the central disaster early warning, store safety monitoring, and incident response hub for SPARTA's retail store network (21,550+ stores across Indonesia).
+SPARTA Siaga is the central disaster early warning, store safety monitoring, and incident response hub for SPARTA's retail store network (21,550+ stores across Indonesia).
 
-This design specification upgrades SPARTA Sentinel from a standalone map viewer to an enterprise-grade **Incident Management & GIS Platform** inspired by the modern RetailCare architecture:
+This design specification upgrades SPARTA Siaga from a standalone map viewer to an enterprise-grade **Incident Management & GIS Platform** inspired by the modern RetailCare architecture:
 1. **Responsive Multi-View Hub**: A desktop command-center dashboard (sidebar navigation, KPI statistics, trend lines, category donut, active incidents table with progress tracking) and a mobile app-like interface (quick incident reporting, disaster category grid, progress stepper, bottom navigation bar).
 2. **End-to-End Disaster & Maintenance Workflow**: Automated BMKG earthquake detection $\rightarrow$ global safety broadcast to all stores $\rightarrow$ permission-gated verification by affected Store Managers / HO $\rightarrow$ standardized rapid damage reporting $\rightarrow$ automatic escalation and handoff to SPARTA Maintenance $\rightarrow$ status progression ($0\% \rightarrow 100\%$) $\rightarrow$ automatic archiving to History for audit and management review.
 3. **Interactive Multi-Layer GIS with Smart Clustering**: Unified map view featuring floating layer controls (All, Earthquake BMKG, Store Network, Weather Radar) and smart marker clustering combining performant circle clusters with prominent pulsating emergency pins for at-risk stores.
@@ -35,7 +35,7 @@ This design specification upgrades SPARTA Sentinel from a standalone map viewer 
 ### 3.1. Desktop Command Center Layout (Width $\ge 1024$px)
 
 - **Fixed Sidebar Navigation (Left, 260px)**
-  - Brand header: SPARTA Sentinel logo + subtitle *"Incident & Disaster Management"*.
+  - Brand header: SPARTA Siaga logo + subtitle *"Incident & Disaster Management"*.
   - Main Navigation:
     - 📊 **Dashboard**: Executive summary, analytics charts, active incidents table, next actions.
     - 🗺️ **Monitoring Peta**: Full-screen GIS hub with layer switches and cluster analysis.
@@ -72,7 +72,7 @@ This design specification upgrades SPARTA Sentinel from a standalone map viewer 
 
 ### 3.2. Mobile App-Like Layout (Width $< 1024$px)
 
-- **Compact App Header**: SPARTA Sentinel emblem, store badge, emergency notification bell.
+- **Compact App Header**: SPARTA Siaga emblem, store badge, emergency notification bell.
 - **Hero Action Card**: Prominent card with `+ Buat Laporan Baru` or `Konfirmasi Gempa Terkini`.
 - **Disaster Category Grid (2 rows x 3 columns)**:
   - Kemalingan, Kebakaran, Gempa Bumi, Banjir, Angin, Lainnya (soft pastel colored cards with icons).
@@ -107,7 +107,7 @@ This design specification upgrades SPARTA Sentinel from a standalone map viewer 
      - Operational status: Buka Normal vs Tutup Sementara.
 
 ### 4.3. Escalation to SPARTA Maintenance
-1. When damage is reported, SPARTA Sentinel automatically issues a maintenance ticket:
+1. When damage is reported, SPARTA Siaga automatically issues a maintenance ticket:
    - Ticket format: `#SPM-YYYYMMDD-XXXX` (e.g., `#SPM-20260901-0042`).
 2. Ticket is routed to SPARTA Maintenance work queue.
 3. Progress status transitions:
@@ -259,14 +259,14 @@ Bagian ini dirancang khusus sebagai materi argumen teknis dan bisnis dalam prese
 
 ### 7.3. Cuaca, Radar & Presipitasi (Weather & Cyclone Engine)
 
-Di SPARTA Sentinel, kebutuhan cuaca dibagi menjadi 2 aspek: **Visualisasi Hamparan Radar di Peta GIS** dan **Prakiraan Cuaca Numerik Per Koordinat Toko**.
+Di SPARTA Siaga, kebutuhan cuaca dibagi menjadi 2 aspek: **Visualisasi Hamparan Radar di Peta GIS** dan **Prakiraan Cuaca Numerik Per Koordinat Toko**.
 
 | Kriteria Evaluasi | **Open-Meteo API** *(Dipilih untuk Toko)* | **RainViewer Tile API** *(Dipilih untuk Peta)* | **OpenWeatherMap 2.0** | **Windy Web API** |
 |---|---|---|---|---|
 | **Fungsi Utama** | **Data Numerik Titik Koordinat**: Memberikan suhu, kecepatan angin, kelembapan, dan prakiraan hujan 7 hari per toko. | **Visual Layer Peta (GIS Tile)**: Menampilkan lapisan animasi visual radar Doppler awan hujan di atas peta. | Kombinasi data numerik dan tile berbayar. | Visual animasi angin interaktif via iframe khusus. |
 | **Format Output** | JSON respon berbasis koordinat latitude/longitude toko. | Standard XYZ Map Tile (`{z}/{x}/{y}.png`). | JSON & Map Tile terpisah. | WebGL Iframe / SDK embed. |
 | **Kebutuhan Lisensi & API Key** | **100% Bebas API Key & Gratis** hingga 10.000 panggilan/hari (Open Source berbasis model ECMWF/GFS). | **Gratis** untuk visualisasi radar publik. | Wajib API Key berbayar untuk akses data per jam & layer resolusi tinggi. | Wajib lisensi enterprise tahunan berbayar mahal. |
-| **Peran di SPARTA Sentinel** | **Widget Cuaca Detail Toko** (Memberi info angin kencang/hujan ekstrem di toko terpilih). | **Layer Cuaca Peta GIS** (Menampilkan hamparan awan hujan/badai di seluruh Indonesia). | Alternatif cadangan berbayar. | Terlalu berat dan mahal untuk kebutuhan operasional retail. |
+| **Peran di SPARTA Siaga** | **Widget Cuaca Detail Toko** (Memberi info angin kencang/hujan ekstrem di toko terpilih). | **Layer Cuaca Peta GIS** (Menampilkan hamparan awan hujan/badai di seluruh Indonesia). | Alternatif cadangan berbayar. | Terlalu berat dan mahal untuk kebutuhan operasional retail. |
 
 > **Argumen Presentasi (Sinergi Open-Meteo & RainViewer):**  
 > *"Kita menerapkan strategi komplementer terbaik tanpa biaya: **RainViewer** digunakan untuk menampilkan visual gumpalan awan hujan/badai secara real-time di layer peta GIS, sedangkan **Open-Meteo** digunakan untuk memberikan data cuaca spesifik per koordinat toko (suhu, kecepatan angin, dan prediksi hujan 7 hari) ketika toko diklik. Keduanya 100% open-source, bebas biaya lisensi, dan tidak membebani anggaran perusahaan."*
@@ -275,7 +275,7 @@ Di SPARTA Sentinel, kebutuhan cuaca dibagi menjadi 2 aspek: **Visualisasi Hampar
 
 ### 7.4. Deteksi Bencana Banjir & Genangan Air (Flood Monitoring Engine)
 
-Banjir adalah salah satu bencana paling sering melanda gerai retail di Indonesia. Di SPARTA Sentinel, pemantauan banjir dirancang memiliki 2 lapisan: **Deteksi Titik Genangan Aktual di Lapangan** dan **Peringatan Dini Prediksi Luapan Sungai**.
+Banjir adalah salah satu bencana paling sering melanda gerai retail di Indonesia. Di SPARTA Siaga, pemantauan banjir dirancang memiliki 2 lapisan: **Deteksi Titik Genangan Aktual di Lapangan** dan **Peringatan Dini Prediksi Luapan Sungai**.
 
 | Kriteria Evaluasi | **Petabencana.id Open API** *(Dipilih untuk Titik Riil)* | **Open-Meteo Flood API** *(Dipilih untuk Prediksi)* | **Pantau Banjir BPBD DKI Jakarta** | **GDACS Global Flood Feed (PBB)** |
 |---|---|---|---|---|
@@ -300,7 +300,7 @@ Banjir adalah salah satu bencana paling sering melanda gerai retail di Indonesia
 | **Biaya Berlangganan (TCO)** | **Rp 0 biaya tambahan**, memaksimalkan ekosistem SPARTA Building & Maintenance yang sudah ada. | Biaya lisensi per-agen (per user seat per bulan). |
 
 > **Argumen Presentasi (Mengapa Native SPARTA Ecosystem?):**  
-> *"Menghubungkan langsung Sparta Sentinel dengan Sparta Maintenance melalui arsitektur SSO bersama menjamin respon darurat dalam hitungan detik, pengalaman terpadu tanpa login ganda bagi Store Manager, kerahasiaan data internal toko tetap aman, dan menghemat biaya berlangganan software pihak ketiga."*
+> *"Menghubungkan langsung SPARTA Siaga dengan Sparta Maintenance melalui arsitektur SSO bersama menjamin respon darurat dalam hitungan detik, pengalaman terpadu tanpa login ganda bagi Store Manager, kerahasiaan data internal toko tetap aman, dan menghemat biaya berlangganan software pihak ketiga."*
 
 ---
 

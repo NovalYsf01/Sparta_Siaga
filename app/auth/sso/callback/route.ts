@@ -17,23 +17,23 @@ export async function GET(request: Request) {
     const exchangeRes = await fetch(`${spartaApiUrl}/v1/sso/exchange`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moduleId: "sentinel", launchToken: token }),
+      body: JSON.stringify({ moduleId: "siaga", launchToken: token }),
     });
 
     const exchangeBody = await exchangeRes.json();
 
     if (!exchangeRes.ok) {
-      console.error("[Sentinel SSO] Token exchange failed:", exchangeRes.status, exchangeBody);
+      console.error("[Sparta Siaga SSO] Token exchange failed:", exchangeRes.status, exchangeBody);
       return NextResponse.redirect(new URL("/login?error=sso_exchange_failed", baseUrl));
     }
 
     const user = exchangeBody?.data?.user;
     const sessionToken = exchangeBody?.data?.sessionToken || token;
 
-    console.log("[Sentinel SSO] Exchange success for user:", user?.email);
+    console.log("[Sparta Siaga SSO] Exchange success for user:", user?.email);
 
     const response = NextResponse.redirect(new URL("/", baseUrl));
-    response.cookies.set("sentinel_session", sessionToken, {
+    response.cookies.set("siaga_session", sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -43,11 +43,11 @@ export async function GET(request: Request) {
 
     return response;
   } catch (error) {
-    console.error("[Sentinel SSO] Error communicating with SPARTA API:", error);
+    console.error("[Sparta Siaga SSO] Error communicating with SPARTA API:", error);
     // If local dev SPARTA API is temporarily offline, allow local dev fallback
     if (process.env.NODE_ENV !== "production") {
       const response = NextResponse.redirect(new URL("/", baseUrl));
-      response.cookies.set("sentinel_session", `dev-session-${Date.now()}`, {
+      response.cookies.set("siaga_session", `dev-session-${Date.now()}`, {
         httpOnly: true,
         sameSite: "lax",
         maxAge: 8 * 60 * 60,

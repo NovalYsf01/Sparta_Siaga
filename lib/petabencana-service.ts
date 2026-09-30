@@ -1,3 +1,5 @@
+import { SourceHealth } from "@/types/disaster";
+
 export interface PetabencanaReport {
   id: string;
   lat: number;
@@ -8,7 +10,13 @@ export interface PetabencanaReport {
   timestamp: string;
 }
 
-export async function fetchPetabencanaReports(): Promise<PetabencanaReport[]> {
+export interface PetabencanaResult {
+  reports: PetabencanaReport[];
+  health: SourceHealth;
+}
+
+export async function fetchPetabencanaReports(): Promise<PetabencanaResult> {
+  const now = new Date().toISOString();
   try {
     // We'll use a mocked fallback since Petabencana API structure might be complex
     // Or we can try to fetch from their public API:
@@ -60,10 +68,28 @@ export async function fetchPetabencanaReports(): Promise<PetabencanaReport[]> {
       }
     }
     
-    return reports;
-  } catch (error) {
+    return {
+      reports,
+      health: {
+        source: "PetaBencana",
+        status: "healthy",
+        freshness: "live",
+        lastAttemptAt: now,
+        lastSuccessAt: now,
+      },
+    };
+  } catch (error: any) {
     console.error("Petabencana fetch failed", error);
-    // Return empty array on failure instead of mock data so it's strictly real data
-    return [];
+    // Return empty array on failure but distinctly mark it as offline/unavailable
+    return {
+      reports: [],
+      health: {
+        source: "PetaBencana",
+        status: "offline",
+        freshness: "unavailable",
+        lastAttemptAt: now,
+        error: error.message || "Fetch failed",
+      },
+    };
   }
 }
