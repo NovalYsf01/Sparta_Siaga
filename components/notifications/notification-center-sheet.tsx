@@ -135,35 +135,14 @@ export function NotificationCenterSheet({
     }
   }, [isOpen, onMarkAllAsRead]);
 
-  const handleRunWorkerNow = async (forceSim = false) => {
+  const handleRefreshData = async () => {
     setRunningWorker(true);
     setLastWorkerMessage(null);
     try {
-      const res = await fetch("/api/notifications/worker", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ forceSimulation: forceSim }),
-      });
-      const data = await res.json();
-      setLastWorkerMessage(data.message || "Evaluasi worker selesai.");
-      
-      // Trigger pop-up for any dispatched notifications
-      if (data.notifications && data.notifications.length > 0) {
-        data.notifications.forEach((n: any) => {
-          triggerDesktopPopup({
-            title: n.title,
-            body: n.message,
-            disasterType: n.disaster_type,
-            ticketNumber: n.ticket_number,
-            branch: n.branch,
-          });
-        });
-      }
-
       await fetchLogs();
-      if (onWorkerDispatched) onWorkerDispatched();
+      setLastWorkerMessage("Data notifikasi berhasil diperbarui.");
     } catch (err) {
-      setLastWorkerMessage("Gagal mengeksekusi worker.");
+      setLastWorkerMessage("Gagal memperbarui notifikasi.");
     } finally {
       setRunningWorker(false);
     }
@@ -181,18 +160,14 @@ export function NotificationCenterSheet({
     return true;
   });
 
-  // Derived status syncs notifications with actual incidents
   const getDerivedStatus = (log: NotificationLog) => {
-    // Basic heuristics: match by branch
-    const related = activeIncidents.filter((inc) => inc.branch === log.branch);
-    if (related.length === 0) return log.status;
-
-    // Check if ALL related incidents in this branch are fully resolved/archived
-    const allResolved = related.every((inc) => inc.status === "resolved" || inc.status === "archived");
-    if (allResolved) return "resolved";
-
-    // If there is ANY active incident (verifying, investigating, in_maintenance), it's acknowledged
-    return "acknowledged";
+    // P0: Notification = Pure Information.
+    // Do NOT mix IncidentRecord.status into notification status.
+    const lastRead = typeof window !== "undefined" ? localStorage.getItem("sparta_last_read_at") : null;
+    const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
+    const sentTime = new Date(log.sent_at).getTime();
+    
+    return sentTime <= lastReadTime ? "read" : "unread";
   };
 
   const eqCount = logs.filter((l) => l.disaster_type === "earthquake").length;
@@ -200,12 +175,21 @@ export function NotificationCenterSheet({
 
   return (
     <div
-      className={`fixed inset-y-0 right-0 w-full sm:w-[540px] md:w-[620px] border-l z-[700] shadow-2xl flex flex-col backdrop-blur-2xl animate-in slide-in-from-right duration-300 transition-colors ${
+      className={`fixed z-[700] flex flex-col shadow-2xl transition-all duration-300 ease-in-out animate-in fade-in ${
         isDark
-          ? "bg-slate-900/98 border-slate-800 text-white"
-          : "bg-white/98 border-slate-200 text-slate-900 shadow-2xl"
-      }`}
+          ? "bg-slate-900 border-slate-800 text-white"
+          : "bg-white border-slate-200 text-slate-900 shadow-2xl"
+      }
+      /* Mobile: bottom sheet style */
+      inset-x-0 bottom-0 h-[85vh] rounded-t-2xl border-t sm:border
+      /* Desktop: popover style */
+      sm:top-20 sm:right-6 sm:bottom-auto sm:left-auto sm:h-auto sm:max-h-[80vh] sm:w-[420px] sm:rounded-2xl sm:slide-in-from-top-4 slide-in-from-bottom-8 sm:slide-in-from-bottom-0`}
     >
+      {/* Mobile drag handle */}
+      <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0 bg-transparent">
+        <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+      </div>
+
       {/* Header */}
       <div
         className={`p-4 border-b flex items-start justify-between gap-3 ${
@@ -327,26 +311,25 @@ export function NotificationCenterSheet({
       >
         <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <button
-            onClick={() => handleRunWorkerNow(false)}
+            onClick={() => handleRefreshData()}
             disabled={runningWorker}
             className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-sm shadow-blue-600/20 disabled:opacity-50"
-            title="Periksa data bencana terbaru dari BMKG dan sinkronkan dengan toko"
+            title="Perbarui data notifikasi"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${runningWorker ? "animate-spin" : ""}`} />
-            <span>Pindai Bencana Baru</span>
+            <span>Muat Ulang Data</span>
           </button>
 
           <button
-            onClick={() => handleRunWorkerNow(true)}
-            disabled={runningWorker}
-            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs border transition-colors disabled:opacity-50 ${
+            disabled={true}
+            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs border transition-colors disabled:opacity-50 cursor-not-allowed ${
               isDark
-                ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700/80"
-                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
+                ? "bg-slate-800 text-slate-500 border-slate-700/80"
+                : "bg-slate-100 text-slate-400 border-slate-300"
             }`}
-            title="Simulasikan trigger pengiriman alert bencana untuk demonstrasi"
+            title="Simulasi hanya dapat dijalankan dari backend/CLI"
           >
-            <Send className="w-3 h-3 text-cyan-500" />
+            <Send className="w-3 h-3 text-cyan-700" />
             <span>Simulasi Alert</span>
           </button>
         </div>
@@ -469,15 +452,15 @@ export function NotificationCenterSheet({
               Semua cabang dalam status normal, atau filter tidak menghasilkan kecocokan.
             </p>
             <button
-              onClick={() => handleRunWorkerNow(true)}
+              onClick={() => handleRefreshData()}
               className={`mt-4 px-3 py-1.5 rounded-lg text-xs inline-flex items-center gap-1.5 border ${
                 isDark
                   ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
                   : "bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-sm"
               }`}
             >
-              <Send className="w-3 h-3 text-cyan-500" />
-              <span>Coba Simulasi Pengiriman Alert</span>
+              <RefreshCw className="w-3 h-3 text-cyan-500" />
+              <span>Muat Ulang Data</span>
             </button>
           </div>
         ) : (
@@ -531,20 +514,15 @@ export function NotificationCenterSheet({
                     </span>
 
                     {/* Status Badge */}
-                    {derivedStatus === "resolved" ? (
+                    {derivedStatus === "read" ? (
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/50 flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span>SELESAI DITANGANI</span>
-                      </span>
-                    ) : derivedStatus === "acknowledged" ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-950/80 text-blue-300 border border-blue-600/50 flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-blue-400" />
-                        <span>SEDANG DITANGANI</span>
+                        <span>DIBACA</span>
                       </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-600/40 flex items-center gap-1 animate-pulse">
                         <Clock className="w-3 h-3 text-amber-400" />
-                        <span>MENUNGGU RESPON</span>
+                        <span>BELUM DIBACA</span>
                       </span>
                     )}
                   </div>
@@ -574,20 +552,15 @@ export function NotificationCenterSheet({
                   }`}
                 >
                   <div className="flex items-center gap-1.5 text-[10px] font-mono">
-                    {derivedStatus === "resolved" ? (
+                    {derivedStatus === "read" ? (
                       <span className="text-emerald-500 font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3" />
-                        <span>Selesai Ditangani</span>
-                      </span>
-                    ) : derivedStatus === "acknowledged" ? (
-                      <span className="text-blue-500 font-medium flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>Sedang Ditangani</span>
+                        <span>Dibaca</span>
                       </span>
                     ) : (
                       <span className="text-amber-500 font-medium flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
-                        <span>Menunggu Respon</span>
+                        <span>Belum Dibaca</span>
                       </span>
                     )}
                   </div>

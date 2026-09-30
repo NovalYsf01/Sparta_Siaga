@@ -7,6 +7,7 @@ export const INITIAL_INCIDENTS: IncidentRecord[] = [
     id: "INC-2026-0001",
     date: "1 Sep 2026",
     disasterType: "flood",
+    reportOrigin: "manual",
     storeId: "T001",
     storeName: "Toko Cibubur",
     branch: "Cabang Jakarta Timur",
@@ -44,6 +45,7 @@ export const INITIAL_INCIDENTS: IncidentRecord[] = [
     id: "INC-2026-0004",
     date: "8 Sep 2026",
     disasterType: "earthquake",
+    reportOrigin: "manual",
     storeId: "T004",
     storeName: "Toko Manado",
     branch: "Cabang Manado Malalayang",
@@ -84,6 +86,7 @@ export const INITIAL_INCIDENTS: IncidentRecord[] = [
     id: "INC-2026-0006",
     date: "12 Sep 2026",
     disasterType: "flood",
+    reportOrigin: "manual",
     storeId: "T006",
     storeName: "Toko Balikpapan",
     branch: "Cabang Balikpapan Baru",
@@ -120,17 +123,16 @@ export const INITIAL_INCIDENTS: IncidentRecord[] = [
 
 export function getStoredIncidents(): IncidentRecord[] {
   if (typeof window === "undefined") {
-    return INITIAL_INCIDENTS;
+    return [];
   }
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_INCIDENTS));
-      return INITIAL_INCIDENTS;
+      return [];
     }
     return JSON.parse(raw);
   } catch {
-    return INITIAL_INCIDENTS;
+    return [];
   }
 }
 
@@ -150,7 +152,10 @@ export function calculateIncidentStats(incidents: IncidentRecord[]): IncidentSta
     fire: 0,
     earthquake: 0,
     flood: 0,
-    wind: 0,
+    heavy_rain: 0,
+    strong_wind: 0,
+    severe_building_damage: 0,
+    wind: 0, // legacy
     other: 0,
     statusBreakdown: {
       resolved: 0,
@@ -162,12 +167,13 @@ export function calculateIncidentStats(incidents: IncidentRecord[]): IncidentSta
   };
 
   incidents.forEach((inc) => {
-    // Count per disaster type
     if (inc.disasterType === "theft") stats.theft++;
     else if (inc.disasterType === "fire") stats.fire++;
     else if (inc.disasterType === "earthquake") stats.earthquake++;
     else if (inc.disasterType === "flood") stats.flood++;
-    else if (inc.disasterType === "wind") stats.wind++;
+    else if (inc.disasterType === "heavy_rain") stats.heavy_rain++;
+    else if (inc.disasterType === "strong_wind") stats.strong_wind++;
+    else if (inc.disasterType === "severe_building_damage") stats.severe_building_damage++;
     else stats.other++;
 
     // Count per status
@@ -187,66 +193,4 @@ export function calculateIncidentStats(incidents: IncidentRecord[]): IncidentSta
   return stats;
 }
 
-export function mergeLiveDangerStoresIntoIncidents(
-  currentIncidents: IncidentRecord[],
-  dangerStores: any[]
-): { updatedIncidents: IncidentRecord[]; addedCount: number } {
-  let addedCount = 0;
-  const existingStoreCodes = new Set(
-    currentIncidents
-      .filter((i) => i.status !== "resolved" && i.status !== "archived")
-      .map((i) => i.storeId)
-  );
-
-  const newIncidents: IncidentRecord[] = [];
-
-  for (const store of dangerStores) {
-    if (!existingStoreCodes.has(store.kode_toko)) {
-      existingStoreCodes.add(store.kode_toko);
-      addedCount++;
-      const todayStr = new Date().toLocaleDateString("id-ID", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-
-      newIncidents.push({
-        id: `INC-EQ-${store.kode_toko}-${Date.now().toString().slice(-4)}`,
-        date: todayStr,
-        disasterType: "earthquake",
-        storeId: store.kode_toko,
-        storeName: store.nama_toko,
-        branch: store.cabang?.startsWith("Cabang") ? store.cabang : `Cabang ${store.cabang}`,
-        locationCity: store.cabang,
-        status: "verifying",
-        progress: 15,
-        disasterMetadata: {
-          place: store.nearestDisasterTitle || "Pusat Gempa BMKG Terkini",
-          magnitude: store.nearestDisasterMag,
-          depth: store.nearestDisasterDepth,
-          distanceKm: store.distanceFromDisasterKm,
-          time: "Deteksi Baru Saja",
-        },
-        timeline: [
-          {
-            stage: "Laporan Masuk",
-            label: `Toko Masuk Zona Bahaya Gempa M${store.nearestDisasterMag || "5+"}`,
-            timestamp: "Baru saja",
-            actor: "BMKG InaTEWS GIS Engine",
-            notes: `Jarak dari episentrum: ${store.distanceFromDisasterKm} km`,
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  }
-
-  if (addedCount === 0) {
-    return { updatedIncidents: currentIncidents, addedCount: 0 };
-  }
-
-  const updatedIncidents = [...newIncidents, ...currentIncidents];
-  return { updatedIncidents, addedCount };
-}
 

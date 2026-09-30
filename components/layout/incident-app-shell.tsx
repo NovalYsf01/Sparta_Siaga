@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   MapPin,
@@ -22,8 +25,6 @@ import {
 import { RoleType } from "@/types/incident";
 
 export interface IncidentAppShellProps {
-  activeTab: "dashboard" | "map" | "incidents" | "history" | "settings";
-  onTabChange: (tab: "dashboard" | "map" | "incidents" | "history" | "settings") => void;
   activeRole: RoleType;
   onRoleChange: (role: RoleType) => void;
   unreadCount?: number;
@@ -36,8 +37,6 @@ export interface IncidentAppShellProps {
 }
 
 export function IncidentAppShell({
-  activeTab,
-  onTabChange,
   activeRole,
   onRoleChange,
   unreadCount = 3,
@@ -51,6 +50,7 @@ export function IncidentAppShell({
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const pathname = usePathname();
 
   const isDark = theme === "dark";
 
@@ -78,18 +78,44 @@ export function IncidentAppShell({
   };
 
   interface NavItem {
-    id: "dashboard" | "map" | "incidents" | "history" | "settings";
+    id: string;
+    href: string;
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     badge?: string;
   }
 
-  const navItems: NavItem[] = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "map", label: "Monitoring Peta", icon: MapPin },
-    { id: "incidents", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
-    { id: "history", label: "History / Riwayat", icon: History },
-    { id: "settings", label: "Pengaturan", icon: Settings },
+  interface NavGroup {
+    title: string;
+    items: NavItem[];
+  }
+
+  const navGroups: NavGroup[] = [
+    {
+      title: "Utama",
+      items: [
+        { id: "dashboard", href: "/", label: "Dashboard", icon: LayoutDashboard },
+      ],
+    },
+    {
+      title: "Monitoring",
+      items: [
+        { id: "map", href: "/monitoring", label: "Peta Monitoring", icon: MapPin },
+        { id: "incidents", href: "/alerts", label: "Kejadian / Alert", icon: Bell, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
+      ],
+    },
+    {
+      title: "Pelaporan",
+      items: [
+        { id: "history", href: "/reports", label: "Arsip Laporan", icon: ClipboardList },
+      ],
+    },
+    {
+      title: "Sistem",
+      items: [
+        { id: "settings", href: "/settings", label: "Pengaturan", icon: Settings },
+      ],
+    },
   ];
 
   return (
@@ -100,108 +126,102 @@ export function IncidentAppShell({
     >
       {/* DESKTOP SIDEBAR */}
       <aside 
-        className={`hidden lg:flex flex-col shrink-0 border-r z-30 transition-all duration-300 ${
-          isSidebarCollapsed ? "w-20" : "w-64"
-        } ${
-          isDark 
-            ? "bg-slate-950 text-slate-300 border-slate-800" 
-            : "bg-white text-slate-700 border-slate-200"
-        }`}
+        className={`hidden lg:flex flex-col shrink-0 border-r-0 z-30 transition-all duration-300 ${
+          isSidebarCollapsed ? "w-20" : "w-[260px]"
+        } bg-[#123B6D] text-white shadow-lg`}
       >
-        {/* Brand Header (h-16 to match main header) */}
-        <div className={`flex items-center h-16 border-b shrink-0 ${isSidebarCollapsed ? "justify-center" : "justify-between px-4"} ${
-          isDark ? "border-slate-800" : "border-slate-200"
-        }`}>
-          {!isSidebarCollapsed && (
-            <div className="flex items-center gap-3 whitespace-nowrap overflow-hidden">
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 shadow-sm text-white shrink-0">
-                <Store className="w-5 h-5" />
-              </div>
-              <div>
-                <div className={`font-bold text-base leading-tight tracking-wide flex items-center gap-1.5 ${isDark ? "text-white" : "text-slate-900"}`}>
-                  SPARTA <span className={`font-extrabold text-[10px] px-1 py-0.5 rounded ${isDark ? "text-red-400 bg-red-500/20" : "text-red-600 bg-red-100"}`}>SIAGA</span>
+        {/* Brand Header */}
+        <div className={`flex flex-col justify-center py-4 shrink-0 border-b border-white/10 ${isSidebarCollapsed ? "items-center px-2" : "px-6"}`}>
+          {!isSidebarCollapsed ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <Image src="/brand/building_logo.png" alt="SPARTA Logo" width={38} height={38} className="shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-black text-lg tracking-wider text-white leading-none">SPARTA SIAGA</span>
+                  <span className="text-[10px] font-medium text-blue-200 mt-1 tracking-wide leading-tight">
+                    Sistem Integrasi Analisis &<br/>Peringatan Bencana
+                  </span>
                 </div>
-                <div className={`text-[10px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Incident Management</div>
+              </div>
+              <div className="flex flex-col gap-1 mt-1">
+                <Image src="/brand/alfamart_logo.png" alt="Alfamart Logo" width={80} height={25} className="opacity-90" />
+                <span className="text-[9px] font-semibold text-blue-300 uppercase tracking-widest">Internal System</span>
               </div>
             </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4">
+              <Image src="/brand/building_logo.png" alt="SPARTA" width={32} height={32} />
+            </div>
           )}
-          
-          <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className={`p-2 rounded-lg transition-colors border border-transparent ${
-              isDark 
-                ? "text-slate-400 hover:bg-slate-800 hover:text-white hover:border-slate-700" 
-                : "text-slate-500 hover:bg-slate-100 hover:text-slate-900 hover:border-slate-200"
-            }`}
-            title="Toggle Sidebar"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Navigation Items */}
-        <nav className={`flex-1 py-4 space-y-1.5 overflow-y-auto overflow-x-hidden ${isSidebarCollapsed ? "px-2" : "px-3"}`}>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onTabChange(item.id)}
-                title={isSidebarCollapsed ? item.label : undefined}
-                className={`w-full relative flex items-center ${isSidebarCollapsed ? "justify-center px-0 py-3" : "justify-between px-3.5 py-2.5"} rounded-lg text-sm font-medium transition-all ${
-                  isActive
-                    ? isDark 
-                      ? "bg-blue-600/20 text-blue-400 font-bold" 
-                      : "bg-blue-50 text-blue-700 font-bold"
-                    : isDark 
-                      ? "text-slate-400 hover:bg-slate-800/80 hover:text-white" 
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
-              >
-                <div className={`flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-3"}`}>
-                  <Icon className={`w-5 h-5 shrink-0 ${isActive ? (isDark ? "text-blue-400" : "text-blue-600") : "text-slate-400"}`} />
-                  {!isSidebarCollapsed && <span className="whitespace-nowrap">{item.label}</span>}
+        <nav className={`flex-1 py-6 space-y-6 overflow-y-auto overflow-x-hidden ${isSidebarCollapsed ? "px-2" : "px-4"}`}>
+          {navGroups.map((group, gIdx) => (
+            <div key={gIdx} className="space-y-1.5">
+              {!isSidebarCollapsed && (
+                <div className="text-[10px] uppercase font-bold tracking-wider text-[#EAF2FB]/50 mb-2 px-2">
+                  {group.title}
                 </div>
-                {!isSidebarCollapsed && item.badge && (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                      isActive 
-                        ? isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700" 
-                        : "bg-red-500 text-white"
+              )}
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/");
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    title={isSidebarCollapsed ? item.label : undefined}
+                    className={`w-full relative flex items-center ${isSidebarCollapsed ? "justify-center px-0 py-3 rounded-xl" : "justify-between px-4 py-2.5 rounded-lg"} text-sm font-medium transition-all ${
+                      isActive
+                        ? "bg-[#1D5AA6] text-white shadow-sm border border-white/10"
+                        : "text-blue-100 hover:bg-white/10 hover:text-white border border-transparent"
                     }`}
                   >
-                    {item.badge}
-                  </span>
-                )}
-                {isSidebarCollapsed && item.badge && (
-                  <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 border border-slate-900" />
-                )}
-              </button>
-            );
-          })}
+                    <div className={`flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-3"}`}>
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-[#F6C800]" : "text-blue-200"}`} />
+                      {!isSidebarCollapsed && <span className="whitespace-nowrap font-medium">{item.label}</span>}
+                    </div>
+                    {!isSidebarCollapsed && item.badge && (
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                          isActive 
+                            ? "bg-[#D9272E] text-white" 
+                            : "bg-[#D9272E] text-white"
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                    {isSidebarCollapsed && item.badge && (
+                      <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#D9272E]" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
-        {/* Sidebar Footer */}
-        {!isSidebarCollapsed && (
-          <div className={`p-4 border-t text-center whitespace-nowrap overflow-hidden ${
-            isDark ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-slate-50/50"
-          }`}>
-            <p className={`text-xs font-medium leading-relaxed ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-              Toko Aman, Operasional Lancar
-              <br />
-              <span className={`font-normal ${isDark ? "text-slate-500" : "text-slate-400"}`}>Satu Visi SPARTA RetailCare</span>
-            </p>
-          </div>
-        )}
+        {/* Sidebar Toggle Button (Moved from Header for better layout) */}
+        <div className="p-4 mt-auto border-t border-white/10">
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className={`w-full flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start px-4"} py-2 rounded-lg transition-colors text-blue-200 hover:bg-white/10 hover:text-white`}
+            title="Toggle Sidebar"
+          >
+            <Menu className="w-5 h-5" />
+            {!isSidebarCollapsed && <span className="ml-3 text-sm font-medium">Tutup Sidebar</span>}
+          </button>
+        </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* TOP BAR / HEADER */}
         <header
-          className={`h-16 flex items-center justify-between px-4 lg:px-8 shrink-0 z-40 border-b transition-colors duration-200 ${
-            isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+          className={`h-16 flex items-center justify-between px-6 lg:px-8 shrink-0 z-40 border-b transition-colors duration-200 ${
+            isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
           }`}
         >
           {/* Left: Mobile hamburger or Universal Search */}
@@ -239,8 +259,21 @@ export function IncidentAppShell({
             </div>
           </div>
 
-          {/* Right: Date Range, Theme Switcher, Notification Bell, & Role Switcher */}
-          <div className="flex items-center gap-2 sm:gap-3.5">
+          {/* Right: Date Range, Notifications, Role */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            
+            <button
+              onClick={() => {
+                // To be wired to the manual report action
+                const event = new CustomEvent('open-manual-report');
+                window.dispatchEvent(event);
+              }}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+            >
+              <ClipboardList className="w-4 h-4" />
+              Buat Laporan
+            </button>
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden md:block mx-1"></div>
 
 
 
@@ -335,11 +368,13 @@ export function IncidentAppShell({
 
         {/* MAIN BODY VIEW */}
         <main
-          className={`flex-1 overflow-y-auto pb-16 lg:pb-0 transition-colors duration-200 ${
-            isDark ? "bg-slate-950" : "bg-slate-50"
+          className={`relative flex-1 overflow-y-auto pb-16 lg:pb-6 lg:px-6 transition-colors duration-200 flex flex-col ${
+            isDark ? "bg-slate-900" : "bg-[#f5f7f9]"
           }`}
         >
-          {children}
+          <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
+            {children}
+          </div>
         </main>
 
         {/* MOBILE BOTTOM NAVIGATION BAR */}
@@ -348,10 +383,10 @@ export function IncidentAppShell({
             isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
           }`}
         >
-          <button
-            onClick={() => onTabChange("dashboard")}
+          <Link
+            href="/"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-              activeTab === "dashboard"
+              pathname === "/"
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -360,12 +395,12 @@ export function IncidentAppShell({
           >
             <LayoutDashboard className="w-5 h-5" />
             <span>Beranda</span>
-          </button>
+          </Link>
 
-          <button
-            onClick={() => onTabChange("map")}
+          <Link
+            href="/monitoring"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-              activeTab === "map"
+              pathname.startsWith("/monitoring")
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -374,12 +409,12 @@ export function IncidentAppShell({
           >
             <MapPin className="w-5 h-5" />
             <span>Peta</span>
-          </button>
+          </Link>
 
-          <button
-            onClick={() => onTabChange("incidents")}
+          <Link
+            href="/alerts"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors relative ${
-              activeTab === "incidents"
+              pathname.startsWith("/alerts")
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -391,12 +426,12 @@ export function IncidentAppShell({
             {(activeIncidentCount ?? 0) > 0 && (
               <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-red-500" />
             )}
-          </button>
+          </Link>
 
-          <button
-            onClick={() => onTabChange("history")}
+          <Link
+            href="/reports"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-              activeTab === "history"
+              pathname.startsWith("/reports")
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -405,12 +440,12 @@ export function IncidentAppShell({
           >
             <History className="w-5 h-5" />
             <span>Riwayat</span>
-          </button>
+          </Link>
 
-          <button
-            onClick={() => onTabChange("settings")}
+          <Link
+            href="/settings"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-              activeTab === "settings"
+              pathname.startsWith("/settings")
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -419,7 +454,7 @@ export function IncidentAppShell({
           >
             <Settings className="w-5 h-5" />
             <span>Pengaturan</span>
-          </button>
+          </Link>
         </nav>
       </div>
 
@@ -446,35 +481,42 @@ export function IncidentAppShell({
               </button>
             </div>
 
-            <nav className="flex-1 py-4 space-y-1.5">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onTabChange(item.id);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      isActive 
-                        ? isDark ? "bg-blue-600/20 text-blue-400 font-bold" : "bg-blue-50 text-blue-700 font-bold"
-                        : isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className={`w-5 h-5 ${isActive ? (isDark ? "text-blue-400" : "text-blue-600") : ""}`} />
-                      <span>{item.label}</span>
-                    </div>
-                    {item.badge && (
-                      <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-red-500 text-white">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+            <nav className="flex-1 py-4 space-y-4">
+              {navGroups.map((group, gIdx) => (
+                <div key={gIdx} className="space-y-1.5">
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-2 mb-2">
+                    {group.title}
+                  </div>
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/");
+                    return (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        onClick={() => {
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                          isActive 
+                            ? isDark ? "bg-blue-600/20 text-blue-400 font-bold" : "bg-blue-50 text-blue-700 font-bold"
+                            : isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon className={`w-5 h-5 ${isActive ? (isDark ? "text-blue-400" : "text-blue-600") : ""}`} />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.badge && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-red-500 text-white">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
             </nav>
           </div>
         </div>

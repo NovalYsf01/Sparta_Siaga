@@ -47,7 +47,7 @@ export function MobileIncidentHome({
   }[] = [
     { id: "earthquake", label: "Gempa Bumi", icon: Activity, bg: "bg-orange-50/80 hover:bg-orange-100/80", darkBg: "bg-orange-950/40 hover:bg-orange-900/50 border-orange-900/40", color: "text-orange-500" },
     { id: "flood", label: "Banjir", icon: Waves, bg: "bg-sky-50/80 hover:bg-sky-100/80", darkBg: "bg-sky-950/40 hover:bg-sky-900/50 border-sky-900/40", color: "text-sky-400" },
-    { id: "other", label: "Lainnya", icon: MoreHorizontal, bg: "bg-slate-100/80 hover:bg-slate-200/80", darkBg: "bg-slate-800/60 hover:bg-slate-800 border-slate-700/50", color: "text-slate-400" },
+    { id: "severe_building_damage", label: "Bangunan Rusak", icon: MoreHorizontal, bg: "bg-slate-100/80 hover:bg-slate-200/80", darkBg: "bg-slate-800/60 hover:bg-slate-800 border-slate-700/50", color: "text-slate-400" },
   ];
 
   // Active highlighted incident for the Progress Penanganan card
@@ -63,8 +63,12 @@ export function MobileIncidentHome({
         return <Flame className="w-5 h-5 text-red-500" />;
       case "earthquake":
         return <Activity className="w-5 h-5 text-amber-500" />;
-      case "wind":
+      case "strong_wind":
         return <Wind className="w-5 h-5 text-emerald-500" />;
+      case "heavy_rain":
+        return <Waves className="w-5 h-5 text-indigo-500" />;
+      case "severe_building_damage":
+        return <MoreHorizontal className="w-5 h-5 text-orange-500" />;
       default:
         return <MoreHorizontal className="w-5 h-5 text-slate-400" />;
     }
@@ -297,7 +301,7 @@ export function MobileIncidentHome({
             <Wind className="w-4 h-4 text-emerald-400 shrink-0" />
             <div>
               <div className={`text-sm font-bold leading-none ${isDark ? "text-white" : "text-slate-900"}`}>
-                {incidents.filter((i) => i.disasterType === "wind").length}
+                {incidents.filter((i) => i.disasterType === "strong_wind" || i.disasterType === "heavy_rain").length}
               </div>
               <div className={`text-[10px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>Angin</div>
             </div>

@@ -25,7 +25,7 @@ export interface NotificationLog {
   affected_stores_count: number;
   affected_stores_sample: AffectedStoreSummary[];
   ticket_number: string;
-  status: 'sent' | 'delivered' | 'failed' | 'acknowledged' | 'resolved';
+  status: 'not_configured' | 'pending' | 'queued' | 'sent' | 'failed' | 'delivered' | 'acknowledged' | 'resolved';
   sent_at: string;
   acknowledged_at?: string;
   acknowledged_by?: string;

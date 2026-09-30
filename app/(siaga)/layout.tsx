@@ -1,28 +1,21 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Store, StoreStatus } from "@/types/store";
 import { Earthquake, DisasterFeedResponse } from "@/types/disaster";
 import { RoleType, IncidentRecord, DamageReport } from "@/types/incident";
 import {
   calculateIncidentStats,
-  mergeLiveDangerStoresIntoIncidents,
 } from "@/lib/incident-store";
 
 import { assessStoreRisk } from "@/lib/haversine";
 import { IncidentAppShell } from "@/components/layout/incident-app-shell";
-import { IncidentKpiRow } from "@/components/dashboard/incident-kpi-row";
-import { IncidentCharts } from "@/components/dashboard/incident-charts";
-import { ActiveIncidentsTable } from "@/components/dashboard/active-incidents-table";
-import { IncidentActionList } from "@/components/dashboard/incident-action-list";
-import { MobileIncidentHome } from "@/components/mobile/mobile-incident-home";
+import { SiagaProvider } from "@/components/layout/siaga-context";
 import { StoreVerificationModal } from "@/components/incident/store-verification-modal";
 import { ManualIncidentModal } from "@/components/incident/manual-incident-modal";
 import { MaintenanceTrackingModal } from "@/components/incident/maintenance-tracking-modal";
-import { IncidentHistoryView } from "@/components/history/incident-history-view";
-import { DisasterAlertBar } from "@/components/disaster/disaster-alert-bar";
-import { MapView } from "@/components/map/map-view";
-import { MapControls } from "@/components/map/map-controls";
 import { StoreDetailSheet } from "@/components/store/store-detail-sheet";
 import { AffectedStoresSheet } from "@/components/disaster/affected-stores-sheet";
 import { SpotlightSearch } from "@/components/search/spotlight-search";
@@ -38,18 +31,15 @@ import {
   hasUserDismissedPermissionPrompt,
   requestDesktopNotificationPermission,
 } from "@/lib/desktop-notification";
-import { Loader2, Plus, Sparkles } from "lucide-react";
 
-export default function SpartaSiagaDashboardPage() {
+export default function SiagaLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [rawStores, setRawStores] = useState<Store[]>([]);
   const [disasterData, setDisasterData] = useState<DisasterFeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Core App Shell & Role State
-  const [activeTab, setActiveTab] = useState<
-    "dashboard" | "map" | "incidents" | "history" | "settings"
-  >("dashboard");
   const [activeRole, setActiveRole] = useState<RoleType>("ho_admin");
   const [activeLayer, setActiveLayer] = useState<"all" | "earthquake" | "stores" | "weather" | "flood">("all");
 
@@ -293,28 +283,10 @@ export default function SpartaSiagaDashboardPage() {
     });
   }, [rawStores, disasterData]);
 
-  // Dynamically feed live BMKG danger stores into incident queue
-  useEffect(() => {
-    if (computedStores.length === 0) return;
-    const dangerStores = computedStores.filter((s) => s.status === "danger");
-    if (dangerStores.length === 0) return;
+  // Dynamically feeding BMKG danger stores into operational incidents
+  // has been REMOVED from the browser. The server daemon is the single
+  // source of truth for creating auto-incidents based on BMKG events.
 
-    setIncidents((prev) => {
-      const { updatedIncidents, addedCount } = mergeLiveDangerStoresIntoIncidents(prev, dangerStores);
-      if (addedCount > 0) {
-        // Persist newly-auto-generated incidents to DB
-        const newOnes = updatedIncidents.slice(0, addedCount);
-        newOnes.forEach((inc) => {
-          fetch("/api/incidents", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(inc),
-          }).catch(console.error);
-        });
-      }
-      return updatedIncidents;
-    });
-  }, [computedStores]);
 
   // Read-only Background Polling (Browser is a consumer, not a worker)
   useEffect(() => {
@@ -426,9 +398,11 @@ export default function SpartaSiagaDashboardPage() {
     return Array.from(branches).sort();
   }, [rawStores]);
 
-  const handleSelectStore = (store: Store) => {
+  const handleSelectStore = (store: Store | null) => {
     setSelectedStore(store);
-    setFlyToTarget({ lat: store.latitude, lng: store.longitude, zoom: 15 });
+    if (store) {
+      setFlyToTarget({ lat: store.latitude, lng: store.longitude, zoom: 15 });
+    }
   };
 
   const handleFocusDisaster = (eqOrLat: Earthquake | number, maybeLng?: number) => {
@@ -589,191 +563,35 @@ export default function SpartaSiagaDashboardPage() {
     handleUpdateIncidents(updated);
   };
 
+  const contextValue = {
+    rawStores, computedStores, disasterData, loading, isRefreshing,
+    activeRole, setActiveRole, activeLayer, setActiveLayer,
+    incidents, activeIncidents, archivedIncidents, incidentStats,
+    handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal,
+    incidentOnly, setIncidentOnly, statusFilter, setStatusFilter,
+    basemap, setBasemap, theme, handleToggleTheme,
+    showRadar, setShowRadar, radarData, selectedStore, setSelectedStore,
+    handleSelectStore, flyToTarget, setFlyToTarget, dangerCount, warningCount,
+    handleResetView, handleFocusDisaster, selectedCategory, setSelectedCategory,
+    setIsAffectedSheetOpen
+  };
+
   return (
-    <IncidentAppShell
-      activeTab={activeTab}
-      onTabChange={(tab) => {
-        if (tab === "settings") {
-          setIsSettingsOpen(true);
-        } else {
-          setActiveTab(tab);
-        }
-      }}
-      activeRole={activeRole}
-      onRoleChange={setActiveRole}
-      unreadCount={notificationCount}
-      activeIncidentCount={activeIncidents.length}
-      onOpenNotifications={() => setIsNotificationCenterOpen(true)}
-      onSearchClick={() => setIsSearchOpen(true)}
-      theme={theme}
-      onToggleTheme={handleToggleTheme}
-    >
-      {/* 1. DASHBOARD VIEW (Desktop Command Center & Mobile App View) */}
-      {activeTab === "dashboard" && (
-        <div className="w-full">
-          {/* Mobile view only on small screens */}
-          <div className="block lg:hidden">
-            <MobileIncidentHome
-              incidents={activeIncidents}
-              onSelectIncident={handleSelectIncidentForDetail}
-              onCreateReportClick={handleOpenReportModal}
-              onCategoryClick={(cat) => setSelectedCategory(cat)}
-              onViewAllClick={() => setActiveTab("incidents")}
-              theme={theme}
-            />
-          </div>
+    <SiagaProvider value={contextValue}>
+      <IncidentAppShell
+        activeRole={activeRole}
+        onRoleChange={setActiveRole}
+        unreadCount={notificationCount}
+        activeIncidentCount={activeIncidents.length}
+        onOpenNotifications={() => setIsNotificationCenterOpen(true)}
+        onSearchClick={() => setIsSearchOpen(true)}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+      >
+        {children}
+      </IncidentAppShell>
 
-          {/* Desktop Executive Command Center (Matches RetailCare Reference) */}
-          <div className="hidden lg:block p-8 space-y-6 max-w-[1600px] mx-auto">
-            {/* Welcome Banner */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className={`text-2xl font-black tracking-tight flex items-center gap-2 ${
-                  theme === "dark" ? "text-white" : "text-slate-900"
-                }`}>
-                  <span>Selamat Datang, {activeRole === "ho_admin" ? "Admin HO" : activeRole === "sparta_maintenance" ? "Tim Maintenance" : "Store Manager"}</span>
-                  <Sparkles className="w-5 h-5 text-amber-500" />
-                </h1>
-                <p className={`text-xs mt-1 ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>
-                  Pantau dan kelola seluruh kejadian di toko secara real-time di seluruh Indonesia
-                </p>
-              </div>
-            </div>
 
-            {/* KPI Metric Stat Cards (7 Cards Row) */}
-            <IncidentKpiRow
-              stats={incidentStats}
-              selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
-            />
-
-            {/* Analytics Charts: Tren Bulanan & Distribusi Kejadian */}
-            <IncidentCharts stats={incidentStats} />
-
-            {/* Active Incidents Table */}
-            <ActiveIncidentsTable
-              incidents={activeIncidents}
-              onSelectIncident={handleSelectIncidentForDetail}
-              onCreateReportClick={handleOpenReportModal}
-              hideAction={true}
-            />
-
-            {/* Bottom Row: Status Penanganan & Tindakan Selanjutnya */}
-            <IncidentActionList stats={incidentStats} incidents={activeIncidents} />
-          </div>
-        </div>
-      )}
-
-      {/* 2. DEDICATED GIS MONITORING VIEW */}
-      {activeTab === "map" && (
-        <div className="w-full h-full relative overflow-hidden flex flex-col">
-          {/* Top Disaster Alert Bar */}
-          <DisasterAlertBar
-            earthquakes={
-              disasterData?.recentEarthquakes && disasterData.recentEarthquakes.length > 0
-                ? disasterData.recentEarthquakes
-                : disasterData?.latestBmkgEarthquake
-                ? [disasterData.latestBmkgEarthquake]
-                : []
-            }
-            latestEarthquake={disasterData?.latestBmkgEarthquake}
-            affectedCount={dangerCount}
-            onOpenAffectedSheet={() => setIsAffectedSheetOpen(true)}
-            onFocusDisaster={handleFocusDisaster}
-            theme={theme}
-          />
-
-          <div className="flex-1 relative w-full h-full">
-            {loading ? (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 text-slate-400 gap-3">
-                <Loader2 className="w-10 h-10 animate-spin text-red-500" />
-                <p className="text-sm font-semibold tracking-wide">
-                  Menghubungkan ke SPARTA Siaga Geospatial Engine (21.550 Toko Master)...
-                </p>
-              </div>
-            ) : (
-              <>
-                <MapView
-                  stores={computedStores}
-                  earthquakes={disasterData?.recentEarthquakes || []}
-                  floodReports={disasterData?.floodReports || []}
-                  basemap={basemap}
-                  incidentOnly={incidentOnly}
-                  statusFilter={statusFilter}
-                  selectedStore={selectedStore}
-                  onSelectStore={handleSelectStore}
-                  flyToTarget={flyToTarget}
-                  showRadar={showRadar}
-                  radarTileUrl={radarData?.tileUrl}
-                  activeLayer={activeLayer}
-                />
-
-                {/* Floating Map Controls with Layer Switcher */}
-                <MapControls
-                  latestEarthquake={disasterData?.latestBmkgEarthquake}
-                  incidentOnly={incidentOnly}
-                  onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
-                  basemap={basemap}
-                  onChangeBasemap={(b) => setBasemap(b)}
-                  onResetView={handleResetView}
-                  totalStoresCount={computedStores.length}
-                  affectedStoresCount={dangerCount + warningCount}
-                  showRadar={showRadar}
-                  onToggleRadar={() => setShowRadar((prev) => !prev)}
-                  radarTimeString={radarData?.timeFormatted}
-                  hidden={isSearchOpen || isAffectedSheetOpen || isNotificationCenterOpen}
-                  theme={theme}
-                  activeLayer={activeLayer}
-                  onLayerChange={setActiveLayer}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 3. INCIDENTS QUEUE VIEW */}
-      {activeTab === "incidents" && (
-        <div className="p-4 lg:p-8 max-w-7xl mx-auto space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className={`text-xl font-bold ${theme === "dark" ? "text-white" : "text-slate-900"}`}>Manajemen Laporan Kejadian Aktif</h2>
-              <p className={`text-xs mt-0.5 ${theme === "dark" ? "text-slate-400" : "text-slate-500"}`}>
-                Pantau proses verifikasi store manager dan eskalasi perbaikan fisik ke Sparta Maintenance
-              </p>
-            </div>
-            <button
-              onClick={handleOpenReportModal}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Buat Laporan Baru</span>
-            </button>
-          </div>
-
-          <ActiveIncidentsTable
-            incidents={activeIncidents}
-            onSelectIncident={handleSelectIncidentForDetail}
-            onCreateReportClick={handleOpenReportModal}
-            onDeleteIncident={async (id) => {
-              try {
-                await fetch(`/api/incidents/${id}`, { method: "DELETE" });
-                setIncidents((prev) => prev.filter((inc) => inc.id !== id));
-              } catch (err) {
-                console.error("[Sparta Siaga] Failed to delete incident:", err);
-              }
-            }}
-          />
-        </div>
-      )}
-
-      {/* 4. HISTORY / RIWAYAT KEJADIAN ARSIP VIEW */}
-      {activeTab === "history" && (
-        <IncidentHistoryView
-          archivedIncidents={archivedIncidents}
-          onSelectIncident={(inc) => setSelectedReadOnlyIncident(inc)}
-        />
-      )}
 
       {/* DIALOGS, MODALS & SLIDING DRAWERS */}
       {/* Manual Incident Creation Modal */}
@@ -791,11 +609,13 @@ export default function SpartaSiagaDashboardPage() {
             branch: data.branch,
             locationCity: data.locationCity,
             disasterType: data.disasterType,
+            reportOrigin: "manual",
+            tkpType: data.tkpType || "Toko",
             date: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            status: "investigating",
-            progress: 30,
+            status: "verifying",
+            progress: 15,
             verification: {
               confirmedBy: activeRole,
               confirmedAt: timestamp,
@@ -805,15 +625,11 @@ export default function SpartaSiagaDashboardPage() {
               operationalStatus: data.operationalStatus,
               notes: data.notes
             },
-            maintenanceTicket: {
-              ticketId: `SPM-MAN-${Date.now()}`,
-              assignedTechnician: "Penugasan Wilayah Sparta Maintenance",
-              workDescription: `Pemeriksaan kerusakan.`
-            },
+            fieldPhotos: data.photos ?? [],
             timeline: [
               {
                 stage: "Laporan Dibuat",
-                label: "Laporan insiden / kerusakan",
+                label: "Laporan insiden / kerusakan manual",
                 timestamp,
                 actor: activeRole,
               }
@@ -902,7 +718,7 @@ export default function SpartaSiagaDashboardPage() {
         activeIncidents={incidents}
         onFlyToIncident={(incident) => {
           setIsNotificationCenterOpen(false);
-          setActiveTab("map");
+          router.push("/monitoring");
           const allEqs = disasterData
             ? [
                 ...(disasterData.latestBmkgEarthquake ? [disasterData.latestBmkgEarthquake] : []),
@@ -964,6 +780,6 @@ export default function SpartaSiagaDashboardPage() {
         showRadar={showRadar}
         onToggleRadar={(sr) => setShowRadar(sr)}
       />
-    </IncidentAppShell>
+    </SiagaProvider>
   );
 }

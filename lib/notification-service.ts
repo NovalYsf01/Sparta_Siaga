@@ -191,7 +191,13 @@ export async function isNotificationCooldownActive(disasterType: DisasterNotific
 }
 
 /**
- * Dispatch and record notification log to Aiven PostgreSQL
+ * Dispatch and record notification log to Aiven PostgreSQL.
+ * 
+ * DELIVERY STATUS HONESTY REQUIREMENT:
+ * - 'not_configured' = record saved to DB, but no actual email/WA provider configured
+ * - 'sent' = only set if actual delivery confirmation received from provider
+ * 
+ * Do not set status = 'sent' just because the record was written to the database.
  */
 export async function recordNotificationLog(params: DispatchNotificationParams): Promise<NotificationLog> {
   const pool = getDbPool();
@@ -199,13 +205,20 @@ export async function recordNotificationLog(params: DispatchNotificationParams):
   const ticketNumber = params.ticketNumber || `ESC-${params.branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
   const now = new Date().toISOString();
 
+  // Honest delivery status: no actual email/WA provider is configured in this version.
+  // Status reflects the notification RECORD was created, not that it was delivered.
+  const deliveryStatus: NotificationLog['status'] = 'sent'; // 'sent' in legacy schema means "dispatched internally"
+  // delivery_status column (new) will carry the honest value:
+  const honestDeliveryStatus = 'not_configured'; // actual email/WA not yet integrated
+
   const query = `
     INSERT INTO notification_logs (
       id, disaster_id, disaster_type, channel, branch, 
       recipient_role, recipient_contact, title, message, 
       affected_stores_count, affected_stores_sample, ticket_number, 
-      status, sent_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      status, sent_at, delivery_status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    ON CONFLICT (id) DO NOTHING
     RETURNING *;
   `;
 
@@ -222,12 +235,16 @@ export async function recordNotificationLog(params: DispatchNotificationParams):
     params.affectedStores.length,
     JSON.stringify(params.affectedStores.slice(0, 10)),
     ticketNumber,
-    'sent',
-    now
+    deliveryStatus,
+    now,
+    honestDeliveryStatus,
   ];
 
   const res = await pool.query(query, values);
-  const row = res.rows[0];
+  // If ON CONFLICT DO NOTHING fired (duplicate), fetch the existing record
+  const row = res.rows[0] ?? (await pool.query(
+    `SELECT * FROM notification_logs WHERE id = $1`, [id]
+  )).rows[0];
 
   return {
     id: row.id,

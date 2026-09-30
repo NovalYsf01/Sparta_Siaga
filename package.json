@@ -9,6 +9,7 @@
     "start": "next start -p 3004",
     "daemon": "tsx scripts/worker-daemon.ts",
     "migrate": "tsx scripts/migrate-incidents.ts",
+    "migrate:report-fields": "tsx scripts/migrate-report-fields.ts",
     "seed": "tsx scripts/seed-incidents.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"

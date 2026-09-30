@@ -81,8 +81,12 @@ export function ActiveIncidentsTable({
         return { label: "Kebakaran", icon: Flame, color: "bg-red-50 text-red-700 border-red-200" };
       case "earthquake":
         return { label: "Gempa Bumi", icon: Activity, color: "bg-amber-50 text-amber-800 border-amber-200" };
-      case "wind":
-        return { label: "Angin", icon: Wind, color: "bg-cyan-50 text-cyan-700 border-cyan-200" };
+      case "strong_wind":
+        return { label: "Angin Kencang", icon: Wind, color: "bg-cyan-50 text-cyan-700 border-cyan-200" };
+      case "heavy_rain":
+        return { label: "Hujan/Badai", icon: Waves, color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
+      case "severe_building_damage":
+        return { label: "Bangunan Rusak", icon: Pencil, color: "bg-orange-50 text-orange-700 border-orange-200" };
       default:
         return { label: "Lainnya", icon: Pencil, color: "bg-slate-50 text-slate-600 border-slate-200" };
     }
@@ -91,27 +95,26 @@ export function ActiveIncidentsTable({
   const getStatusBadge = (status: IncidentStatus) => {
     switch (status) {
       case "in_maintenance":
-        return { label: "Dalam Penanganan", color: "bg-amber-100/80 text-amber-800" };
       case "investigating":
-        return { label: "Investigasi", color: "bg-blue-100/80 text-blue-800" };
+        return { label: "Dalam Penanganan", color: "bg-[#EAF2FB] text-[#1D5AA6]" };
       case "resolved":
-        return { label: "Selesai", color: "bg-emerald-100/80 text-emerald-800" };
+        return { label: "Selesai", color: "bg-[#16A34A]/10 text-[#16A34A]" };
       case "verifying":
-        return { label: "Verifikasi", color: "bg-purple-100/80 text-purple-800" };
+        return { label: "Verifikasi", color: "bg-[#F59E0B]/10 text-[#F59E0B]" };
       default:
-        return { label: "Belum Ditangani", color: "bg-rose-100/80 text-rose-800" };
+        return { label: "Belum Ditangani", color: "bg-[#DC2626]/10 text-[#DC2626]" };
     }
   };
 
   const getProgressBarColor = (progress: number) => {
-    if (progress >= 100) return "bg-emerald-500";
-    if (progress >= 60) return "bg-blue-600";
-    if (progress >= 40) return "bg-amber-500";
-    return "bg-purple-500";
+    if (progress >= 100) return "bg-[#16A34A]"; // Success green
+    if (progress >= 60) return "bg-[#1D5AA6]";  // Action blue
+    if (progress >= 40) return "bg-[#F59E0B]";  // Warning amber
+    return "bg-[#DC2626]/80"; // Critical red
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden transition-colors">
+    <div className="bg-white dark:bg-slate-900 rounded-[20px] shadow-sm overflow-hidden transition-colors border border-slate-200 dark:border-slate-800">
       {/* Table Header with Title & Action Button */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
         <div>
@@ -123,10 +126,10 @@ export function ActiveIncidentsTable({
         <div className="relative">
           <button
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold shadow-sm transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
               filterType !== "all" || filterStatus !== "all" || startDate || endDate
-                ? "bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800/50 text-blue-700 dark:text-blue-400"
-                : "bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300"
+                ? "bg-[#EAF2FB] dark:bg-blue-900/30 text-[#1D5AA6] dark:text-blue-400"
+                : "bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 text-slate-600 dark:text-slate-300"
             }`}
           >
             <Filter className="w-3.5 h-3.5" />
@@ -210,7 +213,7 @@ export function ActiveIncidentsTable({
       {/* Responsive Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-slate-50/80 dark:bg-slate-950/70 text-slate-600 dark:text-slate-400 uppercase font-semibold tracking-wider text-[11px] border-b border-slate-200/60 dark:border-slate-800">
+          <thead className="bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 font-medium tracking-wide text-xs border-b border-slate-100 dark:border-slate-700">
             <tr>
               <th className="px-4 py-3 w-12 text-center">No</th>
               <th className="px-4 py-3">Tanggal</th>

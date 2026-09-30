@@ -7,7 +7,9 @@ import {
   recordNotificationLog, 
   generateEmergencyEmailHtml 
 } from './notification-service';
+import { dbFindAutoEarthquakeReport, dbFindActiveManualEarthquakeReport, dbCreateIncident } from './incident-db';
 import { AffectedStoreSummary } from '@/types/notification';
+import { ReportAffectedStore } from '@/types/incident';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
 
@@ -169,6 +171,78 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
                 affectedStores: branchStores,
                 ticketNumber,
               });
+
+              // PHASE B: Create / reuse automatic earthquake report (anchor lifecycle)
+              // Deduplication: ONE earthquake_event_id + ONE branch = ONE report
+              const existingAutoReport = await dbFindAutoEarthquakeReport(eq.id, branch);
+              const activeManualReport = await dbFindActiveManualEarthquakeReport(branch);
+
+              if (activeManualReport) {
+                // If there's an active manual report, we suppress the automatic one
+                // We don't merge them here to avoid business semantics violation
+                console.log(`[Autonomous Daemon] 🛑 COLLISION DETECTED: Active manual report (${activeManualReport.id}) exists for Cabang ${branch}. Suppressing automatic duplicate for Event ${eq.id}.`);
+              } else if (!existingAutoReport) {
+                const reportId = `LAP-EQ-${branch.substring(0, 4).toUpperCase().replace(/\s/g, '')}-${Date.now().toString().slice(-6)}`;
+                const todayStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+
+                // Map AffectedStoreSummary → ReportAffectedStore
+                const reportAffectedStores: ReportAffectedStore[] = branchStores.map(s => ({
+                  kode_toko: s.kode_toko,
+                  nama_toko: s.nama_toko,
+                  cabang: s.cabang,
+                  alamat: s.alamat,
+                  fr_type: s.fr_type,
+                  distance_km: s.distance_km,
+                  exposure_zone: s.status,   // 'danger' | 'warning'
+                  confirmation_status: 'pending',
+                }));
+
+                const primaryStore = branchStores[0];
+                await dbCreateIncident({
+                  id: reportId,
+                  date: todayStr,
+                  disasterType: 'earthquake',
+                  reportOrigin: 'automatic_earthquake',
+                  earthquakeEventId: eq.id,
+                  earthquakeSource: eq.source || 'BMKG/USGS',
+                  // SEMANTIC CORRECTNESS: do not label calculated radius as "official BMKG radius"
+                  earthquakeProvenance: `Estimasi area dampak berdasarkan data gempa ${eq.source || 'BMKG/USGS'} dan perhitungan SPARTA.`,
+                  tkpType: 'toko',
+                  storeId: primaryStore?.kode_toko ?? branch,
+                  storeName: primaryStore?.nama_toko ?? `Toko ${branch}`,
+                  branch,
+                  locationCity: branch,
+                  status: 'pending_confirmation',
+                  progress: 10,
+                  disasterMetadata: {
+                    magnitude: eq.magnitude,
+                    depth: eq.depth,
+                    coordinates: [eq.latitude, eq.longitude],
+                    place: eq.title,
+                    time: eq.time,
+                  },
+                  affectedStores: reportAffectedStores,
+                  affectedStoreCount: branchStores.length,
+                  dangerStoreCount: dangerStores.length,
+                  // fieldPhotos intentionally empty — auto-report does not fabricate field evidence
+                  fieldPhotos: [],
+                  timeline: [
+                    {
+                      stage: 'Laporan Otomatis Dibuat',
+                      label: `Gempa M${eq.magnitude} terdeteksi oleh ${eq.source || 'BMKG/USGS'}. ${branchStores.length} toko cabang ${branch} terindikasi dalam area dampak dan memerlukan konfirmasi kondisi lapangan.`,
+                      timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+                      actor: 'SPARTA Siaga — Autonomous Engine',
+                      notes: ticketNumber,
+                    },
+                  ],
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                });
+
+                console.log(`[Autonomous Daemon] 📋 AUTO REPORT CREATED: ${reportId} | Cabang ${branch} | ${branchStores.length} toko terindikasi | Konfirmasi lapangan diperlukan`);
+              } else {
+                console.log(`[Autonomous Daemon] ♻️  REPORT EXISTS (dedup): ${existingAutoReport.id} | Cabang ${branch} — no new report created`);
+              }
 
               dispatchedEarthquakeAlerts++;
               console.log(`[Autonomous Daemon] 🚨 DISPATCHED EARTHQUAKE ALERT: Cabang ${branch} (Ticket: ${ticketNumber}, Stores: ${branchStores.length})`);
