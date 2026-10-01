@@ -11,6 +11,7 @@ export interface SiagaContextType {
   disasterData: DisasterFeedResponse | null;
   loading: boolean;
   isRefreshing: boolean;
+  loadInitialData: (isRefresh?: boolean) => Promise<void>;
   activeRole: RoleType;
   setActiveRole: (role: RoleType) => void;
   activeLayer: "all" | "earthquake" | "stores" | "weather" | "flood";
