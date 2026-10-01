@@ -81,23 +81,23 @@ export async function dbFindAutoEarthquakeReport(
 }
 
 /**
- * Check if there is an active manual earthquake report for the branch.
+ * Check if there is a manual earthquake report explicitly linked to this event for the branch.
  * Used to prevent auto-daemon from creating duplicates when a branch
- * has already manually reported an earthquake.
+ * has already manually reported AND linked this specific earthquake.
  */
-export async function dbFindActiveManualEarthquakeReport(
+export async function dbFindManualEarthquakeReportByEvent(
+  earthquakeEventId: string,
   branch: string
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
   const { rows } = await pool.query(
     `SELECT * FROM incidents
-     WHERE branch = $1 
-       AND disaster_type = 'earthquake' 
+     WHERE earthquake_event_id = $1
+       AND branch = $2 
        AND report_origin = 'manual'
-       AND status NOT IN ('resolved', 'archived')
      ORDER BY created_at DESC
      LIMIT 1`,
-    [branch]
+    [earthquakeEventId, branch]
   );
   if (rows.length === 0) return null;
   return rowToIncident(rows[0]);

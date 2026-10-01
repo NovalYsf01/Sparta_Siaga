@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbGetAllIncidents, dbCreateIncident } from "@/lib/incident-db";
 import { IncidentRecord } from "@/types/incident";
 import { getSessionUser } from "@/lib/auth";
+import { ReportDistributionService } from "@/lib/distribution-service";
 
 export async function GET() {
   try {
@@ -69,6 +70,10 @@ export async function POST(request: Request) {
     }
 
     const created = await dbCreateIncident(body);
+    
+    // Trigger distribution (Email/WA)
+    await ReportDistributionService.distributeReport(created.id, created.branch, created);
+
     return NextResponse.json({ data: created }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/incidents]", err);

@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { Camera, Image as ImageIcon, X, UploadCloud } from "lucide-react";
+import { CameraCapture } from "./camera-capture";
 
 export interface PhotoData {
   file: File | null;
@@ -16,11 +17,13 @@ interface FieldPhotoUploaderProps {
   description?: string;
   value: PhotoData;
   onChange: (data: PhotoData) => void;
+  storeName?: string;
+  reporterName?: string;
 }
 
-export function FieldPhotoUploader({ label, description, value, onChange }: FieldPhotoUploaderProps) {
+export function FieldPhotoUploader({ label, description, value, onChange, storeName = "", reporterName = "" }: FieldPhotoUploaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, source: "camera" | "gallery") => {
     const file = e.target.files?.[0];
@@ -36,6 +39,17 @@ export function FieldPhotoUploader({ label, description, value, onChange }: Fiel
       source,
       capturedAt,
       reporterRelation: "self" // default, can be toggled
+    });
+  };
+
+  const handleCameraCapture = (file: File, previewUrl: string) => {
+    onChange({
+      ...value,
+      file,
+      previewUrl,
+      source: "camera",
+      capturedAt: new Date().toISOString(),
+      reporterRelation: "self"
     });
   };
 
@@ -62,14 +76,6 @@ export function FieldPhotoUploader({ label, description, value, onChange }: Fiel
           <input 
             type="file" 
             accept="image/*" 
-            capture="environment"
-            ref={cameraInputRef}
-            className="hidden" 
-            onChange={(e) => handleFileChange(e, "camera")}
-          />
-          <input 
-            type="file" 
-            accept="image/*" 
             ref={fileInputRef}
             className="hidden" 
             onChange={(e) => handleFileChange(e, "gallery")}
@@ -77,7 +83,7 @@ export function FieldPhotoUploader({ label, description, value, onChange }: Fiel
           
           <button 
             type="button"
-            onClick={() => cameraInputRef.current?.click()}
+            onClick={() => setIsCameraOpen(true)}
             className="flex-1 flex flex-col items-center justify-center gap-2 h-24 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg hover:border-[#1D5AA6] hover:bg-[#EAF2FB] dark:hover:bg-blue-900/20 text-slate-500 hover:text-[#1D5AA6] transition-colors"
           >
             <Camera className="w-6 h-6" />
@@ -116,22 +122,23 @@ export function FieldPhotoUploader({ label, description, value, onChange }: Fiel
             </span>
           </div>
 
-          <div className="bg-slate-100 dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2">Sumber Foto ini:</p>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={() => onChange({ ...value, reporterRelation: "self" })}
-                className={`flex-1 flex items-center gap-2 p-2 rounded-md border transition-colors text-xs font-semibold ${
-                  value.reporterRelation === "self"
-                    ? "bg-[#1D5AA6] border-[#1D5AA6] text-white"
-                    : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
-                }`}
-              >
-                <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${value.reporterRelation === "self" ? "border-white" : "border-slate-300"}`}>
-                  {value.reporterRelation === "self" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                </div>
-                Diambil oleh saya
+          {value.source !== "camera" && (
+            <div className="bg-slate-100 dark:bg-slate-800 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2">Sumber Foto ini:</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...value, reporterRelation: "self" })}
+                  className={`flex-1 flex items-center gap-2 p-2 rounded-md border transition-colors text-xs font-semibold ${
+                    value.reporterRelation === "self"
+                      ? "bg-[#1D5AA6] border-[#1D5AA6] text-white"
+                      : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
+                  }`}
+                >
+                  <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center shrink-0 ${value.reporterRelation === "self" ? "border-white" : "border-slate-300"}`}>
+                    {value.reporterRelation === "self" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                  </div>
+                  Diambil oleh saya
               </button>
               <button
                 type="button"
@@ -149,8 +156,16 @@ export function FieldPhotoUploader({ label, description, value, onChange }: Fiel
               </button>
             </div>
           </div>
+          )}
         </div>
       )}
+      <CameraCapture 
+        isOpen={isCameraOpen} 
+        onClose={() => setIsCameraOpen(false)} 
+        onCapture={handleCameraCapture} 
+        storeName={storeName}
+        reporterName={reporterName}
+      />
     </div>
   );
 }

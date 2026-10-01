@@ -7,7 +7,7 @@ import {
   recordNotificationLog, 
   generateEmergencyEmailHtml 
 } from './notification-service';
-import { dbFindAutoEarthquakeReport, dbFindActiveManualEarthquakeReport, dbCreateIncident } from './incident-db';
+import { dbFindAutoEarthquakeReport, dbFindManualEarthquakeReportByEvent, dbCreateIncident, dbUpdateIncident } from './incident-db';
 import { AffectedStoreSummary } from '@/types/notification';
 import { ReportAffectedStore } from '@/types/incident';
 import { Store } from '@/types/store';
@@ -175,12 +175,22 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
               // PHASE B: Create / reuse automatic earthquake report (anchor lifecycle)
               // Deduplication: ONE earthquake_event_id + ONE branch = ONE report
               const existingAutoReport = await dbFindAutoEarthquakeReport(eq.id, branch);
-              const activeManualReport = await dbFindActiveManualEarthquakeReport(branch);
+              const linkedManualReport = await dbFindManualEarthquakeReportByEvent(eq.id, branch);
 
-              if (activeManualReport) {
-                // If there's an active manual report, we suppress the automatic one
-                // We don't merge them here to avoid business semantics violation
-                console.log(`[Autonomous Daemon] 🛑 COLLISION DETECTED: Active manual report (${activeManualReport.id}) exists for Cabang ${branch}. Suppressing automatic duplicate for Event ${eq.id}.`);
+              if (linkedManualReport) {
+                // Enrich existing linked manual report metadata without touching operational state
+                await dbUpdateIncident(linkedManualReport.id, {
+                  earthquakeSource: eq.source || 'BMKG/USGS',
+                  earthquakeProvenance: `Diperbarui otomatis dari event ${eq.source || 'BMKG/USGS'} ${eq.id}`,
+                  disasterMetadata: {
+                    magnitude: eq.magnitude,
+                    depth: eq.depth,
+                    coordinates: [eq.latitude, eq.longitude],
+                    place: eq.title,
+                    time: eq.time,
+                  },
+                });
+                console.log(`[Autonomous Daemon] 🔗 ENRICHED MANUAL REPORT: ${linkedManualReport.id} for Event ${eq.id}`);
               } else if (!existingAutoReport) {
                 const reportId = `LAP-EQ-${branch.substring(0, 4).toUpperCase().replace(/\s/g, '')}-${Date.now().toString().slice(-6)}`;
                 const todayStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -296,8 +306,8 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
                 }));
 
                 const ticketNumber = `FL-${b.cabang.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-                const rainTitle = `🌧️ SIAGA HUJAN EKSTREM & BANJIR: Cabang ${b.cabang}`;
-                const rainMessage = `Model cuaca menunjukkan indikasi curah hujan lebat (${precipitation.toFixed(1)} mm/jam) di sekitar gerai cabang ${b.cabang}. Segera aktifkan SOP peninggian barang dagang ke atas pallet dan pasang tanggul air gerai.`;
+                const rainTitle = `SIAGA HUJAN LEBAT — POTENSI BANJIR: Cabang ${b.cabang}`;
+                const rainMessage = `Model cuaca menunjukkan potensi curah hujan lebat (${precipitation.toFixed(1)} mm/jam) di sekitar cabang ${b.cabang}. Bersiap aktifkan SOP pencegahan genangan.`;
 
                 await recordNotificationLog({
                   disasterId: floodEventId,

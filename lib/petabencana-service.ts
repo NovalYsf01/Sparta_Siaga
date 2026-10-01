@@ -5,7 +5,7 @@ export interface PetabencanaReport {
   lat: number;
   lng: number;
   title: string;
-  depth: number;
+  depth?: number | null;
   imageUrl?: string;
   timestamp: string;
 }
@@ -44,8 +44,8 @@ export async function fetchPetabencanaReports(): Promise<PetabencanaResult> {
             id: geom.properties.pkey || Math.random().toString(),
             lat: coords[1],
             lng: coords[0],
-            title: geom.properties.title || "Titik Genangan Banjir (BNPB/Petabencana)",
-            depth: geom.properties.report_data?.flood_depth || 10,
+            title: geom.properties.title || "Laporan Banjir Lapangan (PetaBencana)",
+            depth: geom.properties.report_data?.flood_depth || null,
             imageUrl: geom.properties.image_url,
             timestamp: geom.properties.created_at || new Date().toISOString(),
           });
@@ -59,8 +59,8 @@ export async function fetchPetabencanaReports(): Promise<PetabencanaResult> {
             id: feature.properties.pkey || Math.random().toString(),
             lat: feature.geometry.coordinates[1],
             lng: feature.geometry.coordinates[0],
-            title: feature.properties.title || "Titik Genangan Banjir (BNPB/Petabencana)",
-            depth: feature.properties.report_data?.flood_depth || 10,
+            title: feature.properties.title || "Laporan Banjir Lapangan (PetaBencana)",
+            depth: feature.properties.report_data?.flood_depth || null,
             imageUrl: feature.properties.image_url,
             timestamp: feature.properties.created_at || new Date().toISOString(),
           });

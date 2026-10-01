@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q") || "";
-  const branch = searchParams.get("branch") || "all";
   const limit = Math.min(parseInt(searchParams.get("limit") || "40", 10), 100);
 
   try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const isHoAdmin = ["ho_admin", "gm_ho", "sm_ho"].includes(sessionUser.role);
     const pool = getDbPool();
     const conditions: string[] = [];
     const values: any[] = [];
@@ -21,9 +27,10 @@ export async function GET(request: Request) {
       paramIndex++;
     }
 
-    if (branch && branch !== "all") {
+    // Server-side enforcement of branch scope
+    if (!isHoAdmin) {
       conditions.push(`cabang = $${paramIndex}`);
-      values.push(branch);
+      values.push(sessionUser.branch);
       paramIndex++;
     }
 

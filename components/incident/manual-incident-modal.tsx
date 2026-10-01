@@ -48,7 +48,7 @@ export function ManualIncidentModal({
   const isAdmin = activeRole === "ho_admin";
 
   useEffect(() => {
-    if (!searchQuery.trim() || !isAdmin) {
+    if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
@@ -74,7 +74,7 @@ export function ManualIncidentModal({
     }, 400);
 
     return () => clearTimeout(delay);
-  }, [searchQuery, isAdmin]);
+  }, [searchQuery]);
 
   const [photos, setPhotos] = useState<{
     depan: PhotoData;
@@ -272,43 +272,37 @@ export function ManualIncidentModal({
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">
                     Cari & Pilih Lokasi {tkpType}:
                   </label>
-                  {!isAdmin ? (
-                    <div className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-semibold text-slate-500">
-                      {rawStores.find(s => s.kode_toko === storeId || s.id === storeId)?.nama_toko || storeId || "Belum dipilih"}
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <input
-                        type="text"
-                        placeholder="Ketik nama atau kode toko..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#1D5AA6] bg-slate-50"
-                      />
-                      {isSearching && (
-                        <div className="absolute right-3 top-2.5 text-xs text-slate-400">Mencari...</div>
-                      )}
-                      {searchResults.length > 0 && (
-                        <ul className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                          {searchResults.map((s) => (
-                            <li
-                              key={s.id || s.kode_toko}
-                              onClick={() => {
-                                setStoreId(s.id || s.kode_toko);
-                                setSelectedStoreObj(s);
-                                setSearchQuery(`[${s.kode_toko}] ${s.nama_toko}`);
-                                setSearchResults([]);
-                              }}
-                              className="px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
-                            >
-                              <div className="font-bold">[{s.kode_toko}] {s.nama_toko}</div>
-                              <div className="text-[10px] text-slate-500">{s.cabang} - {s.alamat}</div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Ketik nama atau kode toko..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#1D5AA6] bg-slate-50"
+                    />
+                    {isSearching && (
+                      <div className="absolute right-3 top-2.5 text-xs text-slate-400">Mencari...</div>
+                    )}
+                    {searchResults.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {searchResults.map((s) => (
+                          <li
+                            key={s.id || s.kode_toko}
+                            onClick={() => {
+                              setStoreId(s.id || s.kode_toko);
+                              setSelectedStoreObj(s);
+                              setSearchQuery(`[${s.kode_toko}] ${s.nama_toko}`);
+                              setSearchResults([]);
+                            }}
+                            className="px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0"
+                          >
+                            <div className="font-bold">[{s.kode_toko}] {s.nama_toko}</div>
+                            <div className="text-[10px] text-slate-500">{s.cabang} - {s.alamat}</div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -326,40 +320,16 @@ export function ManualIncidentModal({
                     onChange={(e) => setDisasterType(e.target.value as DisasterType)}
                     className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#1D5AA6]"
                   >
-                    <option value="earthquake">Gempa Bumi</option>
-                    <option value="flood">Banjir / Genangan</option>
-                    <option value="fire">Kebakaran</option>
-                    <option value="theft">Pencurian / Perampokan</option>
-                    <option value="strong_wind">Angin Kencang / Puting Beliung</option>
-                    <option value="other">Lainnya</option>
+                    <option value="theft">KEMALINGAN</option>
+                    <option value="fire">KEBAKARAN</option>
+                    <option value="flood">KEBANJIRAN</option>
+                    <option value="heavy_rain">HUJAN/BADAI</option>
+                    <option value="strong_wind">ANGIN KENCANG</option>
+                    <option value="earthquake">GEMPA BUMI</option>
+                    <option value="severe_building_damage">BANGUNAN RUSAK PARAH</option>
                   </select>
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                    Detail Kerusakan (Bisa pilih &gt; 1):
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {availableCategories.map((cat) => {
-                      const isChecked = categories.includes(cat);
-                      return (
-                        <button
-                          type="button"
-                          key={cat}
-                          onClick={() => toggleCategory(cat)}
-                          className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                            isChecked
-                              ? "bg-[#1D5AA6] text-white border-[#1D5AA6] font-bold shadow-sm"
-                              : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {isChecked ? "✓ " : "+ "}
-                          {cat}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>
@@ -422,6 +392,8 @@ export function ManualIncidentModal({
                       description="Fokus pada lokasi kerusakan utama di area Gudang/DC"
                       value={photos.detailDC}
                       onChange={(data) => setPhotos({ ...photos, detailDC: data })}
+                      storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
+                      reporterName="Noval"
                     />
                   </div>
                 )}
@@ -431,21 +403,29 @@ export function ManualIncidentModal({
                     label="Foto Tampak 1"
                     value={photos.depan}
                     onChange={(data) => setPhotos({ ...photos, depan: data })}
+                    storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
+                    reporterName="Noval"
                   />
                   <FieldPhotoUploader 
                     label="Foto Tampak 2"
                     value={photos.dalam}
                     onChange={(data) => setPhotos({ ...photos, dalam: data })}
+                    storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
+                    reporterName="Noval"
                   />
                   <FieldPhotoUploader 
                     label="Foto Tampak 3"
                     value={photos.kiri}
                     onChange={(data) => setPhotos({ ...photos, kiri: data })}
+                    storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
+                    reporterName="Noval"
                   />
                   <FieldPhotoUploader 
                     label="Foto Tampak 4"
                     value={photos.kanan}
                     onChange={(data) => setPhotos({ ...photos, kanan: data })}
+                    storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
+                    reporterName="Noval"
                   />
                 </div>
               </div>

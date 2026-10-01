@@ -11,8 +11,12 @@ import {
   ArrowRight,
   ShieldCheck,
   Building,
+  Calculator,
 } from "lucide-react";
 import { IncidentRecord, RoleType } from "@/types/incident";
+import { DistributionStatusViewer } from "./distribution-status-viewer";
+import { EstimationModal } from "./estimation-modal";
+import { FieldPhotoUploader, PhotoData } from "./field-photo-uploader";
 
 interface MaintenanceTrackingModalProps {
   incident: IncidentRecord | null;
@@ -43,6 +47,11 @@ export function MaintenanceTrackingModal({
     incident?.maintenanceTicket?.assignedTechnician ?? "Tim Teknisi Sparta Regional"
   );
   const [workNotes, setWorkNotes] = useState("");
+  const [isEstimationOpen, setIsEstimationOpen] = useState(false);
+  
+  const [spkPhoto, setSpkPhoto] = useState<PhotoData>({ file: null, previewUrl: null, source: null, reporterRelation: null, capturedAt: null });
+  const [progressPhoto, setProgressPhoto] = useState<PhotoData>({ file: null, previewUrl: null, source: null, reporterRelation: null, capturedAt: null });
+  const [handoverPhoto, setHandoverPhoto] = useState<PhotoData>({ file: null, previewUrl: null, source: null, reporterRelation: null, capturedAt: null });
 
   if (!isOpen || !incident) return null;
 
@@ -51,15 +60,21 @@ export function MaintenanceTrackingModal({
 
   const handleApplyUpdate = (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedProgress === 100) {
+      if (!spkPhoto.file || !progressPhoto.file || !handoverPhoto.file) {
+        alert("Untuk menutup laporan (100%), Anda wajib melampirkan Foto SPK, Foto Progres 100%, dan Foto Serah Terima.");
+        return;
+      }
+    }
     onUpdateProgress(incident.id, selectedProgress, workNotes, technicianName);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+      <div className="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
+        {/* Header (Sticky) */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
               <Wrench className="w-5 h-5" />
@@ -67,10 +82,10 @@ export function MaintenanceTrackingModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 text-sm">
-                  Tracking Tiket Sparta Maintenance
+                  Detail Tracking Laporan
                 </h3>
                 <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                  {incident.maintenanceTicket?.ticketId || `#SPM-${incident.id.replace("INC-", "")}`}
+                  {incident.id}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -86,52 +101,12 @@ export function MaintenanceTrackingModal({
           </button>
         </div>
 
-        {/* Content Body */}
-        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-          {/* Summary Box */}
-          <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
-            <div className="flex items-center justify-between font-semibold text-slate-800">
-              <span className="flex items-center gap-1.5">
-                <Building className="w-4 h-4 text-slate-500" />
-                <span>Status Operasional Gerai:</span>
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                  incident.verification?.operationalStatus === "Tutup Sementara"
-                    ? "bg-red-100 text-red-700"
-                    : "bg-emerald-100 text-emerald-700"
-                }`}
-              >
-                {incident.verification?.operationalStatus || "Buka Normal"}
-              </span>
-            </div>
-
-            {incident.verification?.notes && (
-              <p className="text-slate-600 italic bg-white p-2.5 rounded-lg border border-slate-100">
-                "{incident.verification.notes}"
-              </p>
-            )}
-
-            {/* Damage Tags */}
-            {incident.verification?.categories && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[11px] font-medium text-slate-500">Kerusakan:</span>
-                {incident.verification.categories.map((cat) => (
-                  <span
-                    key={cat}
-                    className="px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200 text-[10px] font-semibold"
-                  >
-                    {cat}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
+        {/* Content Body (Scrollable) */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
           {/* Current Progress Bar */}
           <div>
             <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-1.5">
-              <span>Progress Penanganan Fisik</span>
+              <span>Progress Laporan</span>
               <span className="text-blue-600 font-extrabold">{incident.progress}% Selesai</span>
             </div>
             <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
@@ -144,54 +119,50 @@ export function MaintenanceTrackingModal({
             </div>
           </div>
 
-          {/* Progression Stepper */}
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-              <span className="font-semibold text-slate-800 text-[11px]">Laporan</span>
-              <span className="text-[10px] text-slate-400">Masuk</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-              <span className="font-semibold text-slate-800 text-[11px]">Verifikasi</span>
-              <span className="text-[10px] text-slate-400">Selesai</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
-                  incident.progress >= 60
-                    ? "bg-emerald-500 text-white"
-                    : incident.progress >= 30
-                    ? "border-2 border-blue-600 text-blue-600 bg-blue-50"
-                    : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                {incident.progress >= 60 ? <CheckCircle2 className="w-4 h-4" /> : "3"}
-              </div>
-              <span className="font-semibold text-slate-800 text-[11px]">Perbaikan</span>
-              <span className="text-[10px] text-slate-400">Fisik</span>
-            </div>
-
-            <div className="flex flex-col items-center gap-1">
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
-                  incident.progress >= 100
-                    ? "bg-emerald-500 text-white"
-                    : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                {incident.progress >= 100 ? <CheckCircle2 className="w-4 h-4" /> : "4"}
-              </div>
-              <span className="font-semibold text-slate-800 text-[11px]">Selesai</span>
-              <span className="text-[10px] text-slate-400">Arsip History</span>
+          {/* Actual Timeline Status */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+            <h4 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">Perjalanan Laporan</h4>
+            <div className="space-y-4 relative before:absolute before:inset-0 before:ml-[11px] before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+              {incident.timeline.map((item, idx) => (
+                <div key={idx} className="relative flex items-start gap-4 md:justify-center">
+                  <div className="absolute left-0 md:left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-white border-2 border-emerald-500 flex items-center justify-center shadow-sm z-10">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <div className="ml-8 md:ml-0 md:w-1/2 md:pr-10 md:text-right w-full">
+                    <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm text-left">
+                      <span className="block text-[10px] font-bold text-slate-400 mb-0.5">
+                        {item.stage}
+                      </span>
+                      <h5 className="text-xs font-bold text-slate-800 leading-tight">
+                        {item.label}
+                      </h5>
+                      <span className="block text-[9px] text-slate-500 mt-1">
+                        {item.timestamp} • {item.actor}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {/* Future Step Indicator based on completion */}
+              {incident.progress < 100 && (
+                <div className="relative flex items-start gap-4 md:justify-center opacity-50">
+                   <div className="absolute left-0 md:left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center z-10">
+                    <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                  </div>
+                  <div className="ml-8 md:ml-0 md:w-1/2 md:pr-10 md:text-right w-full">
+                    <div className="bg-transparent p-3 rounded-lg border border-dashed border-slate-300 text-left">
+                      <h5 className="text-xs font-bold text-slate-500">
+                        {incident.status === 'in_estimation' ? 'Pengerjaan Fisik' : incident.status === 'in_maintenance' ? 'Penyelesaian' : 'Tahap Selanjutnya'}
+                      </h5>
+                      <span className="block text-[9px] text-slate-400 mt-1">Belum dilakukan</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          <DistributionStatusViewer reportId={incident.id} />
 
           {/* Form Update Progress (For Maintenance & Admin HO) */}
           {canEditMaintenance && incident.status !== "resolved" && !isReadOnly && (
@@ -248,6 +219,18 @@ export function MaintenanceTrackingModal({
                 </div>
               </div>
 
+              {/* Estimation Trigger */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEstimationOpen(true)}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-bold transition-colors"
+                >
+                  <Calculator className="w-4 h-4" />
+                  Buat / Lihat Estimasi
+                </button>
+              </div>
+
               {/* Technician Input */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -275,6 +258,20 @@ export function MaintenanceTrackingModal({
                   placeholder="Contoh: Pengelasan rangka rak selesai, penggantian kaca etalase tuntas..."
                 />
               </div>
+
+              {/* Required Uploads for Completion */}
+              {selectedProgress === 100 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+                  <h4 className="text-[11px] font-bold text-amber-800 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Dokumen Wajib Serah Terima (Close Laporan)
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <FieldPhotoUploader label="Foto SPK" value={spkPhoto} onChange={setSpkPhoto} />
+                    <FieldPhotoUploader label="Foto Progres 100%" value={progressPhoto} onChange={setProgressPhoto} />
+                    <FieldPhotoUploader label="Foto Serah Terima" value={handoverPhoto} onChange={setHandoverPhoto} />
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end pt-2">
                 <button
@@ -307,6 +304,11 @@ export function MaintenanceTrackingModal({
             </div>
           </div>
         </div>
+        <EstimationModal 
+          isOpen={isEstimationOpen} 
+          onClose={() => setIsEstimationOpen(false)} 
+          incident={incident} 
+        />
       </div>
     </div>
   );

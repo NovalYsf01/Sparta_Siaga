@@ -20,6 +20,7 @@ export default function SettingsPage() {
     setPermission(res);
     if (res === "granted") {
       triggerDesktopPopup({
+        id: "perm-settings-granted",
         title: "Izin Notifikasi Aktif",
         body: "Anda akan menerima peringatan darurat melalui pop-up desktop.",
         disasterType: "earthquake"

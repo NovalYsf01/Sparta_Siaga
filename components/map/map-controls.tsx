@@ -139,12 +139,12 @@ export function MapControls({
                       layer.id as "all" | "earthquake" | "stores" | "flood"
                     )
                   }
-                  className={`py-1.5 px-1 rounded-xl border text-center font-medium text-[11px] transition-all flex flex-col items-center gap-1 ${
+                  className={`py-1.5 px-1 rounded-lg border text-center font-medium text-[10px] transition-all flex flex-col items-center gap-1 ${
                     isActive
-                      ? isDark ? "bg-slate-800 text-white border-slate-600 shadow-sm font-bold" : "bg-white text-slate-900 border-slate-300 shadow-sm font-bold"
+                      ? isDark ? "bg-slate-800 text-white border-slate-500 shadow-sm font-bold" : "bg-white text-slate-900 border-slate-300 shadow-sm font-bold"
                       : isDark
-                      ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                      : "bg-slate-50/50 border-slate-200 text-slate-500 hover:bg-white hover:text-slate-700"
+                      ? "bg-transparent border-transparent text-slate-500 hover:bg-slate-800/50 hover:text-slate-300"
+                      : "bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                   }`}
                 >
                   <span className="text-sm">{layer.icon}</span>
@@ -168,22 +168,21 @@ export function MapControls({
           </button>
           
           {isLegendExpanded && (
-            <div className="p-2 pt-0 grid grid-cols-2 gap-y-2 gap-x-1 animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="p-2 pt-0 flex flex-col gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
               <div className="flex items-center gap-2 text-[10px]">
-                <div className="w-3 h-3 rounded-full bg-red-500 flex items-center justify-center text-[7px] text-white">🌋</div>
-                <span className={isDark ? "text-slate-300" : "text-slate-700"}>Epicenter Gempa</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm border border-emerald-600/50"></div>
+                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>Toko Aman</span>
               </div>
               <div className="flex items-center gap-2 text-[10px]">
-                <div className="w-3 h-3 rounded bg-blue-600/20 border border-blue-600 flex items-center justify-center text-[7px]">🏢</div>
-                <span className={isDark ? "text-slate-300" : "text-slate-700"}>Cabang</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm border border-amber-600/50 animate-pulse"></div>
+                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>Toko Terindikasi</span>
               </div>
               <div className="flex items-center gap-2 text-[10px]">
-                <div className="w-3 h-3 rounded-full bg-emerald-500 border border-white"></div>
-                <span className={isDark ? "text-slate-300" : "text-slate-700"}>Toko (Aman)</span>
-              </div>
-              <div className="flex items-center gap-2 text-[10px]">
-                <div className="w-3 h-3 rounded-full bg-amber-500 border border-white animate-pulse"></div>
-                <span className={isDark ? "text-slate-300" : "text-slate-700"}>Toko Terindikasi</span>
+                <div className="relative flex h-2.5 w-2.5 items-center justify-center">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600 shadow-sm border border-red-700/50"></span>
+                </div>
+                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>Toko Bahaya</span>
               </div>
             </div>
           )}
@@ -193,12 +192,12 @@ export function MapControls({
         <div className="grid grid-cols-2 gap-1.5">
           <button
             onClick={onToggleIncidentOnly}
-            className={`py-1.5 px-2 rounded-xl border text-center font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 px-2 rounded-lg border text-center font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all ${
               incidentOnly
-                ? isDark ? "bg-red-500/20 text-red-400 border-red-500/50" : "bg-red-50 text-red-600 border-red-200"
+                ? isDark ? "bg-red-500/10 text-red-400 border-red-500/30" : "bg-red-50 text-red-600 border-red-200"
                 : isDark
-                ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-300"
-                : "bg-slate-50/50 border-slate-200 text-slate-500 hover:bg-white hover:text-slate-700"
+                ? "bg-transparent border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-300"
+                : "bg-transparent border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
             }`}
             title="Filter hanya toko dalam zona terdampak bencana"
           >
@@ -217,12 +216,12 @@ export function MapControls({
 
           <button
             onClick={onToggleRadar}
-            className={`py-1.5 px-2 rounded-xl border text-center font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-1.5 px-2 rounded-lg border text-center font-semibold text-[11px] flex items-center justify-center gap-1.5 transition-all ${
               showRadar
-                ? isDark ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/50" : "bg-cyan-50 text-cyan-600 border-cyan-200"
+                ? isDark ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30" : "bg-cyan-50 text-cyan-600 border-cyan-200"
                 : isDark
-                ? "bg-slate-900/50 border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-300"
-                : "bg-slate-50/50 border-slate-200 text-slate-500 hover:bg-white hover:text-slate-700"
+                ? "bg-transparent border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-slate-300"
+                : "bg-transparent border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
             }`}
             title="Aktifkan Doppler Satelit Radar Cuaca RainViewer"
           >
@@ -238,14 +237,14 @@ export function MapControls({
           }`}>
             <div className="flex items-center justify-between text-[10px] font-semibold mb-1.5">
               <span className={isDark ? "text-slate-300" : "text-slate-700"}>Intensitas Curah Hujan</span>
-              <span className={`font-mono text-[9px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>dBZ</span>
+              <span className={`font-mono text-[9px] px-1 py-0.5 rounded ${isDark ? "bg-slate-800 text-slate-400" : "bg-white border text-slate-500"}`}>dBZ</span>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-gradient-to-r from-cyan-300 via-green-400 via-yellow-400 via-orange-500 via-red-500 to-fuchsia-600 mb-1"></div>
-            <div className="flex justify-between text-[9px] font-medium">
-              <span className="text-cyan-500">Gerimis</span>
-              <span className="text-green-500">Sedang</span>
-              <span className="text-orange-500">Lebat</span>
-              <span className="text-fuchsia-500">Ekstrem</span>
+            <div className="h-1 w-full rounded-full bg-gradient-to-r from-cyan-300 via-green-400 via-yellow-400 via-orange-500 via-red-500 to-fuchsia-600 mb-1.5 opacity-80"></div>
+            <div className="flex justify-between text-[9px] font-semibold tracking-wide">
+              <span className="text-cyan-500 dark:text-cyan-400">Gerimis</span>
+              <span className="text-green-500 dark:text-green-400">Sedang</span>
+              <span className="text-orange-500 dark:text-orange-400">Lebat</span>
+              <span className="text-fuchsia-600 dark:text-fuchsia-500">Ekstrem</span>
             </div>
           </div>
         )}
@@ -256,7 +255,7 @@ export function MapControls({
             isDark ? "border-slate-800" : "border-slate-200"
           }`}
         >
-          <div className="flex items-center gap-1">
+          <div className={`flex items-center gap-0.5 p-0.5 rounded-lg border ${isDark ? "bg-slate-900/50 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
             {(["esri-dark", "esri-light", "osm"] as const).map((mapType) => {
               const isSelected = basemap === mapType;
               const label =
@@ -269,14 +268,14 @@ export function MapControls({
                 <button
                   key={mapType}
                   onClick={() => onChangeBasemap(mapType)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-all ${
+                  className={`px-2 py-0.5 rounded-md text-[9px] font-semibold transition-all ${
                     isSelected
                       ? isDark
-                        ? "bg-cyan-600 text-white font-bold"
-                        : "bg-slate-900 text-white font-bold"
+                        ? "bg-slate-700 text-white shadow-sm"
+                        : "bg-white text-slate-900 shadow-sm border border-slate-200"
                       : isDark
-                      ? "text-slate-400 hover:text-white"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "text-slate-400 hover:text-white hover:bg-slate-800"
+                      : "text-slate-500 hover:text-slate-900 hover:bg-slate-200"
                   }`}
                 >
                   {label}
@@ -288,13 +287,13 @@ export function MapControls({
           <button
             onClick={onResetView}
             title="Reset Kamera ke Peta Nasional"
-            className={`px-2 py-0.5 rounded text-[10px] font-medium border flex items-center gap-1 transition-colors ${
+            className={`px-2 py-1 rounded-lg text-[10px] font-semibold border flex items-center gap-1.5 transition-colors ${
               isDark
-                ? "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
-                : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+                ? "bg-transparent border-slate-700 text-slate-300 hover:bg-slate-800"
+                : "bg-transparent border-slate-200 text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Compass className="w-3 h-3 text-cyan-400" />
+            <Compass className="w-3.5 h-3.5 text-cyan-500" />
             <span>Reset</span>
           </button>
         </div>

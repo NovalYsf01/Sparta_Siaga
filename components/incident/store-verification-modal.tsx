@@ -12,7 +12,8 @@ import {
   Lock,
   ArrowRight,
 } from "lucide-react";
-import { IncidentRecord, RoleType, DamageReport } from "@/types/incident";
+import { IncidentRecord, RoleType, DamageReport, SpartaRole } from "@/types/incident";
+import { canConfirmAffectedStore } from "@/lib/report-permissions";
 
 interface StoreVerificationModalProps {
   incident: IncidentRecord | null;
@@ -39,11 +40,23 @@ export function StoreVerificationModal({
   const [operationalStatus, setOperationalStatus] = useState<"Buka Normal" | "Tutup Sementara">("Buka Normal");
   const [notes, setNotes] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<{ id: string; name: string; role: string; branch: string } | null>(null);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      fetch("/api/auth/me")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => setIdentity(data))
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   if (!isOpen || !incident) return null;
 
-  // Permission Guard
-  const canVerify = activeRole === "ho_admin" || activeRole === "store_manager_affected";
+  // Permission Guard using real RBAC
+  const canVerify = identity
+    ? canConfirmAffectedStore(identity.role as SpartaRole, identity.branch, incident)
+    : false;
 
   const availableCategories = [
     "Dinding/Struktur",
@@ -227,7 +240,7 @@ export function StoreVerificationModal({
                     </label>
                     <select
                       value={severity}
-                      onChange={(e) => setSeverity(e.target.value as any)}
+                      onChange={(e) => setSeverity(e.target.value as "Ringan" | "Sedang" | "Berat")}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
                     >
                       <option value="Ringan">Ringan (Struktur Aman)</option>
@@ -242,7 +255,7 @@ export function StoreVerificationModal({
                     </label>
                     <select
                       value={operationalStatus}
-                      onChange={(e) => setOperationalStatus(e.target.value as any)}
+                      onChange={(e) => setOperationalStatus(e.target.value as "Buka Normal" | "Tutup Sementara")}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
                     >
                       <option value="Buka Normal">Buka Normal</option>

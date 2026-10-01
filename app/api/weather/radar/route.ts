@@ -52,16 +52,14 @@ export async function GET() {
   } catch (err: any) {
     console.error("[Radar API] Error fetching RainViewer data, using fallback:", err);
 
-    // Fallback timestamp if offline
-    const fallbackTileUrl =
-      "https://tilecache.rainviewer.com/v2/radar/56c65c998848/256/{z}/{x}/{y}/2/1_1.png";
+    if (cachedRadar) {
+      console.log("[Radar API] Returning last-known-good cached radar.");
+      return NextResponse.json({ ...cachedRadar, stale: true });
+    }
 
     return NextResponse.json({
-      tileUrl: fallbackTileUrl,
-      timestamp: Math.floor(Date.now() / 1000),
-      timeFormatted: "Live",
-      source: "RainViewer Fallback",
-      fallback: true,
-    });
+      unavailable: true,
+      error: "Radar API offline",
+    }, { status: 503 });
   }
 }

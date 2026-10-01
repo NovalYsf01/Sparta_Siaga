@@ -614,27 +614,16 @@ export default function MapInner({
 
             return (
               <React.Fragment key={report.id}>
-                {/* Flood radius circle (e.g., 2km warning zone) */}
-                <Circle
-                  center={[report.lat, report.lng]}
-                  radius={2000}
-                  pathOptions={{
-                    color: "#3b82f6",
-                    fillColor: "#3b82f6",
-                    fillOpacity: 0.15,
-                    weight: 2,
-                    dashArray: "4, 4",
-                  }}
-                />
+                {/* Removed fake flood polygon radius. Only rendering the marker per business rule. */}
                 <Marker position={[report.lat, report.lng]} icon={floodIcon}>
                   <Popup className="custom-leaflet-popup">
                     <div className="p-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-2xl w-68 space-y-2 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600/20 text-blue-400 border border-blue-500/30">
-                          PB-{report.id.substring(0, 4).toUpperCase()}
+                          {report.id.length > 8 ? "PB-" + report.id.substring(0, 4).toUpperCase() : report.id}
                         </span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white animate-pulse">
-                          Zona Genangan
+                          Laporan Lapangan
                         </span>
                       </div>
 
@@ -644,11 +633,14 @@ export default function MapInner({
 
                       <div className="p-1.5 rounded bg-blue-950/80 border border-blue-600/60 text-[11px] text-blue-200">
                         <span className="block mb-0.5 opacity-80">Estimasi Ketinggian Air:</span>
-                        <strong className="text-red-400 text-sm">{report.depth} cm</strong>
+                        <strong className="text-red-400 text-sm">
+                          {report.depth != null ? `${report.depth} cm` : "Data ketinggian air tidak tersedia"}
+                        </strong>
                       </div>
 
-                      <div className="text-[10px] text-slate-400">
-                        Waktu Update: {new Date(report.timestamp).toLocaleTimeString("id-ID")}
+                      <div className="text-[10px] text-slate-400 space-y-0.5 mt-2">
+                        <p>Source: PetaBencana</p>
+                        <p>Waktu: {new Date(report.timestamp).toLocaleString("id-ID")}</p>
                       </div>
 
                       <button

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
+import { Info, X } from "lucide-react";
 import { Store, StoreStatus } from "@/types/store";
 import { Earthquake, DisasterFeedResponse } from "@/types/disaster";
 import { RoleType, IncidentRecord, DamageReport } from "@/types/incident";
@@ -65,6 +67,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   const [isAffectedSheetOpen, setIsAffectedSheetOpen] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState<boolean>(false);
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
   const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
@@ -262,6 +265,57 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const handleFlyToIncident = useCallback((incident: any) => {
+    setIsNotificationCenterOpen(false);
+    router.push("/monitoring");
+
+    if (incident.disaster_type === "earthquake") {
+      setActiveLayer("earthquake");
+      const allEqs = disasterData
+        ? [
+            ...(disasterData.latestBmkgEarthquake ? [disasterData.latestBmkgEarthquake] : []),
+            ...(disasterData.recentEarthquakes || []),
+          ]
+        : [];
+      const eq = allEqs.find((e) => e.id === incident.disaster_id);
+      if (eq) {
+        setFlyToTarget({ lat: eq.latitude, lng: eq.longitude, zoom: 10 });
+      }
+    } else if (incident.disaster_type === "heavy_rain" || incident.disaster_type === "flood") {
+      setActiveLayer("weather");
+      
+      // Check if spatial data exists in floodReports
+      const flood = disasterData?.floodReports?.find((f: any) => f.id === incident.disaster_id);
+      if (flood) {
+        setFlyToTarget({ lat: flood.lat, lng: flood.lng, zoom: 12 });
+      } else {
+        // Honest message
+        toast.custom((t) => (
+          <div className="flex items-start gap-2 bg-slate-900 dark:bg-slate-800 text-white px-3 py-3 rounded-lg shadow-md max-w-sm pointer-events-auto">
+            <Info className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold">Visual area banjir belum tersedia</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">Data sumber hanya memberikan indikasi cuaca, bukan area spasial lapangan.</p>
+            </div>
+            <button onClick={() => toast.dismiss(t)} className="ml-auto p-1 shrink-0 text-slate-400 hover:text-white transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ), { duration: 5000 });
+        
+        // We can still try to fly to the branch's center if we have stores
+        if (incident.branch) {
+          const branchStores = rawStores.filter(s => s.cabang?.toLowerCase() === incident.branch?.toLowerCase());
+          if (branchStores.length > 0) {
+            const avgLat = branchStores.reduce((acc, s) => acc + s.latitude, 0) / branchStores.length;
+            const avgLng = branchStores.reduce((acc, s) => acc + s.longitude, 0) / branchStores.length;
+            setFlyToTarget({ lat: avgLat, lng: avgLng, zoom: 11 });
+          }
+        }
+      }
+    }
+  }, [router, disasterData, rawStores]);
+
   // Spatial calculation engine
   const computedStores = useMemo(() => {
     const earthquakes = disasterData?.recentEarthquakes || [];
@@ -308,6 +362,33 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           if (unreadLogs.length > notificationCount) {
              playEmergencyChime(); // Play sound if new notification arrived
           }
+          
+          // Trigger popups for all unread logs (triggerDesktopPopup handles deduplication internally)
+          unreadLogs.forEach((l: any) => {
+            let sourceLabel = "SPARTA Siaga";
+            if (l.disaster_id?.includes("bmkg")) sourceLabel = "BMKG";
+            else if (l.disaster_id?.includes("usgs")) sourceLabel = "USGS";
+            else if (l.disaster_id?.includes("open-meteo") || l.disaster_type === "heavy_rain") sourceLabel = "Open-Meteo";
+
+            triggerDesktopPopup({
+              id: l.id,
+              title: l.title,
+              body: l.message,
+              disasterType: l.disaster_type,
+              ticketNumber: l.ticket_number,
+              branch: l.branch,
+              source: sourceLabel,
+              timestamp: new Date(l.sent_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+              isSimulation: l.disaster_id?.includes("sim"),
+              onClickDetail: () => {
+                setSelectedNotificationId(l.id);
+                setIsNotificationCenterOpen(true);
+              },
+              onClickMap: () => {
+                handleFlyToIncident(l);
+              }
+            });
+          });
           setNotificationCount(unreadLogs.length);
         }
 
@@ -587,6 +668,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         onSearchClick={() => setIsSearchOpen(true)}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        onOpenReportModal={handleOpenReportModal}
       >
         {children}
       </IncidentAppShell>
@@ -713,23 +795,12 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       <NotificationCenterSheet
         isOpen={isNotificationCenterOpen}
         onClose={() => setIsNotificationCenterOpen(false)}
+        selectedNotificationId={selectedNotificationId}
+        onClearSelectedNotification={() => setSelectedNotificationId(null)}
         onOpenPermissionDialog={() => setIsPermissionDialogOpen(true)}
         theme={theme}
         activeIncidents={incidents}
-        onFlyToIncident={(incident) => {
-          setIsNotificationCenterOpen(false);
-          router.push("/monitoring");
-          const allEqs = disasterData
-            ? [
-                ...(disasterData.latestBmkgEarthquake ? [disasterData.latestBmkgEarthquake] : []),
-                ...(disasterData.recentEarthquakes || []),
-              ]
-            : [];
-          const eq = allEqs.find((e) => e.id === incident.disaster_id);
-          if (eq) {
-            setFlyToTarget({ lat: eq.latitude, lng: eq.longitude, zoom: 10 });
-          }
-        }}
+        onFlyToIncident={handleFlyToIncident}
         onWorkerDispatched={() => {
           setNotificationCount(0);
         }}

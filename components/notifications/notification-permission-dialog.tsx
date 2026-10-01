@@ -109,10 +109,11 @@ export function NotificationPermissionDialog({
 
       // 4. Trigger test confirmation popup
       triggerDesktopPopup({
-        title: "✅ Notifikasi Siaga Berhasil Diaktifkan!",
-        body: `Laptop Anda terhubung dengan siaga bencana untuk: ${
-          selectedBranch === "all" ? "Seluruh Cabang Nasional (HO Pusat)" : `Cabang ${selectedBranch}`
-        }. Pop-up akan otomatis meletus jika ada gempa bumi atau banjir.`,
+        id: "perm-dialog-granted",
+        title: "Notifikasi Siaga Aktif",
+        body: `Laptop terhubung untuk: ${
+          selectedBranch === "all" ? "HO Pusat" : `Cabang ${selectedBranch}`
+        }.`,
         disasterType: "earthquake",
         branch: selectedBranch,
         forceBypassBranchFilter: true,

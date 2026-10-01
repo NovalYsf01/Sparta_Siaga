@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   MapPin,
   ClipboardList,
+  Activity,
   History,
   Settings,
   Bell,
@@ -33,6 +34,7 @@ export interface IncidentAppShellProps {
   onSearchClick?: () => void;
   theme?: "dark" | "light";
   onToggleTheme?: () => void;
+  onOpenReportModal?: () => void;
   children: React.ReactNode;
 }
 
@@ -45,6 +47,7 @@ export function IncidentAppShell({
   onSearchClick,
   theme = "light",
   onToggleTheme,
+  onOpenReportModal,
   children,
 }: IncidentAppShellProps) {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
@@ -101,13 +104,15 @@ export function IncidentAppShell({
       title: "Monitoring",
       items: [
         { id: "map", href: "/monitoring", label: "Peta Monitoring", icon: MapPin },
-        { id: "incidents", href: "/alerts", label: "Kejadian / Alert", icon: Bell, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
+        { id: "incidents", href: "/alerts", label: "Event Bencana", icon: Bell },
       ],
     },
     {
       title: "Pelaporan",
       items: [
-        { id: "history", href: "/reports", label: "Arsip Laporan", icon: ClipboardList },
+        { id: "history", href: "/reports", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
+        { id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity },
+        { id: "history-browse", href: "/reports/history", label: "Riwayat Laporan", icon: History },
       ],
     },
     {
@@ -117,6 +122,11 @@ export function IncidentAppShell({
       ],
     },
   ];
+
+  const isNavActive = (href: string, currentPath: string) => {
+    if (href === "/reports") return currentPath === "/reports";
+    return currentPath === href || currentPath.startsWith(`${href}/`);
+  };
 
   return (
     <div
@@ -166,7 +176,7 @@ export function IncidentAppShell({
               )}
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/");
+                const isActive = isNavActive(item.href, pathname);
                 return (
                   <Link
                     key={item.id}
@@ -264,9 +274,12 @@ export function IncidentAppShell({
             
             <button
               onClick={() => {
-                // To be wired to the manual report action
-                const event = new CustomEvent('open-manual-report');
-                window.dispatchEvent(event);
+                if (onOpenReportModal) {
+                  onOpenReportModal();
+                } else {
+                  const event = new CustomEvent('open-manual-report');
+                  window.dispatchEvent(event);
+                }
               }}
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
             >
@@ -489,7 +502,7 @@ export function IncidentAppShell({
                   </div>
                   {group.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== "/");
+                    const isActive = isNavActive(item.href, pathname);
                     return (
                       <Link
                         key={item.id}
