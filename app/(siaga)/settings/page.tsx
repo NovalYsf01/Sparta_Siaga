@@ -140,7 +140,29 @@ export default function SettingsPage() {
                   <Server className="w-4 h-4 text-slate-400" />
                   BMKG (Badan Meteorologi, Klimatologi, dan Geofisika)
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">Primary official Indonesia seismic information</div>
+                <div className="text-xs text-slate-500 mt-0.5">Primary official Indonesian seismic information</div>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 gap-2">
+              <div>
+                <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-slate-400" />
+                  USGS
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">Secondary / redundant seismic information</div>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 gap-2">
+              <div>
+                <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-slate-400" />
+                  Open-Meteo
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">Weather forecast / precipitation model</div>
               </div>
               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
             </div>
@@ -156,7 +178,7 @@ export default function SettingsPage() {
               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 gap-2">
               <div>
                 <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Server className="w-4 h-4 text-slate-400" />
@@ -167,26 +189,26 @@ export default function SettingsPage() {
               <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
             </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 gap-2">
               <div>
-                <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 opacity-50">
+                <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Server className="w-4 h-4 text-slate-400" />
                   USGS
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5 opacity-50">Secondary / redundant seismic information</div>
+                <div className="text-xs text-slate-500 mt-0.5">Secondary / redundant seismic information</div>
               </div>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md self-start sm:self-center border border-slate-200 dark:border-slate-700">Tidak Dikonfigurasi</span>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
             </div>
             
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-2">
               <div>
-                <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2 opacity-50">
+                <div className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
                   <Server className="w-4 h-4 text-slate-400" />
                   PetaBencana
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5 opacity-50">Field / community report source</div>
+                <div className="text-xs text-slate-500 mt-0.5">Field / community report source</div>
               </div>
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md self-start sm:self-center border border-slate-200 dark:border-slate-700">Tidak Dikonfigurasi</span>
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-md self-start sm:self-center border border-emerald-100 dark:border-emerald-800">Terkonfigurasi</span>
             </div>
           </div>
         </section>

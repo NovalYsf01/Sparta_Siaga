@@ -177,7 +177,7 @@ export function NotificationCenterSheet({
     <div
       className={`fixed z-[700] flex flex-col shadow-2xl transition-all duration-300 ease-in-out animate-in fade-in ${
         isDark
-          ? "bg-slate-900 border-slate-800 text-white"
+          ? "bg-slate-900 border-slate-800 text-slate-100"
           : "bg-white border-slate-200 text-slate-900 shadow-2xl"
       }
       /* Mobile: bottom sheet style */
@@ -192,31 +192,22 @@ export function NotificationCenterSheet({
 
       {/* Header */}
       <div
-        className={`p-4 border-b flex items-start justify-between gap-3 ${
-          isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200"
+        className={`p-5 pb-4 flex items-start justify-between gap-3 ${
+          isDark ? "bg-slate-900" : "bg-white"
         }`}
       >
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-7 h-7 rounded-lg bg-red-600/20 text-red-500 border border-red-500/30 flex items-center justify-center shrink-0">
-              <Bell className="w-4 h-4" />
-            </div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Bell className={`w-4 h-4 ${isDark ? "text-slate-400" : "text-slate-500"}`} />
             <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              Pusat Notifikasi Darurat
+              Pusat Notifikasi
             </h2>
-            <span
-              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                isDark
-                  ? "bg-emerald-950/80 text-emerald-400 border-emerald-600/30"
-                  : "bg-emerald-50 text-emerald-700 border-emerald-300"
-              }`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Auto-Sync (60d)
+            <span className={`text-[11px] font-medium ml-2 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              Auto Sync · 60 detik
             </span>
           </div>
           <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-            Monitoring peringatan darurat BMKG & eskalasi krisis cabang.
+            Informasi kejadian & peringatan darurat
           </p>
         </div>
 
@@ -233,190 +224,114 @@ export function NotificationCenterSheet({
         </button>
       </div>
 
-      {/* Desktop Alert Status Banner */}
+      {/* Control Area */}
       <div
-        className={`px-4 py-2 border-b flex items-center justify-between gap-3 text-xs ${
-          isDark
-            ? "bg-slate-950/90 border-slate-800/80"
-            : "bg-slate-50/90 border-slate-200"
+        className={`px-5 py-3 flex items-center justify-between gap-3 ${
+          isDark ? "bg-slate-900" : "bg-white"
         }`}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className={`p-1.5 rounded-md shrink-0 ${
-              isDark ? "bg-slate-800/80 text-cyan-400" : "bg-cyan-50 text-cyan-700 border border-cyan-200"
-            }`}
-          >
-            <Monitor className="w-3.5 h-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                Alarm Layar Desktop:
-              </span>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
-                  permissionState === "granted"
-                    ? isDark
-                      ? "bg-emerald-950 text-emerald-400 border border-emerald-600/30"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-300"
-                    : isDark
-                    ? "bg-amber-950 text-amber-400 border border-amber-600/30"
-                    : "bg-amber-50 text-amber-700 border-amber-300"
-                }`}
-              >
-                {permissionState === "granted" ? "● Aktif" : "○ Belum Aktif"}
-              </span>
-            </div>
-            <p className={`text-[11px] truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-              {permissionState === "granted"
-                ? "Banner pop-up & audio siaga aktif saat layar terminimalisir."
-                : "Aktifkan izin pop-up agar peringatan krisis langsung tampil di laptop."}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          {permissionState !== "granted" && (
-            <button
-              onClick={handleRequestPermission}
-              className="px-2.5 py-1 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs transition-colors shadow-sm"
-            >
-              Aktifkan
-            </button>
-          )}
-
-          <button
-            onClick={handleTestDesktopPopup}
-            className={`px-2.5 py-1 rounded-md text-xs flex items-center gap-1 transition-colors border ${
-              isDark
-                ? "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700"
-                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300 shadow-sm"
-            }`}
-            title="Uji coba pop-up darurat dan suara audio chime"
-          >
-            <Volume2 className="w-3 h-3 text-amber-500" />
-            <span>Tes Alarm</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Control Actions Bar */}
-      <div
-        className={`px-3 sm:px-4 py-2 sm:py-2.5 border-b flex flex-wrap items-center justify-between gap-2 ${
-          isDark
-            ? "bg-slate-950/40 border-slate-800/80"
-            : "bg-slate-50/50 border-slate-200"
-        }`}
-      >
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => handleRefreshData()}
             disabled={runningWorker}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-sm shadow-blue-600/20 disabled:opacity-50"
-            title="Perbarui data notifikasi"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+              isDark
+                ? "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+            } disabled:opacity-50`}
+            title="Muat Ulang Data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${runningWorker ? "animate-spin" : ""}`} />
-            <span>Muat Ulang Data</span>
+            <span>Muat Ulang</span>
           </button>
-
           <button
-            disabled={true}
-            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs border transition-colors disabled:opacity-50 cursor-not-allowed ${
+            onClick={handleTestDesktopPopup}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
               isDark
-                ? "bg-slate-800 text-slate-500 border-slate-700/80"
-                : "bg-slate-100 text-slate-400 border-slate-300"
+                ? "bg-slate-800 hover:bg-slate-700 text-slate-200"
+                : "bg-slate-100 hover:bg-slate-200 text-slate-700"
             }`}
-            title="Simulasi hanya dapat dijalankan dari backend/CLI"
+            title="Tes Alarm Peringatan"
           >
-            <Send className="w-3 h-3 text-cyan-700" />
-            <span>Simulasi Alert</span>
+            <Volume2 className="w-3.5 h-3.5" />
+            <span>Tes Alarm</span>
           </button>
         </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={handleMarkAllAsRead}
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs transition-colors border shadow-sm ${
-              isDark
-                ? "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700/80"
-                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
-            }`}
-            title="Tandai semua notifikasi telah dibaca"
-          >
-            <Check className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="hidden xs:inline">Tandai Semua Dibaca</span>
-            <span className="xs:hidden">Tandai Dibaca</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Last Worker Status Feedback */}
-      {lastWorkerMessage && (
-        <div
-          className={`px-4 py-2 border-b text-xs flex items-center gap-2 animate-in fade-in duration-200 ${
-            isDark
-              ? "bg-slate-800/90 border-slate-700 text-slate-200"
-              : "bg-emerald-50 border-emerald-200 text-emerald-800"
+        <button
+          onClick={handleMarkAllAsRead}
+          className={`text-xs font-medium transition-colors ${
+            isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
           }`}
         >
-          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          <span className="truncate">{lastWorkerMessage}</span>
+          Tandai Semua Dibaca
+        </button>
+      </div>
+
+      {/* Desktop Alert Request Banner (If needed) */}
+      {permissionState !== "granted" && (
+        <div className={`px-5 py-3 border-y flex items-center justify-between gap-3 text-xs ${
+          isDark ? "bg-slate-950/50 border-slate-800" : "bg-slate-50 border-slate-200"
+        }`}>
+          <span className={isDark ? "text-slate-400" : "text-slate-600"}>
+            Aktifkan pop-up peringatan desktop
+          </span>
+          <button
+            onClick={handleRequestPermission}
+            className="text-blue-500 font-semibold hover:underline"
+          >
+            Aktifkan
+          </button>
         </div>
       )}
 
-      {/* Filters (Channel tabs & Branch dropdown) */}
+      {/* Filter Area */}
       <div
-        className={`px-4 py-2.5 border-b flex items-center justify-between gap-2 flex-wrap text-xs ${
-          isDark
-            ? "bg-slate-900/60 border-slate-800"
-            : "bg-slate-50 border-slate-200"
+        className={`px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap text-xs ${
+          isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"
         }`}
       >
-        <div
-          className={`flex items-center gap-1 p-1 rounded-lg border ${
-            isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
-          }`}
-        >
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setFilterType("all")}
-            className={`px-2.5 py-1 rounded-md transition-colors ${
+            className={`px-3 py-1.5 rounded-md transition-colors ${
               filterType === "all"
                 ? isDark
                   ? "bg-slate-800 text-white font-semibold"
-                  : "bg-white text-slate-900 font-semibold shadow-sm"
+                  : "bg-slate-200 text-slate-900 font-semibold"
                 : isDark
-                ? "text-slate-400 hover:text-slate-200"
-                : "text-slate-600 hover:text-slate-900"
+                ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
             }`}
           >
-            Semua ({logs.length})
+            Semua
           </button>
           <button
             onClick={() => setFilterType("earthquake")}
-            className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-md transition-colors ${
               filterType === "earthquake"
-                ? "bg-red-600 text-white font-semibold shadow-sm"
+                ? isDark
+                  ? "bg-slate-800 text-white font-semibold"
+                  : "bg-slate-200 text-slate-900 font-semibold"
                 : isDark
-                ? "text-slate-400 hover:text-slate-200"
-                : "text-slate-600 hover:text-slate-900"
+                ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
             }`}
           >
-            <Flame className="w-3 h-3 text-red-500" />
-            <span>Gempa ({eqCount})</span>
+            Gempa
           </button>
           <button
             onClick={() => setFilterType("heavy_rain")}
-            className={`px-2.5 py-1 rounded-md transition-colors flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-md transition-colors ${
               filterType === "heavy_rain"
-                ? "bg-blue-600 text-white font-semibold shadow-sm"
+                ? isDark
+                  ? "bg-slate-800 text-white font-semibold"
+                  : "bg-slate-200 text-slate-900 font-semibold"
                 : isDark
-                ? "text-slate-400 hover:text-slate-200"
-                : "text-slate-600 hover:text-slate-900"
+                ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
             }`}
           >
-            <CloudRain className="w-3 h-3 text-cyan-500" />
-            <span>Hujan & Banjir ({rainCount})</span>
+            Hujan & Banjir
           </button>
         </div>
 
@@ -424,10 +339,10 @@ export function NotificationCenterSheet({
           <select
             value={selectedBranch}
             onChange={(e) => setSelectedBranch(e.target.value)}
-            className={`px-2.5 py-1 rounded-lg border text-xs focus:outline-none focus:border-red-500 ${
+            className={`px-2 py-1.5 rounded border text-xs focus:outline-none focus:border-blue-500 bg-transparent ${
               isDark
-                ? "bg-slate-950 border-slate-800 text-slate-300"
-                : "bg-white border-slate-300 text-slate-800 shadow-sm"
+                ? "border-slate-800 text-slate-300"
+                : "border-slate-200 text-slate-700"
             }`}
           >
             <option value="all">Semua Cabang DC</option>
@@ -441,27 +356,15 @@ export function NotificationCenterSheet({
       </div>
 
       {/* Main List */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
         {filteredLogs.length === 0 ? (
-          <div className="text-center py-16 text-slate-500">
-            <CheckCircle className="w-12 h-12 mx-auto mb-3 text-emerald-500/50" />
-            <p className={`text-sm font-semibold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-              Tidak ada log notifikasi
+          <div className="text-center py-12 text-slate-500">
+            <p className={`text-sm font-semibold ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+              Tidak ada notifikasi
             </p>
             <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">
-              Semua cabang dalam status normal, atau filter tidak menghasilkan kecocokan.
+              Saat ini tidak ada peringatan darurat yang sesuai filter.
             </p>
-            <button
-              onClick={() => handleRefreshData()}
-              className={`mt-4 px-3 py-1.5 rounded-lg text-xs inline-flex items-center gap-1.5 border ${
-                isDark
-                  ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
-                  : "bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-sm"
-              }`}
-            >
-              <RefreshCw className="w-3 h-3 text-cyan-500" />
-              <span>Muat Ulang Data</span>
-            </button>
           </div>
         ) : (
           filteredLogs.map((log) => {
@@ -469,112 +372,64 @@ export function NotificationCenterSheet({
             const dateStr = new Date(log.sent_at).toLocaleTimeString("id-ID", {
               hour: "2-digit",
               minute: "2-digit",
-              second: "2-digit",
               timeZone: "Asia/Jakarta",
             });
             const derivedStatus = getDerivedStatus(log);
+            const isRead = derivedStatus === "read";
 
             return (
               <div
                 key={log.id}
-                className={`border rounded-xl p-3.5 transition-all shadow-md group ${
-                  isDark
-                    ? "bg-slate-950/80 border-slate-800/90 hover:border-slate-700 text-white"
-                    : "bg-white border-slate-200 hover:border-slate-300 text-slate-900 shadow-sm"
-                }`}
+                className={`group border-b pb-4 last:border-0 last:pb-0 ${
+                  isDark ? "border-slate-800" : "border-slate-100"
+                } ${isRead ? "opacity-70" : "opacity-100"}`}
               >
-                {/* Top line: Badges and time */}
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* Disaster Type Badge */}
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
-                        isEarthquake
-                          ? isDark
-                            ? "bg-red-600/20 text-red-400 border border-red-500/30"
-                            : "bg-red-50 text-red-700 border border-red-200"
-                          : isDark
-                          ? "bg-blue-600/20 text-cyan-400 border border-blue-500/30"
-                          : "bg-blue-50 text-cyan-700 border border-blue-200"
-                      }`}
-                    >
-                      {isEarthquake ? <Flame className="w-3 h-3 text-red-500" /> : <CloudRain className="w-3 h-3 text-cyan-500" />}
-                      {isEarthquake ? "Gempa Bumi" : "Hujan & Banjir"}
-                    </span>
-
-                    {/* Ticket Number */}
-                    <span
-                      className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold border ${
-                        isDark
-                          ? "bg-slate-800 text-slate-300 border-slate-700"
-                          : "bg-slate-100 text-slate-700 border-slate-200"
-                      }`}
-                    >
-                      {log.ticket_number}
-                    </span>
-
-                    {/* Status Badge */}
-                    {derivedStatus === "read" ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-600/50 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span>DIBACA</span>
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-600/40 flex items-center gap-1 animate-pulse">
-                        <Clock className="w-3 h-3 text-amber-400" />
-                        <span>BELUM DIBACA</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <span className={`text-[11px] flex items-center gap-1 font-mono ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                    <Clock className="w-3 h-3" />
-                    {dateStr} WIB
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                    isEarthquake 
+                      ? (isDark ? "text-red-400" : "text-red-600")
+                      : (isDark ? "text-blue-400" : "text-blue-600")
+                  }`}>
+                    {isEarthquake ? "Gempa Bumi" : "Hujan & Banjir"}
+                  </span>
+                  <span className={`text-[11px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                    {dateStr}
                   </span>
                 </div>
-
-                {/* Title */}
-                <h3 className={`text-xs font-bold mb-1 transition-colors ${
-                  isDark ? "text-white group-hover:text-red-300" : "text-slate-900 group-hover:text-red-600"
+                
+                <h3 className={`text-sm leading-snug mb-1 ${
+                  !isRead ? "font-bold" : "font-medium"
+                } ${
+                  isDark ? "text-slate-100" : "text-slate-900"
                 }`}>
                   {log.title}
                 </h3>
-
-                {/* Subtitle impact summary */}
-                <p className={`text-[11px] mb-2.5 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                  ⚠️ Terdeteksi <strong className={isDark ? "text-white" : "text-slate-900"}>{log.affected_stores_count} Gerai Toko</strong> Cabang {log.branch} di zona pantauan bahaya & waspada.
+                
+                <p className={`text-xs mb-3 line-clamp-2 ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                  {log.message}
                 </p>
-
-                {/* Footer Bar with Status and Detail Action */}
-                <div
-                  className={`flex items-center justify-between gap-2 pt-2 border-t ${
-                    isDark ? "border-slate-800/80" : "border-slate-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono">
-                    {derivedStatus === "read" ? (
-                      <span className="text-emerald-500 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Dibaca</span>
-                      </span>
-                    ) : (
-                      <span className="text-amber-500 font-medium flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" />
-                        <span>Belum Dibaca</span>
-                      </span>
-                    )}
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    {!isRead ? (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    ) : null}
+                    <span className={`text-[11px] font-medium ${
+                      !isRead 
+                        ? (isDark ? "text-slate-300" : "text-slate-700") 
+                        : (isDark ? "text-slate-500" : "text-slate-400")
+                    }`}>
+                      {isRead ? "Dibaca" : "Belum dibaca"}
+                    </span>
                   </div>
-
                   <button
                     onClick={() => setSelectedIncidentForDetail(log)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm border ${
-                      isDark
-                        ? "bg-slate-800 hover:bg-slate-700 text-white hover:text-cyan-300 border-slate-700"
-                        : "bg-slate-100 hover:bg-slate-200 text-slate-800 hover:text-cyan-600 border-slate-200"
+                    className={`text-[11px] font-bold flex items-center gap-1 transition-colors ${
+                      isDark ? "text-slate-300 hover:text-white" : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
-                    <span>Lihat Detail Notifikasi</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
+                    Detail
+                    <ChevronRight className="w-3 h-3" />
                   </button>
                 </div>
               </div>
@@ -583,7 +438,7 @@ export function NotificationCenterSheet({
         )}
       </div>
 
-      {/* Incident Detail & Store Verification SOP Modal */}
+      {/* Incident Detail Modal */}
       <IncidentDetailModal
         isOpen={!!selectedIncidentForDetail}
         incident={selectedIncidentForDetail}
