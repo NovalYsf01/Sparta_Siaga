@@ -564,7 +564,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   };
 
   const contextValue = {
-    rawStores, computedStores, disasterData, loading, isRefreshing,
+    rawStores, computedStores, disasterData, loading, isRefreshing, loadInitialData,
     activeRole, setActiveRole, activeLayer, setActiveLayer,
     incidents, activeIncidents, archivedIncidents, incidentStats,
     handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal,
