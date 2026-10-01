@@ -5,7 +5,6 @@ import {
   Activity,
   Archive,
   ArrowUpRight,
-  CheckCircle2,
   Clock3,
   FileText,
   Filter,
