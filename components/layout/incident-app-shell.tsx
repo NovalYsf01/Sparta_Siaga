@@ -101,13 +101,13 @@ export function IncidentAppShell({
       title: "Monitoring",
       items: [
         { id: "map", href: "/monitoring", label: "Peta Monitoring", icon: MapPin },
-        { id: "incidents", href: "/alerts", label: "Kejadian / Alert", icon: Bell, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
+        { id: "events", href: "/alerts", label: "Event Bencana", icon: Bell },
       ],
     },
     {
       title: "Pelaporan",
       items: [
-        { id: "history", href: "/reports", label: "Arsip Laporan", icon: ClipboardList },
+        { id: "reports", href: "/reports", label: "Pusat Laporan", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
       ],
     },
     {
@@ -412,9 +412,9 @@ export function IncidentAppShell({
           </Link>
 
           <Link
-            href="/alerts"
+            href="/reports"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors relative ${
-              pathname.startsWith("/alerts")
+              pathname.startsWith("/reports")
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -429,17 +429,17 @@ export function IncidentAppShell({
           </Link>
 
           <Link
-            href="/reports"
+            href="/alerts"
             className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-              pathname.startsWith("/reports")
+              pathname.startsWith("/alerts")
                 ? "text-blue-500 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            <History className="w-5 h-5" />
-            <span>Riwayat</span>
+            <Bell className="w-5 h-5" />
+            <span>Event</span>
           </Link>
 
           <Link
