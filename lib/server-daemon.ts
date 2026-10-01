@@ -7,7 +7,7 @@ import {
   recordNotificationLog, 
   generateEmergencyEmailHtml 
 } from './notification-service';
-import { dbFindAutoEarthquakeReport, dbFindActiveManualEarthquakeReport, dbCreateIncident } from './incident-db';
+import { dbFindAutoEarthquakeReport, dbFindActiveManualEarthquakeReport, dbLinkManualEarthquakeReport, dbCreateIncident } from './incident-db';
 import { AffectedStoreSummary } from '@/types/notification';
 import { ReportAffectedStore } from '@/types/incident';
 import { Store } from '@/types/store';
@@ -178,9 +178,24 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
               const activeManualReport = await dbFindActiveManualEarthquakeReport(branch);
 
               if (activeManualReport) {
-                // If there's an active manual report, we suppress the automatic one
-                // We don't merge them here to avoid business semantics violation
-                console.log(`[Autonomous Daemon] 🛑 COLLISION DETECTED: Active manual report (${activeManualReport.id}) exists for Cabang ${branch}. Suppressing automatic duplicate for Event ${eq.id}.`);
+                // Manual report owns the operational lifecycle. Link the external
+                // earthquake event so HO retains source context without creating a duplicate.
+                const linked = await dbLinkManualEarthquakeReport(
+                  activeManualReport.id,
+                  eq.id,
+                  eq.source || 'BMKG/USGS',
+                  `Event gempa dari ${eq.source || 'BMKG/USGS'} ditautkan ke laporan manual yang dibuat lebih dahulu.`,
+                  {
+                    magnitude: eq.magnitude,
+                    depth: eq.depth,
+                    coordinates: [eq.latitude, eq.longitude],
+                    place: eq.title,
+                    time: eq.time,
+                  }
+                );
+                console.log(
+                  `[Autonomous Daemon] 🔗 MANUAL REPORT LINKED: ${activeManualReport.id} | Event ${eq.id} | linked=${Boolean(linked)}`
+                );
               } else if (!existingAutoReport) {
                 const reportId = `LAP-EQ-${branch.substring(0, 4).toUpperCase().replace(/\s/g, '')}-${Date.now().toString().slice(-6)}`;
                 const todayStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
