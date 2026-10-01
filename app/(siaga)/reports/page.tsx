@@ -2,21 +2,23 @@
 
 import React, { useState } from "react";
 import { useSiaga } from "@/components/layout/siaga-context";
-import { IncidentHistoryView } from "@/components/history/incident-history-view";
 import { MaintenanceTrackingModal } from "@/components/incident/maintenance-tracking-modal";
+import { ReportCenterView } from "@/components/reports/report-center-view";
 import { IncidentRecord } from "@/types/incident";
 
 export default function ReportsPage() {
-  const { archivedIncidents, activeRole } = useSiaga();
+  const { incidents, activeRole, handleOpenReportModal } = useSiaga();
   const [selectedReadOnlyIncident, setSelectedReadOnlyIncident] = useState<IncidentRecord | null>(null);
 
   return (
     <>
-      <IncidentHistoryView
-        archivedIncidents={archivedIncidents}
-        onSelectIncident={(inc) => setSelectedReadOnlyIncident(inc)}
+      <ReportCenterView
+        incidents={incidents}
+        activeRole={activeRole}
+        onCreateReport={() => handleOpenReportModal()}
+        onSelectIncident={setSelectedReadOnlyIncident}
       />
-      {/* Read-Only Incident Detail Modal (History) */}
+
       <MaintenanceTrackingModal
         incident={selectedReadOnlyIncident}
         activeRole={activeRole}
