@@ -103,6 +103,39 @@ export async function dbFindActiveManualEarthquakeReport(
   return rowToIncident(rows[0]);
 }
 
+export async function dbLinkManualEarthquakeReport(
+  reportId: string,
+  earthquakeEventId: string,
+  earthquakeSource: string,
+  earthquakeProvenance: string,
+  disasterMetadata?: IncidentRecord["disasterMetadata"]
+): Promise<IncidentRecord | null> {
+  const pool = getDbPool();
+  const { rows } = await pool.query(
+    `UPDATE incidents
+     SET earthquake_event_id = $1,
+         earthquake_source = $2,
+         earthquake_provenance = $3,
+         disaster_metadata = COALESCE(disaster_metadata, '{}'::jsonb) || $4::jsonb,
+         updated_at = NOW()
+     WHERE id = $5
+     RETURNING *`,
+    [
+      earthquakeEventId,
+      earthquakeSource,
+      earthquakeProvenance,
+      JSON.stringify(disasterMetadata ?? {}),
+      reportId,
+    ]
+  );
+  if (rows.length === 0) return null;
+  return rowToIncident(rows[0]);
+}
+
+/**
+ * Links a fresh earthquake event to an already-created manual field report.
+ * It never changes the manual report lifecycle, verification, photos, or progress.
+ */
 export async function dbCreateIncident(
   inc: IncidentRecord
 ): Promise<IncidentRecord> {
