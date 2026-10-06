@@ -415,6 +415,15 @@ export class EstimationIntegrationService {
 
       // Validasi Readiness sesuai TKP & Handler
       if (!options?.bypassReadinessValidation) {
+        if (existing.status !== "ESTIMATION_COMPLETED") {
+          const err: any = new Error(
+            "Pekerjaan belum dapat dialihkan ke Siap Dikerjakan (READY_FOR_WORK) karena tahap estimasi belum selesai (ESTIMATION_COMPLETED)."
+          );
+          err.status = 422;
+          err.code = "ESTIMATION_NOT_COMPLETED";
+          throw err;
+        }
+
         const report = await dbGetIncidentById(reportId);
         const evidences = options?.readinessEvidences || existing.readinessData || {};
         const evaluation = evaluateWorkReadiness(

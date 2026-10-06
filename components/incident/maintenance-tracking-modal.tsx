@@ -29,6 +29,7 @@ import { CloseReportModal } from "./close-report-modal";
 import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { WorkReadinessCard } from "./work-readiness-card";
 
 interface MaintenanceTrackingModalProps {
   incident: IncidentRecord | null;
@@ -76,6 +77,8 @@ export function MaintenanceTrackingModal({
   const [closeReason, setCloseReason] = useState("");
   const [canTriggerEstimation, setCanTriggerEstimation] = useState(false);
   const [triggerEstimationReason, setTriggerEstimationReason] = useState("");
+  const [canUpdateReadiness, setCanUpdateReadiness] = useState(false);
+  const [updateReadinessReason, setUpdateReadinessReason] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -100,6 +103,8 @@ export function MaintenanceTrackingModal({
         setCloseReason(permRes.data.closeReason || "");
         setCanTriggerEstimation(permRes.data.canTriggerEstimation);
         setTriggerEstimationReason(permRes.data.triggerEstimationReason || "");
+        setCanUpdateReadiness(Boolean(permRes.data.canUpdateReadiness));
+        setUpdateReadinessReason(permRes.data.updateReadinessReason || "");
       }
 
       if (estRes?.data) {
@@ -333,12 +338,32 @@ export function MaintenanceTrackingModal({
             )}
           </div>
 
-          {/* SECTION 4: PROGRESS PEKERJAAN (Section N, O, P, Q, T) */}
+          {/* SECTION 4: PERSYARATAN MULAI PEKERJAAN (WORK READINESS) */}
+          {estimationRoute && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  4. Persyaratan Mulai Pekerjaan
+                </h4>
+              </div>
+
+              <WorkReadinessCard
+                incident={incident}
+                estimationRoute={estimationRoute}
+                canUpdate={canUpdateReadiness}
+                updateReason={updateReadinessReason}
+                onReadinessUpdated={loadData}
+              />
+            </div>
+          )}
+
+          {/* SECTION 5: PROGRESS PEKERJAAN (Section N, O, P, Q, T) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                 <Wrench className="w-4 h-4 text-blue-600" />
-                4. Progress Pekerjaan
+                5. Progress Pekerjaan
               </h4>
 
               {/* Tombol Update Progress */}
@@ -424,22 +449,22 @@ export function MaintenanceTrackingModal({
             </div>
           </div>
 
-          {/* SECTION 5: RIWAYAT PROGRESS & TIMELINE (Section AB, AC, AH) */}
+          {/* SECTION 6: RIWAYAT PROGRESS & TIMELINE (Section AB, AC, AH) */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-600" />
-              5. Riwayat Progress Pekerjaan (Multi-Day Timeline)
+              6. Riwayat Progress Pekerjaan (Multi-Day Timeline)
             </h4>
 
             <ProgressTimeline history={progressHistory} loading={loading} />
           </div>
 
-          {/* SECTION 6: BUKTI AKHIR (Section AD, AE) */}
+          {/* SECTION 7: BUKTI AKHIR (Section AD, AE) */}
           {latestProgress === 100 && (
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                 <FileCheck className="w-4 h-4 text-emerald-600" />
-                6. Bukti Akhir Pekerjaan / Serah Terima
+                7. Bukti Akhir Pekerjaan / Serah Terima
               </h4>
 
               <div className="bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl p-4 space-y-3">
@@ -470,14 +495,14 @@ export function MaintenanceTrackingModal({
             </div>
           )}
 
-          {/* SECTION 7: CLOSE LAPORAN (Section AF) */}
+          {/* SECTION 8: CLOSE LAPORAN (Section AF) */}
           {!isReportClosed && (
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    7. Penyelesaian & Penutupan Laporan
+                    8. Penyelesaian & Penutupan Laporan
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     Syarat: Progress 100% + Foto Bukti Akhir + Izin REPORT_CLOSE.

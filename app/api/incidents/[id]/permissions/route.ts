@@ -26,6 +26,7 @@ export async function GET(_: Request, { params }: RouteContext) {
       instructionResult,
       triggerEstimationResult,
       viewEstimationResult,
+      readinessResult,
     ] = await Promise.all([
       checkUserPermission({ user: sessionUser, permission: "REPORT_CONFIRM", report: incident }),
       checkUserPermission({ user: sessionUser, permission: "REPORT_FOLLOW_UP", report: incident }),
@@ -34,6 +35,7 @@ export async function GET(_: Request, { params }: RouteContext) {
       checkUserPermission({ user: sessionUser, permission: "MANAGEMENT_INSTRUCTION_CREATE", report: incident }),
       checkUserPermission({ user: sessionUser, permission: "ESTIMATION_TRIGGER", report: incident }),
       checkUserPermission({ user: sessionUser, permission: "ESTIMATION_VIEW", report: incident }),
+      checkUserPermission({ user: sessionUser, permission: "WORK_READINESS_UPDATE", report: incident }),
     ]);
 
     return NextResponse.json({
@@ -52,6 +54,8 @@ export async function GET(_: Request, { params }: RouteContext) {
         canTriggerEstimation: triggerEstimationResult.authorized,
         triggerEstimationReason: triggerEstimationResult.reason || "",
         canViewEstimation: viewEstimationResult.authorized,
+        canUpdateReadiness: readinessResult.authorized,
+        updateReadinessReason: readinessResult.reason || "",
       },
     });
   } catch (err) {

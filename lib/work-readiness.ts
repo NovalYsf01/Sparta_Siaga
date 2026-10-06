@@ -212,6 +212,91 @@ export interface WorkReadinessEvaluationResult {
   >;
 }
 
+export interface WorkReadinessRequirementData {
+  satisfied: boolean;
+  type: "BOOLEAN_APPROVAL" | "FILE_ATTACHMENT" | "RECEIPT_ATTACHMENT";
+  value?: boolean | string | null;
+  evidenceId?: string | null;
+  storageKey?: string | null;
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  notes?: string | null;
+  updatedBy: string;
+  updatedByName: string;
+  updatedAt: string;
+}
+
+/**
+ * Validasi magic bytes keamanan berkas evidence (gambar JPEG, PNG, WEBP, dan dokumen PDF).
+ * Kompatibel baik di Node.js (Buffer) maupun client/edge (Uint8Array).
+ */
+export function validateReadinessEvidenceBytes(
+  buffer: Uint8Array | Buffer
+): { valid: boolean; mimeType: string; error?: string } {
+  if (!buffer || buffer.length === 0) {
+    return { valid: false, mimeType: "unknown", error: "Berkas kosong." };
+  }
+
+  // Max 10MB
+  if (buffer.length > 10 * 1024 * 1024) {
+    return {
+      valid: false,
+      mimeType: "unknown",
+      error: "Ukuran berkas melebihi batas maksimal 10MB.",
+    };
+  }
+
+  // PDF: %PDF (0x25 0x50 0x44 0x46)
+  if (
+    buffer.length >= 4 &&
+    buffer[0] === 0x25 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x44 &&
+    buffer[3] === 0x46
+  ) {
+    return { valid: true, mimeType: "application/pdf" };
+  }
+
+  // JPEG: FF D8 FF
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { valid: true, mimeType: "image/jpeg" };
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return { valid: true, mimeType: "image/png" };
+  }
+
+  // WEBP: RIFF .... WEBP
+  if (buffer.length >= 12) {
+    const isRiff =
+      buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46;
+    const isWebp =
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+    if (isRiff && isWebp) {
+      return { valid: true, mimeType: "image/webp" };
+    }
+  }
+
+  return {
+    valid: false,
+    mimeType: "unknown",
+    error: "Format berkas tidak didukung. Hanya gambar (JPEG, PNG, WEBP) dan dokumen PDF yang diizinkan.",
+  };
+}
+
 /**
  * Mengevaluasi apakah data/bukti yang disubmit telah memenuhi seluruh
  * syarat Work Readiness untuk memulai pekerjaan fisik.
@@ -229,15 +314,33 @@ export function evaluateWorkReadiness(
   let completedCount = 0;
 
   for (const req of requirements) {
-    const val = submittedEvidences[req.key];
-    const isCompleted =
-      val === true ||
-      (typeof val === "string" && val.trim().length > 0) ||
-      (typeof val === "object" && val !== null && Object.keys(val).length > 0);
+    const rawVal = submittedEvidences[req.key] ?? submittedEvidences.requirements?.[req.key];
+    let isCompleted = false;
+
+    if (req.type === "BOOLEAN_APPROVAL") {
+      if (rawVal === true) {
+        isCompleted = true;
+      } else if (typeof rawVal === "object" && rawVal !== null) {
+        isCompleted = rawVal.satisfied === true;
+      }
+    } else if (req.type === "FILE_ATTACHMENT" || req.type === "RECEIPT_ATTACHMENT") {
+      if (typeof rawVal === "string" && rawVal.trim().length > 0) {
+        isCompleted = true;
+      } else if (typeof rawVal === "object" && rawVal !== null) {
+        const hasFile = Boolean(
+          rawVal.fileUrl ||
+          rawVal.originalPath ||
+          rawVal.path ||
+          rawVal.fileName ||
+          rawVal.file
+        );
+        isCompleted = rawVal.satisfied !== false && hasFile;
+      }
+    }
 
     details[req.key] = {
       completed: Boolean(isCompleted),
-      value: val ?? null,
+      value: rawVal ?? null,
     };
 
     if (isCompleted) {

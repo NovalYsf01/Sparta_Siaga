@@ -585,7 +585,8 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
     permission === "REPORT_FOLLOW_UP" ||
     permission === "REPORT_UPDATE_PROGRESS" ||
     permission === "REPORT_CLOSE" ||
-    permission === "ESTIMATION_TRIGGER";
+    permission === "ESTIMATION_TRIGGER" ||
+    permission === "WORK_READINESS_UPDATE";
 
   if (isOperationalAction) {
     // HO users CANNOT act on branch without explicit branch override (checked earlier in userAllow)

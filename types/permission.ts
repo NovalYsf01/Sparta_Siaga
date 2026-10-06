@@ -17,6 +17,8 @@ export const PERMISSION_KEYS = [
   // ESTIMASI (Foundation only - not full workflow)
   "ESTIMATION_TRIGGER",
   "ESTIMATION_VIEW",
+  // WORK READINESS (Task 3)
+  "WORK_READINESS_UPDATE",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -104,6 +106,14 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     category: "ESTIMASI",
     description: "Izin melihat status dan rincian estimasi perbaikan.",
   },
+  // WORK READINESS
+  {
+    key: "WORK_READINESS_UPDATE",
+    label: "Update Syarat Siap Kerja (Readiness)",
+    category: "ESTIMASI",
+    description: "Izin mengunggah bukti dan memperbarui persyaratan kesiapan mulai kerja fisik.",
+    isOperational: true,
+  },
 ];
 
 // ============================================================
@@ -131,6 +141,7 @@ export const OPERATIONAL_PERMISSIONS: readonly PermissionKey[] = [
   "REPORT_CLOSE",
   "MANAGEMENT_INSTRUCTION_CREATE",
   "ESTIMATION_TRIGGER",
+  "WORK_READINESS_UPDATE",
 ] as const;
 
 export const MONITORING_PERMISSIONS: readonly PermissionKey[] = [
@@ -203,6 +214,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
     "NOTIFICATION_VIEW",
     "ESTIMATION_TRIGGER",
     "ESTIMATION_VIEW",
+    "WORK_READINESS_UPDATE",
   ],
   bmc: [
     "REPORT_VIEW_OWN",
@@ -284,6 +296,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_TRIGGER: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
+    WORK_READINESS_UPDATE: "ALLOW",
   },
   bmc: {
     REPORT_VIEW_OWN: "ALLOW",
