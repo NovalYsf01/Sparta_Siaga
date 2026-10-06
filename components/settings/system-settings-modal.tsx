@@ -251,7 +251,7 @@ export function SystemSettingsModal({
                   <div>
                     <div className="font-bold text-sm">Suara Chime Siaga Darurat</div>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Memutar audio chime ganda harmonis secara otomatis saat gempa BMKG terdeteksi di radius bahaya gerai toko.
+                      Memutar audio chime ganda harmonis secara otomatis saat gempa BMKG terdeteksi di Zona Prioritas Pantau SPARTA gerai toko.
                     </p>
                   </div>
                 </div>

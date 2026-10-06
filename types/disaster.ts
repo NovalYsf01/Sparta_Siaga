@@ -29,28 +29,34 @@ export interface SourceHealth {
 export interface Earthquake {
   id: string;
   source: string;
+  sourcePrimary?: string;
+  canonicalEventKey?: string;
   informationType?: InformationType;
   verificationStatus?: VerificationStatus;
   title: string;
+  place?: string;
   magnitude: number;
   depth: string; // e.g. "10 km"
   depthKm: number;
   latitude: number;
   longitude: number;
   time: string; // ISO or human readable
+  date?: string;
   timestamp: number;
   potensiTsunami: boolean;
   potensiText?: string;
   feltArea?: string;
+  felt?: string;
   shakemapUrl?: string;
   isSignificant?: boolean;
-  dangerRadiusKm: number; // Scientifically calculated from Magnitude & Depth
-  warningRadiusKm: number; // Secondary buffer radius
+  priorityRadiusKm: number; // SPARTA's priority monitoring zone
+  monitoringRadiusKm: number; // SPARTA's general monitoring zone
 }
 
 export interface DisasterFeedResponse {
   latestBmkgEarthquake?: Earthquake;
   recentEarthquakes: Earthquake[];
+  activeEarthquakes: Earthquake[];
   lastUpdated: string;
   totalActive: number;
   floodReports?: any[];

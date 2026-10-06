@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { dbGetIncidentById, dbUpdateIncident } from "@/lib/incident-db";
-import { canConfirmAffectedStore } from "@/lib/report-permissions";
+import { canConfirmReportAsync } from "@/lib/permission-service";
 import { SpartaRole } from "@/types/incident";
 import { getSessionUser } from "@/lib/auth";
 
@@ -59,11 +59,12 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
-    // Server-side permission check from trusted identity: only affected branch may confirm
-    if (!canConfirmAffectedStore(sessionUser.role, sessionUser.branch, report)) {
+    // Server-side permission check from trusted identity: only affected branch may confirm (or user override)
+    const isAllowed = await canConfirmReportAsync(sessionUser, report);
+    if (!isAllowed) {
       return NextResponse.json(
         {
-          error: "Unauthorized: Hanya cabang terdampak yang dapat mengonfirmasi kondisi toko. Cabang tidak terdampak hanya menerima informasi awareness.",
+          error: "Unauthorized: Anda tidak memiliki izin untuk melakukan konfirmasi pada laporan ini. Akses ditentukan berdasarkan permission dan cakupan laporan yang dimiliki akun Anda.",
         },
         { status: 403 }
       );

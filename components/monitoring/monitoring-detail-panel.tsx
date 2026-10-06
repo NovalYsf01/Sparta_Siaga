@@ -91,7 +91,7 @@ export function MonitoringDetailPanel() {
         </div>
         
         <p className="text-[10px] leading-relaxed mt-4 text-slate-500 italic">
-          * Catatan: Data di atas adalah estimasi spasial berdasarkan radius kejadian. Tidak merepresentasikan kerusakan fisik aktual sebelum konfirmasi dari cabang.
+          * Catatan: Data di atas adalah estimasi spasial berdasarkan Zona Pantau SPARTA. Tidak merepresentasikan kerusakan fisik aktual sebelum konfirmasi dari cabang.
         </p>
       </div>
 

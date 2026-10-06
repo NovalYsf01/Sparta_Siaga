@@ -76,7 +76,7 @@ export function EarthquakeListModal({
                 </span>
               </div>
               <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                Data real-time BMKG & USGS dengan radius kalkulasi dampak
+                Data real-time BMKG & USGS dengan kalkulasi dampak Zona Pantau SPARTA
               </p>
             </div>
           </div>
@@ -223,9 +223,9 @@ export function EarthquakeListModal({
                           </span>
                         </div>
                         <div className="col-span-2 sm:col-span-1">
-                          <span>Radius Bahaya:</span>{" "}
+                          <span>Zona Prioritas:</span>{" "}
                           <span className="font-mono font-bold text-red-500">
-                            {eq.dangerRadiusKm || 50} km
+                            {eq.priorityRadiusKm || 50} km
                           </span>
                         </div>
                       </div>

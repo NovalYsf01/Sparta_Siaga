@@ -133,24 +133,24 @@ export function StoreDetailSheet({ store, onClose, theme = "dark" }: StoreDetail
 
             <span
               className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 border ${
-                store.status === "danger"
+                store.status === "PRIORITY_MONITOR"
                   ? "bg-red-600 text-white animate-pulse border-red-600"
-                  : store.status === "warning"
+                  : store.status === "MONITOR"
                   ? "bg-amber-600 text-white border-amber-600"
                   : isDark 
                     ? "bg-emerald-600/30 text-emerald-300 border-emerald-500/30"
                     : "bg-emerald-100 text-emerald-700 border-emerald-200"
               }`}
             >
-              {store.status === "danger" ? (
+              {store.status === "PRIORITY_MONITOR" ? (
                 <>
                   <AlertTriangle className="w-3 h-3" />
-                  Zona Bahaya
+                  Zona Prioritas Pantau
                 </>
-              ) : store.status === "warning" ? (
+              ) : store.status === "MONITOR" ? (
                 <>
                   <AlertTriangle className="w-3 h-3" />
-                  Zona Waspada
+                  Zona Pantau
                 </>
               ) : (
                 <>
@@ -183,10 +183,10 @@ export function StoreDetailSheet({ store, onClose, theme = "dark" }: StoreDetail
       {/* Content scroll area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Disaster alert context if in danger/warning */}
-        {store.distanceFromDisasterKm !== undefined && store.status !== "safe" && (
+        {store.distanceFromDisasterKm !== undefined && store.status !== "SAFE" && (
           <div
             className={`p-3 rounded-xl border text-xs ${
-              store.status === "danger"
+              store.status === "PRIORITY_MONITOR"
                 ? isDark 
                   ? "bg-red-950/70 border-red-700/60 text-red-200" 
                   : "bg-red-50 border-red-200 text-red-800"
@@ -196,7 +196,7 @@ export function StoreDetailSheet({ store, onClose, theme = "dark" }: StoreDetail
             }`}
           >
             <div className="flex items-center gap-2 font-bold mb-1">
-              <AlertTriangle className={`w-4 h-4 ${store.status === "danger" ? "text-red-500" : "text-amber-500"}`} />
+              <AlertTriangle className={`w-4 h-4 ${store.status === "PRIORITY_MONITOR" ? "text-red-500" : "text-amber-500"}`} />
               <span>Peringatan Kedekatan Episentrum Gempa BMKG</span>
             </div>
             <p>

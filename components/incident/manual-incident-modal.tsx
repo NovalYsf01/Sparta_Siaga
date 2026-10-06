@@ -1,15 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, AlertTriangle, FileText, Building, User, ChevronRight, CheckCircle2, Eye } from "lucide-react";
+import { X, AlertTriangle, FileText, Building, User, ChevronRight, CheckCircle2, Eye, Activity } from "lucide-react";
 import { DisasterType } from "@/types/incident";
+import { Earthquake } from "@/types/disaster";
 import { FieldPhotoUploader, PhotoData } from "./field-photo-uploader";
+import { UserIdentity } from "@/lib/identity";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface ManualIncidentModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeRole: string;
   rawStores: any[];
+  activeEarthquakes?: Earthquake[];
   onConfirm: (data: any) => void;
 }
 
@@ -29,10 +33,15 @@ export function ManualIncidentModal({
   onClose,
   activeRole,
   rawStores,
+  activeEarthquakes = [],
   onConfirm,
 }: ManualIncidentModalProps) {
+  // Lock background scroll when modal is open
+  useBodyScrollLock(isOpen);
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [disasterType, setDisasterType] = useState<DisasterType>("flood");
+  const [selectedEarthquakeEventId, setSelectedEarthquakeEventId] = useState<string>("");
   const [tkpType, setTkpType] = useState<"Toko" | "DC">("Toko");
   const [storeId, setStoreId] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
@@ -45,7 +54,6 @@ export function ManualIncidentModal({
   const [isSearching, setIsSearching] = useState(false);
   const [selectedStoreObj, setSelectedStoreObj] = useState<any>(null);
 
-  const isAdmin = activeRole === "ho_admin";
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -90,21 +98,36 @@ export function ManualIncidentModal({
     detailDC: emptyPhoto,
   });
 
+  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+
   useEffect(() => {
-    if (isOpen && !isAdmin) {
-      const assignedStore = rawStores.find((s) => s.cabang !== "MANUAL"); 
-      if (assignedStore) {
-        setStoreId(assignedStore.id || assignedStore.kode_toko);
-      }
-    } else if (isOpen && isAdmin) {
-      setStoreId("");
-    }
-    
-    // reset state on open
     if (isOpen) {
+      fetch("/api/auth/me")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) setIdentity(data.user || data);
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
+
+  const isHOScope = identity?.scope === "HO";
+
+  useEffect(() => {
+    if (isOpen) {
+      if (!isHOScope && identity?.branch) {
+        const assignedStore = rawStores.find(
+          (s) => s.cabang?.toLowerCase() === identity.branch?.toLowerCase()
+        ) || rawStores.find((s) => s.cabang !== "MANUAL");
+        if (assignedStore) {
+          setStoreId(assignedStore.id || assignedStore.kode_toko);
+        }
+      } else if (isHOScope) {
+        setStoreId("");
+      }
       setStep(1);
     }
-  }, [isOpen, isAdmin, rawStores]);
+  }, [isOpen, isHOScope, identity, rawStores]);
 
   const toggleCategory = (cat: string) => {
     setCategories((prev) =>
@@ -114,7 +137,7 @@ export function ManualIncidentModal({
 
   const handleNext = () => {
     if (step === 1) {
-      if (!storeId && isAdmin) {
+      if (!storeId && !selectedStoreObj) {
         alert("Pilih lokasi terlebih dahulu!");
         return;
       }
@@ -147,9 +170,18 @@ export function ManualIncidentModal({
       dummyPhotos.unshift(photos.detailDC.previewUrl);
     }
 
+    const matchedEq = disasterType === "earthquake" && selectedEarthquakeEventId
+      ? activeEarthquakes.find((e) => (e.canonicalEventKey || e.id) === selectedEarthquakeEventId)
+      : undefined;
+
     onConfirm({
       disasterType,
       reportOrigin: "manual",
+      earthquakeEventId: selectedEarthquakeEventId ? selectedEarthquakeEventId : undefined,
+      earthquakeSource: matchedEq?.source || (selectedEarthquakeEventId ? "BMKG" : undefined),
+      earthquakeProvenance: selectedEarthquakeEventId
+        ? `Ditautkan manual oleh pelapor ke kejadian ${selectedEarthquakeEventId}`
+        : undefined,
       tkpType,
       storeId,
       storeName: store?.nama_toko || (tkpType === "DC" ? "Gudang Utama" : "Lokasi Tidak Diketahui"),
@@ -183,9 +215,9 @@ export function ManualIncidentModal({
   const store = selectedStoreObj || rawStores.find(s => s.kode_toko === storeId || s.id === storeId);
 
   return (
-    <div className="fixed inset-0 z-[6000] flex md:items-center justify-center bg-slate-50 md:bg-slate-950/70 md:backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-[6000] flex md:items-center justify-center p-0 md:p-4 bg-slate-50 md:bg-slate-950/70 md:backdrop-blur-sm animate-in fade-in overscroll-none">
       {/* Full screen on mobile, large dialog on desktop */}
-      <div className="bg-slate-50 md:bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-[24px] overflow-hidden md:shadow-2xl flex flex-col animate-in slide-in-from-bottom-full md:slide-in-from-bottom-0 md:zoom-in-95 duration-200 ease-out">
+      <div className="bg-slate-50 md:bg-white w-full h-full md:h-auto md:max-h-[90dvh] md:max-w-4xl md:rounded-[24px] overflow-hidden md:shadow-2xl flex flex-col animate-in slide-in-from-bottom-full md:slide-in-from-bottom-0 md:zoom-in-95 duration-200 ease-out">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-4 bg-[#123B6D] text-white shrink-0">
           <div className="flex items-center gap-3">
@@ -218,7 +250,7 @@ export function ManualIncidentModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 md:p-8">
           
           {/* STEP 1: Pelapor & Lokasi & Kondisi */}
           {step === 1 && (
@@ -330,6 +362,29 @@ export function ManualIncidentModal({
                   </select>
                 </div>
 
+                {disasterType === "earthquake" && (
+                  <div className="mb-4 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl">
+                    <label className="block text-[11px] font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-amber-600" />
+                      Kejadian Gempa Terkait (Opsional):
+                    </label>
+                    <select
+                      value={selectedEarthquakeEventId}
+                      onChange={(e) => setSelectedEarthquakeEventId(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="">-- Tidak terkait kejadian pada daftar / Gempa Lokal --</option>
+                      {activeEarthquakes.map((eq) => (
+                        <option key={eq.id} value={eq.canonicalEventKey || eq.id}>
+                          [M{eq.magnitude}] {eq.title || eq.place} ({eq.time || eq.date})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-amber-800 mt-1.5 leading-snug">
+                      Pilih jika laporan ini berkaitan dengan salah satu kejadian gempa aktif dalam sistem untuk menghindari duplikasi laporan otomatis.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div>

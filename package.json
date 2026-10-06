@@ -12,9 +12,11 @@
     "migrate:report-fields": "tsx scripts/migrate-report-fields.ts",
     "seed": "tsx scripts/seed-incidents.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:admin": "pnpm dlx tsx scripts/seed-admin.ts"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -28,6 +30,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-leaflet": "^5.0.0",
+    "sharp": "^0.35.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "xlsx": "^0.18.5"
@@ -35,6 +38,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
     "@tailwindcss/postcss": "^4.2.1",
+    "@types/bcryptjs": "^3.0.0",
     "@types/leaflet": "^1.9.21",
     "@types/leaflet.markercluster": "^1.5.6",
     "@types/node": "^22.13.0",
@@ -43,6 +47,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.14.0",
     "eslint-config-next": "^15.0.3",
+    "jose": "^6.2.12",
     "postcss": "^8.5.1",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.7.3"

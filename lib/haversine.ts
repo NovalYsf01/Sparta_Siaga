@@ -39,23 +39,20 @@ function toRad(degrees: number): number {
 }
 
 /**
- * Calculates the scientific impact radius from BMKG Magnitude and Hypocentral Depth.
- * Based on BMKG attenuation relations (Peak Ground Acceleration & MMI intensity decay).
- * Shallow quakes (depth <= 30km) concentrate severe surface shaking (MMI >= VI).
- * Deep subduction events dissipate surface energy over a broader area with lower peak acceleration.
+ * Calculates SPARTA's operational monitoring zones based on BMKG earthquake parameters.
+ * Note: These are SPARTA's internal operational zones, not official BMKG MMI/Shakemap radii.
  */
-export function calculateBmkgImpactRadius(
+export function calculateSpartaMonitoringZone(
   magnitude: number,
   depthKm: number = 10
-): { dangerRadiusKm: number; warningRadiusKm: number } {
+): { priorityRadiusKm: number; monitoringRadiusKm: number } {
   // If magnitude < 4.5, minimal structural risk to modern retail buildings
   if (magnitude < 4.5) {
-    return { dangerRadiusKm: 15, warningRadiusKm: 35 };
+    return { priorityRadiusKm: 15, monitoringRadiusKm: 35 };
   }
 
-  // Base epicentral radius for MMI >= VI based on BMKG empirical attenuation:
-  // log10(R) ≈ 0.48 * M - 1.15
-  const baseDanger = Math.pow(10, 0.48 * magnitude - 1.15);
+  // Base priority radius based on magnitude
+  const basePriority = Math.pow(10, 0.48 * magnitude - 1.15);
 
   // Depth attenuation factor: deeper quakes cause less surface PGA
   const depthFactor =
@@ -69,61 +66,77 @@ export function calculateBmkgImpactRadius(
       ? 0.45
       : 0.3;
 
-  const dangerRadiusKm = Math.max(15, Math.round(baseDanger * depthFactor));
-  // Warning radius (MMI IV - V, light shaking, operational vigilance) is approx 2.2x danger radius
-  const warningRadiusKm = Math.round(dangerRadiusKm * 2.2);
+  const priorityRadiusKm = Math.max(15, Math.round(basePriority * depthFactor));
+  // Monitoring radius (operational vigilance) is approx 2.2x priority radius
+  const monitoringRadiusKm = Math.round(priorityRadiusKm * 2.2);
 
-  return { dangerRadiusKm, warningRadiusKm };
+  return { priorityRadiusKm, monitoringRadiusKm };
 }
 
+export type SpatialRisk = "SAFE" | "MONITOR" | "PRIORITY_MONITOR";
+
 export interface StoreRiskAssessment {
-  status: StoreStatus;
-  distanceFromDisasterKm?: number;
-  nearestDisaster?: Earthquake;
+  spatialRisk: SpatialRisk;
+  distanceFromEventKm?: number;
+  riskSourceEvent?: Earthquake;
 }
 
 /**
- * Evaluates the risk status of a store against all active earthquakes
- * using each earthquake's auto-calculated scientific attenuation radius.
+ * Evaluates the spatial risk of a store against all active earthquakes
+ * using SPARTA's monitoring zones.
  */
 export function assessStoreRisk(
   store: { latitude: number; longitude: number },
-  disasters: Earthquake[]
+  activeEarthquakes: Earthquake[]
 ): StoreRiskAssessment {
-  if (!disasters || disasters.length === 0) {
-    return { status: "safe" };
+  if (!activeEarthquakes || activeEarthquakes.length === 0) {
+    return { spatialRisk: "SAFE" };
   }
 
-  let highestRiskStatus: StoreStatus = "safe";
+  let highestSpatialRisk: SpatialRisk = "SAFE";
   let minDistance = Infinity;
-  let closestDisaster: Earthquake | undefined;
+  let riskSourceEvent: Earthquake | undefined;
 
-  for (const disaster of disasters) {
+  // We want to find the event that causes the HIGHEST spatial risk.
+  // If multiple events cause the same risk, we pick the closest one.
+  const riskPriority = { "SAFE": 0, "MONITOR": 1, "PRIORITY_MONITOR": 2 };
+
+  for (const event of activeEarthquakes) {
     const dist = calculateHaversineDistance(
       store.latitude,
       store.longitude,
-      disaster.latitude,
-      disaster.longitude
+      event.latitude,
+      event.longitude
     );
 
-    if (dist < minDistance) {
-      minDistance = dist;
-      closestDisaster = disaster;
+    let currentEventRisk: SpatialRisk = "SAFE";
+    
+    const priorityR = (event as any).priorityRadiusKm ?? (event as any).dangerRadiusKm ?? 50;
+    const monitorR = (event as any).monitoringRadiusKm ?? (event as any).warningRadiusKm ?? 120;
+
+    if (dist <= priorityR) {
+      currentEventRisk = "PRIORITY_MONITOR";
+    } else if (dist <= monitorR) {
+      currentEventRisk = "MONITOR";
     }
 
-    const dangerR = disaster.dangerRadiusKm || 50;
-    const warningR = disaster.warningRadiusKm || 120;
-
-    if (dist <= dangerR) {
-      highestRiskStatus = "danger";
-    } else if (dist <= warningR && highestRiskStatus !== "danger") {
-      highestRiskStatus = "warning";
+    if (riskPriority[currentEventRisk] > riskPriority[highestSpatialRisk]) {
+      highestSpatialRisk = currentEventRisk;
+      minDistance = dist;
+      riskSourceEvent = currentEventRisk !== "SAFE" ? event : undefined;
+    } else if (riskPriority[currentEventRisk] === riskPriority[highestSpatialRisk] && currentEventRisk !== "SAFE") {
+      if (dist < minDistance) {
+        minDistance = dist;
+        riskSourceEvent = event;
+      }
+    } else if (highestSpatialRisk === "SAFE" && dist < minDistance) {
+      minDistance = dist;
     }
   }
 
   return {
-    status: highestRiskStatus,
-    distanceFromDisasterKm: minDistance === Infinity ? undefined : minDistance,
-    nearestDisaster: closestDisaster,
+    spatialRisk: highestSpatialRisk,
+    distanceFromEventKm: minDistance === Infinity ? undefined : minDistance,
+    riskSourceEvent: highestSpatialRisk === "SAFE" ? undefined : riskSourceEvent,
   };
 }

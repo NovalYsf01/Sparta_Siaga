@@ -21,10 +21,10 @@ export async function GET(request: Request) {
     const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10", 10)));
     const offset = (page - 1) * limit;
 
-    const isHoAdmin = ["ho_admin", "gm_ho", "sm_ho"].includes(sessionUser.role);
+    const canViewAllBranches = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
     
     // Server-side branch enforcement
-    const targetBranch = isHoAdmin 
+    const targetBranch = canViewAllBranches 
       ? (clientBranch && clientBranch !== "all" ? clientBranch : null)
       : sessionUser.branch;
 
@@ -56,6 +56,9 @@ export async function GET(request: Request) {
       conditions.push(`report_origin = $${paramIndex++}`);
       values.push(reportOrigin);
     }
+
+    // Exclude test fixture namespace from normal runtime history
+    conditions.push("id NOT LIKE 'INC-TEST-%'");
 
     // ENFORCE HISTORY STATUSES
     if (status && status !== "all") {

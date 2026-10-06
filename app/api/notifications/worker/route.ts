@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { fetchDisasterFeed } from '@/lib/disaster-service';
-import { calculateHaversineDistance, calculateBmkgImpactRadius } from '@/lib/haversine';
+import { calculateHaversineDistance, calculateSpartaMonitoringZone } from '@/lib/haversine';
 import { getDbPool } from '@/lib/db';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
@@ -100,19 +100,18 @@ export async function POST(request: Request) {
 
     const isEligibleForAlert = forceSimulation || (disasterFeed.dataFreshness !== 'stale' && disasterFeed.dataFreshness !== 'unavailable');
 
-    // 3. Evaluate each earthquake
-    if (isEligibleForAlert) {
-      for (const eq of earthquakes) {
-        // Calculate scientific radius
-        const { dangerRadiusKm, warningRadiusKm } = calculateBmkgImpactRadius(eq.magnitude, eq.depthKm);
+    if (isEligibleForAlert && disasterFeed.activeEarthquakes && disasterFeed.activeEarthquakes.length > 0) {
+      for (const eq of disasterFeed.activeEarthquakes) {
+        // Calculate SPARTA zones
+        const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(eq.magnitude, eq.depthKm);
 
       // Collect affected stores
       const affectedByBranch = new Map<string, AffectedStoreSummary[]>();
 
       for (const st of stores) {
         const dist = calculateHaversineDistance(eq.latitude, eq.longitude, st.latitude, st.longitude);
-        if (dist <= warningRadiusKm) {
-          const status = dist <= dangerRadiusKm ? 'danger' : 'warning';
+        if (dist <= monitoringRadiusKm) {
+          const status = dist <= priorityRadiusKm ? 'PRIORITY_MONITOR' : 'MONITOR';
           const summary: AffectedStoreSummary = {
             kode_toko: st.kode_toko,
             nama_toko: st.nama_toko,
@@ -130,12 +129,12 @@ export async function POST(request: Request) {
         }
       }
 
-      // If simulated or actually has affected stores in danger
+      // If simulated or actually has affected stores in priority monitor
       for (const [branch, branchStores] of affectedByBranch.entries()) {
-        const dangerStores = branchStores.filter(s => s.status === 'danger');
+        const priorityStores = branchStores.filter(s => s.status === 'PRIORITY_MONITOR');
         
-        // Dispatch alert if there are stores in danger, or high magnitude, or forced simulation
-        if (dangerStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0) || forceSimulation) {
+        // Dispatch alert if there are stores in priority monitor, or high magnitude, or forced simulation
+        if (priorityStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0) || forceSimulation) {
           const isProcessed = !forceSimulation && await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
           const inCooldown = !forceSimulation && await isNotificationCooldownActive('earthquake', branch);
 
@@ -147,7 +146,7 @@ export async function POST(request: Request) {
             const disasterTitle = forceSimulation
               ? `[SIMULATION] ⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`
               : `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
-            const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Radius bahaya terhitung ${dangerRadiusKm} km. ${dangerStores.length} gerai toko cabang Anda berada di zona bahaya guncangan.`;
+            const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Zona Prioritas Pantau SPARTA terhitung ${priorityRadiusKm} km. ${priorityStores.length} gerai toko cabang Anda berada di Zona Prioritas Pantau SPARTA.`;
 
             const instructions = [
               'Duty Officer DC Cabang segera melakukan panggilan radio/telepon siaga ke Area Coordinator (AC) terkait.',
@@ -196,7 +195,7 @@ export async function POST(request: Request) {
         nama_toko: s.nama_toko,
         cabang: s.cabang,
         distance_km: 1.2,
-        status: 'warning' as const,
+        status: 'MONITOR' as const,
         alamat: s.alamat,
         fr_type: s.fr_type,
       }));

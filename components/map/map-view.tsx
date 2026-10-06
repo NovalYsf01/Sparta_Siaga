@@ -24,13 +24,14 @@ interface MapViewProps {
   floodReports?: any[];
   basemap: "esri-dark" | "esri-light" | "osm";
   incidentOnly: boolean;
-  statusFilter: "all" | "danger" | "warning" | "safe";
+  statusFilter: "all" | "PRIORITY_MONITOR" | "MONITOR" | "SAFE";
   selectedStore: Store | null;
   onSelectStore: (store: Store) => void;
   flyToTarget: { lat: number; lng: number; zoom?: number } | null;
   showRadar?: boolean;
   radarTileUrl?: string;
   activeLayer?: "all" | "earthquake" | "stores" | "weather" | "flood";
+  theme?: "dark" | "light";
 }
 
 export function MapView(props: MapViewProps) {

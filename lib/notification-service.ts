@@ -1,7 +1,7 @@
 import { getDbPool } from './db';
 import { DisasterNotificationType, NotificationChannel, NotificationLog, AffectedStoreSummary } from '@/types/notification';
 import { Store } from '@/types/store';
-import { calculateHaversineDistance, calculateBmkgImpactRadius } from './haversine';
+import { calculateHaversineDistance, calculateSpartaMonitoringZone } from './haversine';
 
 export interface DispatchNotificationParams {
   disasterId: string;
@@ -13,6 +13,22 @@ export interface DispatchNotificationParams {
   message: string;
   affectedStores: AffectedStoreSummary[];
   ticketNumber?: string;
+}
+
+/**
+ * Helper to retrieve APP_BASE_URL honestly.
+ * Fallbacks to localhost only in development mode.
+ */
+export function getAppBaseUrl(): string {
+  const url = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
+  if (!url) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn("[SPARTA CONFIG] Warning: APP_BASE_URL is not configured in production environment!");
+      return "";
+    }
+    return "http://localhost:3004";
+  }
+  return url.replace(/\/$/, "");
 }
 
 /**
@@ -43,9 +59,9 @@ export function generateEmergencyEmailHtml(params: {
         <td style="padding: 10px 8px; font-size: 12px; color: #cbd5e1;">${s.distance_km.toFixed(1)} km</td>
         <td style="padding: 10px 8px; font-size: 12px;">
           ${
-            s.status === 'danger'
-              ? '<span style="background: #dc2626; color: #ffffff; font-weight: bold; font-size: 11px; padding: 3px 8px; border-radius: 4px;">ZONA BAHAYA</span>'
-              : '<span style="background: #d97706; color: #ffffff; font-weight: bold; font-size: 11px; padding: 3px 8px; border-radius: 4px;">ZONA WASPADA</span>'
+            s.status === 'PRIORITY_MONITOR'
+              ? '<span style="background: #dc2626; color: #ffffff; font-weight: bold; font-size: 11px; padding: 3px 8px; border-radius: 4px;">ZONA PRIORITAS PANTAU</span>'
+              : '<span style="background: #d97706; color: #ffffff; font-weight: bold; font-size: 11px; padding: 3px 8px; border-radius: 4px;">ZONA PANTAU</span>'
           }
         </td>
       </tr>`
@@ -101,7 +117,7 @@ export function generateEmergencyEmailHtml(params: {
           ${params.disasterDetail}
         </p>
         <p style="margin: 8px 0 0 0; font-size: 13px; color: #fca5a5; font-weight: bold;">
-          ⚠️ Total Toko Terdeteksi di Radius Pantau: ${params.affectedCount} Gerai
+          ⚠️ Total Toko Terdeteksi di Zona Pantau SPARTA: ${params.affectedCount} Gerai
         </p>
       </div>
 
@@ -136,7 +152,10 @@ export function generateEmergencyEmailHtml(params: {
 
       <!-- Action Button -->
       <div style="text-align: center; margin-bottom: 20px;">
-        <a href="http://localhost:3004" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);">
+        <a href="${(() => {
+          const baseUrl = getAppBaseUrl();
+          return baseUrl ? `${baseUrl}/monitoring` : "/monitoring";
+        })()}" style="display: inline-block; background-color: #dc2626; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);">
           Buka Live Incident Dashboard
         </a>
       </div>
@@ -275,7 +294,8 @@ export async function getRecentNotificationLogs(limit: number = 50, branch?: str
              recipient_role, recipient_contact, title, message, 
              affected_stores_count, affected_stores_sample, ticket_number, 
              status, sent_at, acknowledged_at, acknowledged_by, acknowledgment_notes,
-             resolved_at, resolved_by, resolution_notes, store_verifications
+             resolved_at, resolved_by, resolution_notes, store_verifications,
+             delivery_status
       FROM notification_logs
     `;
     const params: (string | number)[] = [];
@@ -305,7 +325,9 @@ export async function getRecentNotificationLogs(limit: number = 50, branch?: str
       affected_stores_sample: row.affected_stores_sample || [],
       ticket_number: row.ticket_number,
       status: row.status,
+      delivery_status: row.delivery_status || 'not_configured',
       sent_at: row.sent_at,
+      updated_at: row.updated_at,
       acknowledged_at: row.acknowledged_at,
       acknowledged_by: row.acknowledged_by,
       acknowledgment_notes: row.acknowledgment_notes,
@@ -317,5 +339,44 @@ export async function getRecentNotificationLogs(limit: number = 50, branch?: str
   } catch (error) {
     console.error('[Notification Service] Error fetching notification logs:', error);
     return [];
+  }
+}
+
+/**
+ * Requirement 10: Deduplicate & Update existing notification log per canonical event
+ * If BMKG updates magnitude, location, or shakemap, update existing record instead of creating duplicate.
+ */
+export async function updateNotificationLogForEvent(
+  disasterId: string,
+  branch: string,
+  updates: {
+    title?: string;
+    message?: string;
+    affectedStores?: AffectedStoreSummary[];
+  }
+): Promise<boolean> {
+  try {
+    const pool = getDbPool();
+    const query = `
+      UPDATE notification_logs
+      SET title = COALESCE($1, title),
+          message = COALESCE($2, message),
+          affected_stores_count = COALESCE($3, affected_stores_count),
+          affected_stores_sample = COALESCE($4, affected_stores_sample),
+          updated_at = NOW()
+      WHERE disaster_id = $5 AND branch = $6;
+    `;
+    const res = await pool.query(query, [
+      updates.title || null,
+      updates.message || null,
+      updates.affectedStores ? updates.affectedStores.length : null,
+      updates.affectedStores ? JSON.stringify(updates.affectedStores.slice(0, 10)) : null,
+      disasterId,
+      branch,
+    ]);
+    return (res.rowCount ?? 0) > 0;
+  } catch (error) {
+    console.warn('[Notification Service] Warning updating canonical notification:', error);
+    return false;
   }
 }

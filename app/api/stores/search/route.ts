@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const isHoAdmin = ["ho_admin", "gm_ho", "sm_ho"].includes(sessionUser.role);
+    const canSearchAllStores = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
     const pool = getDbPool();
     const conditions: string[] = [];
     const values: any[] = [];
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     }
 
     // Server-side enforcement of branch scope
-    if (!isHoAdmin) {
+    if (!canSearchAllStores) {
       conditions.push(`cabang = $${paramIndex}`);
       values.push(sessionUser.branch);
       paramIndex++;

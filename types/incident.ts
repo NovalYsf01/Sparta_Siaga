@@ -62,8 +62,12 @@ export type SpartaRole =
   | "bms"           // Branch Maintenance Support
   | "tim_toko"
   | "tim_maintenance"
+  | "sparta_maintenance" // Sparta Maintenance
   | "tim_office"
   | "tim_warehouse";
+
+export type SystemRole = "ADMIN" | "USER";
+export type Scope = "HO" | "BRANCH";
 
 // Legacy alias — dipertahankan untuk backward compatibility
 export type RoleType =
@@ -119,7 +123,7 @@ export interface ReportAffectedStore {
   alamat?: string;
   fr_type?: string;
   distance_km: number;
-  exposure_zone: "danger" | "warning"; // Hasil kalkulasi SPARTA, bukan confirmed damage
+  exposure_zone: "PRIORITY_MONITOR" | "MONITOR"; // Hasil kalkulasi SPARTA, bukan confirmed damage
   confirmation_status: "pending" | "confirmed_safe" | "confirmed_damaged" | "unreachable";
   confirmed_by?: string;
   confirmed_at?: string;

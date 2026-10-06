@@ -120,33 +120,33 @@ export function SiagaHeader({
         </button>
 
         <button
-          onClick={() => onSelectStatusFilter("danger")}
+          onClick={() => onSelectStatusFilter("PRIORITY_MONITOR")}
           className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-            statusFilter === "danger"
+            statusFilter === "PRIORITY_MONITOR"
               ? "bg-red-600 text-white shadow-sm"
               : "text-red-500 hover:bg-red-500/10"
           } ${dangerCount > 0 ? "animate-pulse" : ""}`}
         >
           <AlertOctagon className="w-3.5 h-3.5" />
-          <span>Bahaya ({dangerCount})</span>
+          <span>Prioritas ({dangerCount})</span>
         </button>
 
         <button
-          onClick={() => onSelectStatusFilter("warning")}
+          onClick={() => onSelectStatusFilter("MONITOR")}
           className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-            statusFilter === "warning"
+            statusFilter === "MONITOR"
               ? "bg-amber-600 text-white shadow-sm"
               : "text-amber-500 hover:bg-amber-500/10"
           }`}
         >
           <AlertTriangle className="w-3.5 h-3.5" />
-          <span>Waspada ({warningCount})</span>
+          <span>Pantau ({warningCount})</span>
         </button>
 
         <button
-          onClick={() => onSelectStatusFilter("safe")}
+          onClick={() => onSelectStatusFilter("SAFE")}
           className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-            statusFilter === "safe"
+            statusFilter === "SAFE"
               ? "bg-emerald-600 text-white shadow-sm"
               : "text-emerald-500 hover:bg-emerald-500/10"
           }`}
@@ -164,7 +164,7 @@ export function SiagaHeader({
           title={
             incidentOnly
               ? "Tampilkan kembali semua toko"
-              : "Fokus hanya pada toko di radius bahaya & waspada"
+              : "Fokus hanya pada toko di Zona Prioritas & Pantau SPARTA"
           }
           className={`flex items-center gap-1 sm:gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg text-xs font-semibold border transition-all ${
             incidentOnly

@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { dbGetIncidentById, dbCreateInstruction, dbGetInstructionsByReport } from "@/lib/incident-db";
-import { canCreateManagementInstruction } from "@/lib/report-permissions";
+import { canCreateManagementInstructionAsync } from "@/lib/permission-service";
 import { ManagementInstruction, SpartaRole } from "@/types/incident";
 import { getSessionUser } from "@/lib/auth";
 
@@ -36,10 +36,10 @@ export async function GET(_: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
     }
 
-    // Role-based visibility
-    const isHoAdmin = ["ho_admin", "gm_ho", "sm_ho"].includes(sessionUser.role);
-    if (!isHoAdmin) {
-      if (report.branch.trim().toLowerCase() !== sessionUser.branch.trim().toLowerCase()) {
+    // Role-based visibility: System Admin and HO scope can view instructions for any branch
+    const canViewAll = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
+    if (!canViewAll) {
+      if (report.branch.trim().toLowerCase() !== (sessionUser.branch || "").trim().toLowerCase()) {
         return NextResponse.json({ error: "Unauthorized: Cabang tidak berhak mengakses laporan ini" }, { status: 403 });
       }
     }
@@ -82,21 +82,16 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
 
     // Server-side authorization from trusted identity
-    if (!canCreateManagementInstruction(sessionUser.role)) {
+    const isAllowed = await canCreateManagementInstructionAsync(sessionUser);
+    if (!isAllowed) {
       return NextResponse.json(
-        { error: "Unauthorized: Hanya GM/SM HO yang dapat membuat instruksi manajemen" },
+        { error: "Unauthorized: Hanya GM/SM HO yang berhak membuat instruksi manajemen" },
         { status: 403 }
       );
     }
 
-    if (sessionUser.role !== "gm_ho" && sessionUser.role !== "sm_ho") {
-      return NextResponse.json(
-        { error: "Hanya GM/SM HO yang dapat membuat instruksi" },
-        { status: 403 }
-      );
-    }
-
-    const instructionId = `INS-${sessionUser.role.toUpperCase()}-${Date.now().toString().slice(-8)}`;
+    const roleTag = (sessionUser.role || "ho").toUpperCase();
+    const instructionId = `INS-${roleTag}-${Date.now().toString().slice(-8)}`;
     const instruction: ManagementInstruction = {
       instruction_id: instructionId,
       report_id: id,

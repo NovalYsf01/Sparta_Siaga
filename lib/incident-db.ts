@@ -44,7 +44,7 @@ function rowToIncident(row: Record<string, unknown>): IncidentRecord {
 export async function dbGetAllIncidents(): Promise<IncidentRecord[]> {
   const pool = getDbPool();
   const { rows } = await pool.query(
-    `SELECT * FROM incidents ORDER BY created_at DESC`
+    `SELECT * FROM incidents WHERE id NOT LIKE 'INC-TEST-%' ORDER BY created_at DESC`
   );
   return rows.map(rowToIncident);
 }
@@ -101,6 +101,34 @@ export async function dbFindManualEarthquakeReportByEvent(
   );
   if (rows.length === 0) return null;
   return rowToIncident(rows[0]);
+}
+
+/**
+ * Find candidate unlinked manual reports for a branch within a time window (Requirement 20).
+ * Matches: same branch, disaster_type = 'earthquake', earthquake_event_id IS NULL,
+ * created_at within event timestamp +/- windowMinutes.
+ */
+export async function dbFindUnlinkedManualEarthquakeCandidates(
+  branch: string,
+  eventTimestamp: number,
+  windowMinutes: number = 120
+): Promise<IncidentRecord[]> {
+  const pool = getDbPool();
+  const eventDate = new Date(eventTimestamp);
+  const minTime = new Date(eventDate.getTime() - windowMinutes * 60 * 1000);
+  const maxTime = new Date(eventDate.getTime() + windowMinutes * 60 * 1000);
+
+  const { rows } = await pool.query(
+    `SELECT * FROM incidents
+     WHERE branch = $1
+       AND disaster_type = 'earthquake'
+       AND report_origin = 'manual'
+       AND earthquake_event_id IS NULL
+       AND created_at >= $2 AND created_at <= $3
+     ORDER BY created_at ASC`,
+    [branch, minTime.toISOString(), maxTime.toISOString()]
+  );
+  return rows.map(rowToIncident);
 }
 
 export async function dbCreateIncident(

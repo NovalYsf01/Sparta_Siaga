@@ -45,6 +45,15 @@ export interface SiagaContextType {
   selectedCategory: string | null;
   setSelectedCategory: (cat: string | null) => void;
   setIsAffectedSheetOpen: (open: boolean) => void;
+
+  // Requirement 3: Map Time Filter (24 Jam vs 3 Hari)
+  mapTimeFilter: "24h" | "3d";
+  setMapTimeFilter: (filter: "24h" | "3d") => void;
+
+  // Requirement 7: True Event Focus Mode
+  selectedEarthquake: Earthquake | null;
+  setSelectedEarthquake: (eq: Earthquake | null) => void;
+  clearEventFocus: () => void;
 }
 
 const SiagaContext = createContext<SiagaContextType | null>(null);

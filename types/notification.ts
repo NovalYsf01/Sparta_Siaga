@@ -7,7 +7,7 @@ export interface AffectedStoreSummary {
   nama_toko: string;
   cabang: string;
   distance_km: number;
-  status: 'danger' | 'warning';
+  status: 'PRIORITY_MONITOR' | 'MONITOR';
   alamat?: string;
   fr_type?: string;
 }
@@ -26,7 +26,9 @@ export interface NotificationLog {
   affected_stores_sample: AffectedStoreSummary[];
   ticket_number: string;
   status: 'not_configured' | 'pending' | 'queued' | 'sent' | 'failed' | 'delivered' | 'acknowledged' | 'resolved';
+  delivery_status?: 'not_configured' | 'pending' | 'queued' | 'sent' | 'delivered' | 'failed';
   sent_at: string;
+  updated_at?: string;
   acknowledged_at?: string;
   acknowledged_by?: string;
   acknowledgment_notes?: string;

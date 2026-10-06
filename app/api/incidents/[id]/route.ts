@@ -5,7 +5,7 @@ import {
   dbDeleteIncident,
 } from "@/lib/incident-db";
 import { getSessionUser } from "@/lib/auth";
-import { checkMutationAuthorization } from "@/lib/report-permissions";
+import { checkMutationAuthorization, canViewReportAsync } from "@/lib/permission-service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -23,11 +23,9 @@ export async function GET(_: Request, { params }: RouteContext) {
     }
 
     // Role-based visibility
-    const isHoAdmin = ["ho_admin", "gm_ho", "sm_ho"].includes(sessionUser.role);
-    if (!isHoAdmin) {
-      if (incident.branch.trim().toLowerCase() !== sessionUser.branch.trim().toLowerCase()) {
-        return NextResponse.json({ error: "Unauthorized: Cabang tidak berhak mengakses laporan ini" }, { status: 403 });
-      }
+    const canView = await canViewReportAsync(sessionUser, incident);
+    if (!canView) {
+      return NextResponse.json({ error: "Unauthorized: Cabang tidak berhak mengakses laporan ini" }, { status: 403 });
     }
 
     return NextResponse.json({ data: incident });
@@ -50,13 +48,33 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
     }
 
-    // Usually PATCH is an operational action
-    const authResult = checkMutationAuthorization("act", sessionUser, incident);
+    const patch = await request.json();
+    const isClose = patch.status === "resolved";
+    const action = isClose ? "close" : "act";
+
+    const authResult = await checkMutationAuthorization(action, sessionUser, incident);
     if (!authResult.authorized) {
       return NextResponse.json({ error: authResult.reason }, { status: 403 });
     }
 
-    const patch = await request.json();
+    if (isClose) {
+      const { ProgressService } = await import("@/lib/progress-service");
+      const latest = await ProgressService.getLatestProgress(id);
+      if (latest.latestPercentage < 100) {
+        return NextResponse.json(
+          { error: `Laporan hanya dapat diselesaikan jika progress pekerjaan telah mencapai 100% (saat ini ${latest.latestPercentage}%).` },
+          { status: 400 }
+        );
+      }
+      const hasFinal = await ProgressService.hasFinalOrHandoverEvidence(id);
+      if (!hasFinal) {
+        return NextResponse.json(
+          { error: "Penutupan laporan wajib menyertakan foto bukti akhir pekerjaan (FINAL atau HANDOVER)." },
+          { status: 400 }
+        );
+      }
+    }
+
     const updated = await dbUpdateIncident(id, patch);
     return NextResponse.json({ data: updated });
   } catch (err) {
@@ -81,7 +99,7 @@ export async function DELETE(_: Request, { params }: RouteContext) {
     // Only HO Admin or GM should probably delete, but we'll use act for now or a custom check.
     // The instruction says "Close: TBD / deny for now. Do not invent Close permission."
     // Let's just fail closed for DELETE unless it's ho_admin for safety.
-    if (sessionUser.role !== "ho_admin") {
+    if (sessionUser.systemRole !== "ADMIN") {
       return NextResponse.json({ error: "Hanya Administrator yang dapat menghapus laporan" }, { status: 403 });
     }
 

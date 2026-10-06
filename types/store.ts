@@ -1,4 +1,24 @@
-export type StoreStatus = "safe" | "warning" | "danger";
+import { Earthquake } from "./disaster";
+
+export type SpatialRisk = "SAFE" | "MONITOR" | "PRIORITY_MONITOR";
+export type StoreStatus = SpatialRisk; // Backward compatibility alias
+
+export type OperationalStatus =
+  | "NONE"
+  | "NEED_CONFIRMATION"
+  | "CONFIRMED_AFFECTED"
+  | "ESTIMATION"
+  | "READY_FOR_WORK"
+  | "IN_PROGRESS"
+  | "WORK_COMPLETED"
+  | "RESOLVED";
+
+export type MapVisualStatus =
+  | "NORMAL"
+  | "PERLU_PERHATIAN"
+  | "TERDAMPAK"
+  | "DALAM_PENANGANAN"
+  | "SELESAI";
 
 export interface Store {
   id: string;
@@ -10,11 +30,26 @@ export interface Store {
   longitude: number;
   fr_type?: "R" | "F" | string; // Franchise or Regular
   branch_emergency_contact?: string; // Duty officer / DC hotline
+
+  // Dimension 1: Spatial Risk
   status?: StoreStatus;
+  spatialRisk?: SpatialRisk;
+
+  // Dimension 2: Operational Status
+  operationalStatus?: OperationalStatus;
+  activeReportId?: string;
+  activeReportProgress?: number;
+
+  // Final Derived Map Visual Status
+  visualStatus?: MapVisualStatus;
+
+  // Causative Risk Source
   distanceFromDisasterKm?: number;
+  riskSourceEvent?: Earthquake;
   nearestDisasterTitle?: string;
   nearestDisasterMag?: number;
   nearestDisasterDepth?: string;
+
   floodWarning?: boolean;
   rainIntensityMm?: number;
   weatherSummary?: string;

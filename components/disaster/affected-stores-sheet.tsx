@@ -30,17 +30,17 @@ export function AffectedStoresSheet({
   onSelectStore,
   theme = "dark",
 }: AffectedStoresSheetProps) {
-  const [filter, setFilter] = useState<"all" | "danger" | "warning">("all");
+  const [filter, setFilter] = useState<"all" | "PRIORITY_MONITOR" | "MONITOR">("all");
 
   if (!isOpen) return null;
 
   const isLight = theme === "light";
-  const dangerStores = affectedStores.filter((s) => s.status === "danger");
-  const warningStores = affectedStores.filter((s) => s.status === "warning");
+  const dangerStores = affectedStores.filter((s) => s.status === "PRIORITY_MONITOR");
+  const warningStores = affectedStores.filter((s) => s.status === "MONITOR");
 
   const filteredStores = affectedStores.filter((s) => {
-    if (filter === "danger") return s.status === "danger";
-    if (filter === "warning") return s.status === "warning";
+    if (filter === "PRIORITY_MONITOR") return s.status === "PRIORITY_MONITOR";
+    if (filter === "MONITOR") return s.status === "MONITOR";
     return true;
   });
 
@@ -59,7 +59,7 @@ export function AffectedStoresSheet({
             Toko Potensi Terdampak
           </h2>
           <p className={`text-[11px] font-medium mt-1 ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-            {earthquake ? earthquake.title : "Pemantauan Radius Bencana"}
+            {earthquake ? earthquake.title : "Pemantauan Zona Pantau SPARTA"}
           </p>
         </div>
 
@@ -78,43 +78,43 @@ export function AffectedStoresSheet({
       {/* Filter / Summary Tabs */}
       <div className={`px-5 pb-4 border-b flex gap-2 ${isLight ? "border-slate-100 bg-white" : "border-slate-800 bg-slate-900"}`}>
         <button
-          onClick={() => setFilter(filter === "danger" ? "all" : "danger")}
+          onClick={() => setFilter(filter === "PRIORITY_MONITOR" ? "all" : "PRIORITY_MONITOR")}
           className={`flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all ${
-            filter === "danger"
+            filter === "PRIORITY_MONITOR"
               ? isLight ? "border-red-500 bg-red-50 shadow-sm ring-1 ring-red-500/20" : "border-red-500 bg-red-950/40 shadow-sm ring-1 ring-red-500/20"
               : isLight ? "border-slate-200 bg-white hover:bg-slate-50 opacity-80" : "border-slate-700 bg-slate-900 hover:bg-slate-800 opacity-80"
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${filter === "danger" ? "bg-red-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
+            <span className={`w-2 h-2 rounded-full ${filter === "PRIORITY_MONITOR" ? "bg-red-500 animate-pulse" : "bg-slate-300 dark:bg-slate-600"}`} />
             <span className={`text-[11px] font-semibold ${
-              filter === "danger" 
+              filter === "PRIORITY_MONITOR" 
                 ? "text-red-600 dark:text-red-400" 
                 : "text-slate-500 dark:text-slate-400"
-            }`}>Bahaya</span>
+            }`}>Prioritas</span>
           </div>
-          <span className={`font-mono font-bold text-sm ${filter === "danger" ? "text-red-600 dark:text-red-400" : "text-slate-400 dark:text-slate-500"}`}>
+          <span className={`font-mono font-bold text-sm ${filter === "PRIORITY_MONITOR" ? "text-red-600 dark:text-red-400" : "text-slate-400 dark:text-slate-500"}`}>
             {dangerStores.length}
           </span>
         </button>
 
         <button
-          onClick={() => setFilter(filter === "warning" ? "all" : "warning")}
+          onClick={() => setFilter(filter === "MONITOR" ? "all" : "MONITOR")}
           className={`flex-1 flex items-center justify-between p-2.5 rounded-xl border transition-all ${
-            filter === "warning"
+            filter === "MONITOR"
               ? isLight ? "border-amber-500 bg-amber-50 shadow-sm ring-1 ring-amber-500/20" : "border-amber-500 bg-amber-950/40 shadow-sm ring-1 ring-amber-500/20"
               : isLight ? "border-slate-200 bg-white hover:bg-slate-50 opacity-80" : "border-slate-700 bg-slate-900 hover:bg-slate-800 opacity-80"
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${filter === "warning" ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+            <span className={`w-2 h-2 rounded-full ${filter === "MONITOR" ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600"}`} />
             <span className={`text-[11px] font-semibold ${
-              filter === "warning" 
+              filter === "MONITOR" 
                 ? "text-amber-600 dark:text-amber-400" 
                 : "text-slate-500 dark:text-slate-400"
-            }`}>Waspada</span>
+            }`}>Pantau</span>
           </div>
-          <span className={`font-mono font-bold text-sm ${filter === "warning" ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"}`}>
+          <span className={`font-mono font-bold text-sm ${filter === "MONITOR" ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"}`}>
             {warningStores.length}
           </span>
         </button>
@@ -136,7 +136,7 @@ export function AffectedStoresSheet({
           </div>
         ) : (
           filteredStores.map((store, index) => {
-            const isDanger = store.status === "danger";
+            const isDanger = store.status === "PRIORITY_MONITOR";
 
             return (
               <div

@@ -13,6 +13,7 @@ import {
 } from "@/lib/incident-store";
 
 import { assessStoreRisk } from "@/lib/haversine";
+import { deriveStoreStatuses } from "@/lib/store-status";
 import { IncidentAppShell } from "@/components/layout/incident-app-shell";
 import { SiagaProvider } from "@/components/layout/siaga-context";
 import { StoreVerificationModal } from "@/components/incident/store-verification-modal";
@@ -61,6 +62,12 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   const [theme, setTheme] = useState<"dark" | "light">("light");
   const [showRadar, setShowRadar] = useState<boolean>(true);
   const [radarData, setRadarData] = useState<{ tileUrl: string; timeFormatted: string } | null>(null);
+
+  // Requirement 3: Map Time Filter (24 Jam vs 3 Hari)
+  const [mapTimeFilter, setMapTimeFilter] = useState<"24h" | "3d">("3d");
+
+  // Requirement 7: True Event Focus Mode
+  const [selectedEarthquake, setSelectedEarthquake] = useState<Earthquake | null>(null);
 
   // Interaction & Dialog states
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
@@ -271,15 +278,14 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
 
     if (incident.disaster_type === "earthquake") {
       setActiveLayer("earthquake");
-      const allEqs = disasterData
-        ? [
-            ...(disasterData.latestBmkgEarthquake ? [disasterData.latestBmkgEarthquake] : []),
-            ...(disasterData.recentEarthquakes || []),
-          ]
-        : [];
-      const eq = allEqs.find((e) => e.id === incident.disaster_id);
+      const allEqs = [
+        ...(disasterData?.activeEarthquakes || []),
+        ...(disasterData?.recentEarthquakes || []),
+      ];
+      const eq = allEqs.find((e) => e.id === incident.disaster_id || (incident.disaster_id && e.id.includes(incident.disaster_id)));
       if (eq) {
-        setFlyToTarget({ lat: eq.latitude, lng: eq.longitude, zoom: 10 });
+        setSelectedEarthquake(eq); // Requirement 23: Activates Event Focus Mode!
+        setFlyToTarget({ lat: eq.latitude, lng: eq.longitude, zoom: 11 });
       }
     } else if (incident.disaster_type === "heavy_rain" || incident.disaster_type === "flood") {
       setActiveLayer("weather");
@@ -316,26 +322,72 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     }
   }, [router, disasterData, rawStores]);
 
-  // Spatial calculation engine
-  const computedStores = useMemo(() => {
-    const earthquakes = disasterData?.recentEarthquakes || [];
+  // Requirement 2 & 3: Time filtered earthquakes according to mapTimeFilter (24h or 3d <=72h)
+  const timeFilteredEarthquakes = useMemo(() => {
+    const allActive = disasterData?.activeEarthquakes || [];
+    const maxHours = mapTimeFilter === "24h" ? 24 : 72;
+    const maxAgeMs = maxHours * 60 * 60 * 1000;
+    const now = Date.now();
+    return allActive.filter((eq) => now - eq.timestamp <= maxAgeMs);
+  }, [disasterData, mapTimeFilter]);
 
+  // Requirement 7: Contextual earthquakes for spatial risk calculation (Event Focus Mode vs all active)
+  const effectiveEarthquakesForRisk = useMemo(() => {
+    if (selectedEarthquake) {
+      return [selectedEarthquake];
+    }
+    return timeFilteredEarthquakes;
+  }, [selectedEarthquake, timeFilteredEarthquakes]);
+
+  // Index incidents by store ID and affected stores for 2D operational status derivation (Requirement 9 & 10)
+  const incidentByStoreCode = useMemo(() => {
+    const map = new Map<string, IncidentRecord>();
+    for (const inc of incidents) {
+      if (inc.storeId) {
+        if (!map.has(inc.storeId) || map.get(inc.storeId)?.status === "resolved") {
+          map.set(inc.storeId, inc);
+        }
+      }
+      if (Array.isArray(inc.affectedStores)) {
+        for (const aff of inc.affectedStores) {
+          if (aff.kode_toko) {
+            if (!map.has(aff.kode_toko) || map.get(aff.kode_toko)?.status === "resolved") {
+              map.set(aff.kode_toko, inc);
+            }
+          }
+        }
+      }
+    }
+    return map;
+  }, [incidents]);
+
+  // 2-Dimensional Spatial & Operational calculation engine
+  const computedStores = useMemo(() => {
     return rawStores.map((store) => {
       const risk = assessStoreRisk(
         { latitude: store.latitude, longitude: store.longitude },
-        earthquakes
+        effectiveEarthquakesForRisk
       );
+
+      const matchingIncident = incidentByStoreCode.get(store.kode_toko) || incidentByStoreCode.get(store.id);
+      const { operationalStatus, visualStatus } = deriveStoreStatuses(risk.spatialRisk, matchingIncident);
 
       return {
         ...store,
-        status: risk.status,
-        distanceFromDisasterKm: risk.distanceFromDisasterKm,
-        nearestDisasterTitle: risk.nearestDisaster?.title,
-        nearestDisasterMag: risk.nearestDisaster?.magnitude,
-        nearestDisasterDepth: risk.nearestDisaster?.depth,
+        status: risk.spatialRisk,
+        spatialRisk: risk.spatialRisk,
+        operationalStatus,
+        visualStatus,
+        activeReportId: matchingIncident?.id,
+        activeReportProgress: matchingIncident?.progress,
+        distanceFromDisasterKm: risk.distanceFromEventKm,
+        riskSourceEvent: risk.riskSourceEvent,
+        nearestDisasterTitle: risk.riskSourceEvent?.title,
+        nearestDisasterMag: risk.riskSourceEvent?.magnitude,
+        nearestDisasterDepth: risk.riskSourceEvent?.depth,
       };
     });
-  }, [rawStores, disasterData]);
+  }, [rawStores, effectiveEarthquakesForRisk, incidentByStoreCode]);
 
   // Dynamically feeding BMKG danger stores into operational incidents
   // has been REMOVED from the browser. The server daemon is the single
@@ -347,24 +399,46 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     // 1. Notification State & Earthquake Feed (60 seconds)
     const fetchFastFeeds = async () => {
       try {
-        const logsRes = await fetch("/api/notifications/logs?limit=50");
+        const logsRes = await fetch("/api/notifications/logs?limit=100");
         if (logsRes.ok) {
           const logsJson = await logsRes.json();
+          const nowMs = Date.now();
+          const MAX_ACTIVE_WINDOW_MS = 72 * 60 * 60 * 1000;
+
           const lastRead = typeof window !== "undefined"
             ? localStorage.getItem("sparta_last_read_at")
             : null;
           const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
-          const unreadLogs = (logsJson.logs || []).filter((l: any) => {
+
+          let readIds = new Set<string>();
+          if (typeof window !== "undefined") {
+            try {
+              const raw = localStorage.getItem("sparta_read_notif_ids");
+              if (raw) readIds = new Set(JSON.parse(raw));
+            } catch (e) {}
+          }
+
+          // Requirements 5 & 6: Bell count counts strictly UNREAD + ACTIVE (<=72h) notifications
+          // Do NOT count archived/historical notifications (>72h) or legacy acknowledged/resolved fields
+          const isHo = monitoredBranch === "all" || !activeRole || activeRole.startsWith("ho_");
+          const activeUnreadLogs = (logsJson.logs || []).filter((l: any) => {
             const sentTime = new Date(l.sent_at).getTime();
-            return sentTime > lastReadTime && l.status !== "acknowledged";
+            const isActive = (nowMs - sentTime) <= MAX_ACTIVE_WINDOW_MS;
+            const isRead = readIds.has(l.id) || sentTime <= lastReadTime;
+
+            if (!isHo && monitoredBranch && l.branch?.toLowerCase() !== monitoredBranch.toLowerCase()) {
+              return false;
+            }
+
+            return isActive && !isRead;
           });
           
-          if (unreadLogs.length > notificationCount) {
+          if (activeUnreadLogs.length > notificationCount) {
              playEmergencyChime(); // Play sound if new notification arrived
           }
           
           // Trigger popups for all unread logs (triggerDesktopPopup handles deduplication internally)
-          unreadLogs.forEach((l: any) => {
+          activeUnreadLogs.forEach((l: any) => {
             let sourceLabel = "SPARTA Siaga";
             if (l.disaster_id?.includes("bmkg")) sourceLabel = "BMKG";
             else if (l.disaster_id?.includes("usgs")) sourceLabel = "USGS";
@@ -389,7 +463,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
               }
             });
           });
-          setNotificationCount(unreadLogs.length);
+          setNotificationCount(activeUnreadLogs.length);
         }
 
         const disastersRes = await fetch("/api/disasters/earthquakes?refresh=true");
@@ -452,17 +526,24 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     };
   }, [playEmergencyChime, notificationCount]);
 
-  // Risk metrics calculation
+  // Risk metrics calculation (Requirement 7: Danger / Monitor counts in focus context)
   const { dangerCount, warningCount, affectedStores } = useMemo(() => {
     let danger = 0;
     let warning = 0;
     const affected: Store[] = [];
 
     for (const store of computedStores) {
-      if (store.status === "danger") {
+      if (
+        store.visualStatus === "TERDAMPAK" ||
+        store.visualStatus === "DALAM_PENANGANAN" ||
+        store.spatialRisk === "PRIORITY_MONITOR"
+      ) {
         danger++;
         affected.push(store);
-      } else if (store.status === "warning") {
+      } else if (
+        store.visualStatus === "PERLU_PERHATIAN" ||
+        store.spatialRisk === "MONITOR"
+      ) {
         warning++;
         affected.push(store);
       }
@@ -489,13 +570,20 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   const handleFocusDisaster = (eqOrLat: Earthquake | number, maybeLng?: number) => {
     setIncidentOnly(true);
     if (typeof eqOrLat === "number") {
-      setFlyToTarget({ lat: eqOrLat, lng: maybeLng ?? 0, zoom: 9 });
+      setFlyToTarget({ lat: eqOrLat, lng: maybeLng ?? 0, zoom: 10 });
     } else {
-      setFlyToTarget({ lat: eqOrLat.latitude, lng: eqOrLat.longitude, zoom: 9 });
+      setSelectedEarthquake(eqOrLat); // Requirement 7: Activates Event Focus Mode!
+      setFlyToTarget({ lat: eqOrLat.latitude, lng: eqOrLat.longitude, zoom: 10 });
     }
   };
 
+  const clearEventFocus = useCallback(() => {
+    setSelectedEarthquake(null);
+    setSelectedCategory(null);
+  }, []);
+
   const handleResetView = () => {
+    setSelectedEarthquake(null);
     setFlyToTarget({ lat: -2.548926, lng: 118.0148634, zoom: 5 });
   };
 
@@ -506,11 +594,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
 
   const handleSelectIncidentForDetail = (inc: IncidentRecord) => {
     setSelectedIncidentForAction(inc);
-    if (inc.status === "in_maintenance" || inc.status === "investigating") {
-      setIsMaintenanceModalOpen(true);
-    } else {
-      setIsVerificationModalOpen(true);
-    }
+    setIsMaintenanceModalOpen(true);
   };
 
   // Confirmation of store condition
@@ -531,7 +615,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           status: "resolved" as const,
           progress: 100,
           verification: {
-            confirmedBy: report?.confirmedBy || "Store Manager",
+            confirmedBy: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
             confirmedAt: timestamp,
             isDamaged: false,
             notes: report?.notes || "Toko aman, operasional normal.",
@@ -542,7 +626,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
               stage: "Verifikasi Selesai",
               label: "Toko Dikonfirmasi Aman",
               timestamp,
-              actor: report?.confirmedBy || "Store Manager",
+              actor: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
               notes: report?.notes,
             },
           ],
@@ -560,7 +644,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           status: "investigating" as const,
           progress: 30,
           verification: {
-            confirmedBy: report?.confirmedBy || "Store Manager",
+            confirmedBy: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
             confirmedAt: timestamp,
             isDamaged: true,
             categories: report?.categories || ["Rak Barang"],
@@ -580,7 +664,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
               stage: "Verifikasi Kerusakan",
               label: `Kerusakan Terkonfirmasi (${report?.severity || "Sedang"})`,
               timestamp,
-              actor: report?.confirmedBy || "Store Manager",
+              actor: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
               notes: report?.notes,
             },
             {
@@ -654,7 +738,9 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     showRadar, setShowRadar, radarData, selectedStore, setSelectedStore,
     handleSelectStore, flyToTarget, setFlyToTarget, dangerCount, warningCount,
     handleResetView, handleFocusDisaster, selectedCategory, setSelectedCategory,
-    setIsAffectedSheetOpen
+    setIsAffectedSheetOpen,
+    mapTimeFilter, setMapTimeFilter,
+    selectedEarthquake, setSelectedEarthquake, clearEventFocus,
   };
 
   return (
@@ -682,6 +768,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         onClose={() => setIsManualModalOpen(false)}
         activeRole={activeRole}
         rawStores={rawStores}
+        activeEarthquakes={disasterData?.activeEarthquakes || []}
         onConfirm={(data) => {
           const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
           const newIncident: IncidentRecord = {
@@ -692,6 +779,9 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             locationCity: data.locationCity,
             disasterType: data.disasterType,
             reportOrigin: "manual",
+            earthquakeEventId: data.earthquakeEventId || undefined,
+            earthquakeSource: data.earthquakeSource || (data.earthquakeEventId ? "BMKG" : undefined),
+            earthquakeProvenance: data.earthquakeEventId ? `Ditautkan secara manual oleh pelapor ke kejadian ${data.earthquakeEventId}` : undefined,
             tkpType: data.tkpType || "Toko",
             date: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }),
             createdAt: new Date().toISOString(),
@@ -762,7 +852,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       <AffectedStoresSheet
         isOpen={isAffectedSheetOpen}
         onClose={() => setIsAffectedSheetOpen(false)}
-        earthquake={disasterData?.latestBmkgEarthquake}
+        earthquake={selectedEarthquake || disasterData?.latestBmkgEarthquake}
         affectedStores={affectedStores}
         theme={theme}
         onSelectStore={(store) => {
@@ -801,6 +891,16 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         theme={theme}
         activeIncidents={incidents}
         onFlyToIncident={handleFlyToIncident}
+        onOpenReport={handleSelectIncidentForDetail}
+        userRole={activeRole}
+        userBranch={monitoredBranch}
+        onUnreadCountChange={setNotificationCount}
+        onMarkAllAsRead={() => {
+          setNotificationCount(0);
+        }}
+        onNotificationRead={() => {
+          setNotificationCount((prev) => Math.max(0, prev - 1));
+        }}
         onWorkerDispatched={() => {
           setNotificationCount(0);
         }}

@@ -12,8 +12,10 @@ import {
   Lock,
   ArrowRight,
 } from "lucide-react";
-import { IncidentRecord, RoleType, DamageReport, SpartaRole } from "@/types/incident";
-import { canConfirmAffectedStore } from "@/lib/report-permissions";
+import { IncidentRecord, RoleType, DamageReport } from "@/types/incident";
+import { checkClientPermission } from "@/lib/client-permissions";
+import { UserIdentity } from "@/lib/identity";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface StoreVerificationModalProps {
   incident: IncidentRecord | null;
@@ -29,34 +31,52 @@ interface StoreVerificationModalProps {
 
 export function StoreVerificationModal({
   incident,
-  activeRole,
   isOpen,
   onClose,
   onConfirmVerification,
 }: StoreVerificationModalProps) {
+  // Lock background scroll when modal is open
+  useBodyScrollLock(isOpen);
+
   const [selectedCondition, setSelectedCondition] = useState<"safe" | "damaged">("safe");
   const [categories, setCategories] = useState<string[]>([]);
   const [severity, setSeverity] = useState<"Ringan" | "Sedang" | "Berat">("Sedang");
   const [operationalStatus, setOperationalStatus] = useState<"Buka Normal" | "Tutup Sementara">("Buka Normal");
   const [notes, setNotes] = useState("");
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [identity, setIdentity] = useState<{ id: string; name: string; role: string; branch: string } | null>(null);
+  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+  const [permissionData, setPermissionData] = useState<{ canConfirm: boolean; confirmReason: string; scopeReason: string } | null>(null);
 
   React.useEffect(() => {
-    if (isOpen) {
-      fetch("/api/auth/me")
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => setIdentity(data))
+    if (isOpen && incident) {
+      Promise.all([
+        fetch("/api/auth/me").then((res) => (res.ok ? res.json() : null)),
+        fetch(`/api/incidents/${incident.id}/permissions`).then((res) => (res.ok ? res.json() : null)),
+      ])
+        .then(([meData, permData]) => {
+          if (meData) setIdentity(meData);
+          if (permData?.data) {
+            setPermissionData({
+              canConfirm: permData.data.canConfirm,
+              confirmReason: permData.data.confirmReason,
+              scopeReason: permData.data.canConfirm ? "" : (permData.data.confirmReason || "Di luar cakupan akses akun Anda"),
+            });
+          }
+        })
         .catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, incident]);
 
   if (!isOpen || !incident) return null;
 
-  // Permission Guard using real RBAC
-  const canVerify = identity
-    ? canConfirmAffectedStore(identity.role as SpartaRole, identity.branch, incident)
-    : false;
+  const clientCheck = checkClientPermission({
+    identity,
+    permission: "REPORT_CONFIRM",
+    report: incident,
+  });
+
+  const canVerify = permissionData !== null ? permissionData.canConfirm : clientCheck.authorized;
+  const blockedScopeReason = permissionData?.scopeReason || clientCheck.scopeReason || "Di luar cakupan akun Anda";
 
   const availableCategories = [
     "Dinding/Struktur",
@@ -75,7 +95,6 @@ export function StoreVerificationModal({
   };
 
   const handleSimulatePhoto = () => {
-    // Simulated store damage proof image
     setPhotoPreview(
       "https://images.unsplash.com/photo-1590247813693-5541d1c609fd?auto=format&fit=crop&q=80&w=400"
     );
@@ -85,24 +104,23 @@ export function StoreVerificationModal({
     e.preventDefault();
     if (!canVerify) return;
 
+    const confirmedBy = identity?.name
+      ? `${identity.name} (${identity.position || "Staff SPARTA"})`
+      : `PIC ${incident.storeName}`;
+    const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+
     if (selectedCondition === "safe") {
       onConfirmVerification(incident.id, false, {
-        confirmedBy:
-          activeRole === "ho_admin"
-            ? "Admin HO Pusat"
-            : `Manager ${incident.storeName}`,
-        confirmedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+        confirmedBy,
+        confirmedAt: timestamp,
         isDamaged: false,
         operationalStatus: "Buka Normal",
         notes: notes || "Toko aman, tidak ada kerusakan fisik setelah guncangan/kejadian.",
       });
     } else {
       onConfirmVerification(incident.id, true, {
-        confirmedBy:
-          activeRole === "ho_admin"
-            ? "Admin HO Pusat"
-            : `Manager ${incident.storeName}`,
-        confirmedAt: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+        confirmedBy,
+        confirmedAt: timestamp,
         isDamaged: true,
         categories: categories.length > 0 ? categories : ["Rak Barang"],
         severity,
@@ -116,24 +134,24 @@ export function StoreVerificationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overscroll-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-red-50 text-red-600">
+            <div className="p-2 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                 Konfirmasi Kondisi Toko Pasca Bencana
               </h3>
-              <p className="text-xs text-slate-500">{incident.storeName} • {incident.branch}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{incident.storeName} • {incident.branch}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -141,29 +159,42 @@ export function StoreVerificationModal({
 
         {/* Content */}
         {!canVerify ? (
-          <div className="p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+          <div className="p-6 text-center space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
+            <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
               <Lock className="w-6 h-6" />
             </div>
-            <div>
-              <h4 className="font-bold text-slate-800 text-sm">Akses Konfirmasi Terkunci</h4>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
-                Anda sedang menggunakan peran <strong>Store Manager (Toko Normal/Aman)</strong>. 
-                Konfirmasi laporan kerusakan fisik hanya dapat dilakukan oleh <strong>Store Manager {incident.storeName}</strong> atau <strong>Admin HO</strong>.
+            <div className="space-y-1">
+              <h4 className="font-bold text-slate-900 dark:text-white text-sm">Akses Konfirmasi Tidak Tersedia</h4>
+              <p className="text-xs text-slate-600 dark:text-slate-300 max-w-sm mx-auto leading-relaxed">
+                Anda tidak memiliki izin untuk melakukan konfirmasi pada laporan ini.
+              </p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                Akses ditentukan berdasarkan permission dan cakupan laporan yang dimiliki akun Anda.
               </p>
             </div>
-            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-left">
-              💡 <em>Tips Demo:</em> Silakan ubah peran pengguna di pojok kanan atas header menjadi <strong>Admin HO</strong> atau <strong>SM Toko Cibubur</strong> untuk menguji alur pengisian form ini.
+
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-left text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Permission:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">Konfirmasi Laporan (REPORT_CONFIRM)</span>
+              </div>
+              <div className="flex items-start justify-between gap-2 border-t border-slate-100 dark:border-slate-700/60 pt-2">
+                <span className="text-slate-500 dark:text-slate-400 shrink-0">Cakupan (Scope):</span>
+                <span className="font-medium text-slate-700 dark:text-slate-300 text-right text-[11px]">
+                  {blockedScopeReason}
+                </span>
+              </div>
             </div>
+
             <button
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold text-xs transition-colors"
+              className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors"
             >
               Tutup
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
             {/* Condition Choice (Radio Toggle) */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">

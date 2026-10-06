@@ -1,80 +1,122 @@
 "use client";
 
-import React, { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { Shield, LogIn, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
-
-function LoginContent() {
-  const searchParams = useSearchParams();
-  const error = searchParams?.get("error");
-  const spartaLoginUrl = process.env.NEXT_PUBLIC_SPARTA_LOGIN_URL || "http://localhost:5173";
-
-  return (
-    <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 text-white shadow-lg shadow-red-600/30">
-          <Shield className="w-6 h-6" />
-        </div>
-        <div>
-          <h1 className="text-lg font-extrabold text-white">SPARTA SIAGA</h1>
-          <p className="text-xs text-slate-400">Disaster & Branch Monitoring</p>
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-3 rounded-xl bg-red-950/60 border border-red-800/60 text-xs text-red-200 flex items-start gap-2.5">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-red-300">Autentikasi Diperlukan</p>
-            <p className="text-[11px] text-red-400 mt-0.5">
-              {error === "sso_token_missing"
-                ? "Token akses SSO tidak ditemukan. Silakan login melalui portal utama."
-                : error === "sso_exchange_failed"
-                ? "Sesi atau token SSO telah kedaluwarsa. Silakan login kembali."
-                : "Akses modul ini memerlukan autentikasi SPARTA SSO."}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <p className="text-xs text-slate-400 leading-relaxed">
-        Modul <strong>SPARTA Siaga</strong> terintegrasi penuh dengan Single Sign-On (SSO) Portal SPARTA Alfamart. Silakan login melalui Portal Utama untuk mengakses peta monitoring.
-      </p>
-
-      <div className="space-y-3 pt-2">
-        <a
-          href={spartaLoginUrl}
-          className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition-all hover:scale-[1.01]"
-        >
-          <LogIn className="w-4 h-4" />
-          <span>Login Melalui Portal SPARTA</span>
-        </a>
-
-        <a
-          href="/"
-          className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs flex items-center justify-center gap-2 transition-colors border border-slate-700"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Kembali ke Dashboard Utama</span>
-        </a>
-      </div>
-    </div>
-  );
-}
+import React, { useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { ShieldAlert, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ identifier, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        window.location.href = "/";
+      } else {
+        setError(data.error || "Gagal masuk");
+      }
+    } catch (err) {
+      setError("Terjadi kesalahan jaringan");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-950 text-slate-100">
-      <Suspense
-        fallback={
-          <div className="flex items-center gap-2 text-slate-400 text-xs">
-            <Loader2 className="w-4 h-4 animate-spin text-red-500" />
-            <span>Memuat halaman login...</span>
+    <div className="min-h-screen bg-[#f5f7f9] flex flex-col justify-center items-center p-4">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl overflow-hidden">
+        {/* Header Branding */}
+        <div className="bg-[#123B6D] p-8 text-center flex flex-col items-center">
+          <div className="flex gap-4 items-center mb-6">
+            <div className="w-16 h-16 relative bg-white/10 rounded-xl p-2">
+              <Image src="/brand/building_logo.png" alt="SPARTA Logo" fill className="object-contain" />
+            </div>
           </div>
-        }
-      >
-        <LoginContent />
-      </Suspense>
+          
+          <h1 className="text-2xl font-black text-white tracking-widest mb-1">SPARTA SIAGA</h1>
+          <p className="text-blue-200 text-xs font-medium tracking-wider uppercase">
+            Sistem Integrasi Analisis & Peringatan Bencana
+          </p>
+          
+          <div className="mt-8 pt-6 border-t border-white/20 w-full flex justify-center">
+            <Image src="/brand/alfamart_logo.png" alt="Alfamart" width={100} height={30} className="opacity-90" />
+          </div>
+        </div>
+
+        {/* Login Form */}
+        <div className="p-8">
+          <h2 className="text-lg font-bold text-slate-800 mb-6 text-center">Masuk ke Sistem</h2>
+          
+          {error && (
+            <div className="mb-6 p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100 flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                NIK / Username
+              </label>
+              <input
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D5AA6] focus:bg-white transition-all text-slate-800"
+                placeholder="Masukkan NIK"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D5AA6] focus:bg-white transition-all text-slate-800"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 bg-[#D9272E] hover:bg-[#b91e24] text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center mt-2"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Masuk"}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center text-xs text-slate-400">
+            Pastikan Anda menggunakan kredensial internal yang valid.
+            <br />
+            Untuk bantuan, hubungi IT Helpdesk.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

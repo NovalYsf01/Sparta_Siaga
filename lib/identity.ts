@@ -1,20 +1,31 @@
 import { getSessionUser } from "./auth";
-import { SpartaRole } from "@/types/incident";
+import { SpartaRole, SystemRole, Scope } from "@/types/incident";
+import {
+  PERMISSION_KEYS,
+  PermissionKey,
+  checkUserPermission,
+  getUserOverrides,
+} from "./permission-service";
 
 export interface UserIdentity {
+  id: string;
   userId: string;
-  nik: string;
+  nik: string | null;
   name: string;
-  role: SpartaRole;
-  branch: string;
-  position?: string;
+  avatarUrl: string | null;
+  systemRole: SystemRole;
+  businessRole: SpartaRole | null;
+  scope: Scope | null;
+  branch: string | null;
+  role: SpartaRole | null;
+  position: string;
+  effectivePermissions?: Record<PermissionKey, boolean>;
+  overrides?: import("./permission-service").UserPermissionOverrideRecord[];
+  rolePermissions?: Partial<Record<PermissionKey, import("./permission-service").PermissionEffect>>;
 }
 
 /**
- * Resolves the current user's identity.
- * In a fully integrated environment, this would call a centralized authentication service
- * or decode a verified JWT from SSO. For now, it derives identity from the development session
- * while exposing a robust, production-ready interface.
+ * Resolves the current user's identity including effective permissions.
  */
 export async function resolveCurrentUserIdentity(): Promise<UserIdentity | null> {
   try {
@@ -24,14 +35,47 @@ export async function resolveCurrentUserIdentity(): Promise<UserIdentity | null>
       return null;
     }
 
-    // Mapping session to the strict UserIdentity interface
+    const isSystemAdmin = session.systemRole === "ADMIN";
+
+    // Pre-fetch overrides once for efficiency
+    let overrides: import("./permission-service").UserPermissionOverrideRecord[] = [];
+    if (session.id) {
+      overrides = await getUserOverrides(session.id);
+    }
+
+    let rolePermissions: Partial<Record<PermissionKey, import("./permission-service").PermissionEffect>> = {};
+    if (session.role) {
+      const { getRolePermissions } = await import("./permission-service");
+      rolePermissions = await getRolePermissions(session.role);
+    }
+
+    const effectivePermissions: Partial<Record<PermissionKey, boolean>> = {};
+    for (const key of PERMISSION_KEYS) {
+      const res = await checkUserPermission({
+        user: session,
+        permission: key,
+        overrides,
+      });
+      effectivePermissions[key] = res.authorized;
+    }
+
     return {
-      userId: session.id || `usr_${Date.now()}`,
-      nik: (session as any).nik || "000000000",
-      name: session.name || `User ${session.role.toUpperCase()}`,
-      role: session.role as SpartaRole,
-      branch: session.branch || "HO",
-      position: (session as any).position || (session.role.includes("ho") ? "Staff Head Office" : "Staff Cabang"),
+      id: session.id,
+      userId: session.id,
+      nik: session.nik || null,
+      name: session.name,
+      avatarUrl: session.avatarUrl || null,
+      systemRole: session.systemRole,
+      businessRole: isSystemAdmin ? null : session.role,
+      scope: isSystemAdmin ? null : session.scope,
+      branch: isSystemAdmin ? null : session.branch,
+      role: isSystemAdmin ? null : session.role,
+      position: isSystemAdmin
+        ? "System Administrator"
+        : (session.role?.includes("ho") ? "Staff Head Office" : "Staff Cabang"),
+      effectivePermissions: effectivePermissions as Record<PermissionKey, boolean>,
+      overrides,
+      rolePermissions,
     };
   } catch (error) {
     console.error("[Identity Service] Failed to resolve user identity:", error);

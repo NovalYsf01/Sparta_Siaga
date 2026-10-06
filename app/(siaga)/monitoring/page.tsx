@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
@@ -45,20 +45,41 @@ export default function MonitoringPage() {
     handleFocusDisaster,
     setIsAffectedSheetOpen,
     theme,
+    mapTimeFilter,
+    setMapTimeFilter,
+    selectedEarthquake,
+    clearEventFocus,
   } = useSiaga();
+
+  // Requirement 2 & 3: Active operational earthquakes filtered strictly by active window (24h or 72h max)
+  const activeQuakes = useMemo(() => {
+    const allActive = disasterData?.activeEarthquakes || [];
+    const maxHours = mapTimeFilter === "24h" ? 24 : 72;
+    const maxAgeMs = maxHours * 60 * 60 * 1000;
+    const now = Date.now();
+    return allActive.filter((eq) => now - eq.timestamp <= maxAgeMs);
+  }, [disasterData, mapTimeFilter]);
+
+  // Requirement 7: In Event Focus Mode, render focused event
+  const mapEarthquakes = useMemo(() => {
+    if (selectedEarthquake) {
+      return [selectedEarthquake];
+    }
+    return activeQuakes;
+  }, [selectedEarthquake, activeQuakes]);
 
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col">
       {/* Top Disaster Alert Bar */}
       <DisasterAlertBar
         earthquakes={
-          disasterData?.recentEarthquakes && disasterData.recentEarthquakes.length > 0
-            ? disasterData.recentEarthquakes
+          activeQuakes.length > 0
+            ? activeQuakes
             : disasterData?.latestBmkgEarthquake
             ? [disasterData.latestBmkgEarthquake]
             : []
         }
-        latestEarthquake={disasterData?.latestBmkgEarthquake}
+        latestEarthquake={selectedEarthquake || disasterData?.latestBmkgEarthquake}
         affectedCount={dangerCount}
         onOpenAffectedSheet={() => setIsAffectedSheetOpen(true)}
         onFocusDisaster={handleFocusDisaster}
@@ -70,7 +91,7 @@ export default function MonitoringPage() {
         <div className="w-full h-full relative z-0">
           <MapView
             stores={computedStores}
-            earthquakes={disasterData?.recentEarthquakes || []}
+            earthquakes={mapEarthquakes}
             floodReports={disasterData?.floodReports || []}
             basemap={basemap}
             incidentOnly={incidentOnly}
@@ -81,12 +102,13 @@ export default function MonitoringPage() {
             showRadar={showRadar}
             radarTileUrl={radarData?.tileUrl}
             activeLayer={activeLayer}
+            theme={theme}
           />
           
           {/* Compact Map Controls inside Map */}
           <div className="absolute bottom-4 left-4 sm:bottom-auto sm:top-4 sm:left-4 z-[400] scale-90 sm:scale-100 origin-bottom-left sm:origin-top-left">
             <MapControls
-              latestEarthquake={disasterData?.latestBmkgEarthquake}
+              latestEarthquake={selectedEarthquake || disasterData?.latestBmkgEarthquake}
               incidentOnly={incidentOnly}
               onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
               basemap={basemap}
@@ -100,6 +122,10 @@ export default function MonitoringPage() {
               theme={theme}
               activeLayer={activeLayer}
               onLayerChange={setActiveLayer}
+              mapTimeFilter={mapTimeFilter}
+              onChangeMapTimeFilter={setMapTimeFilter}
+              selectedEarthquake={selectedEarthquake}
+              onClearEventFocus={clearEventFocus}
             />
           </div>
         </div>

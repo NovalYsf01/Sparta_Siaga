@@ -17,10 +17,10 @@ import L from "leaflet";
 import { Store } from "@/types/store";
 import { Earthquake } from "@/types/disaster";
 import {
-  AlertTriangle,
   Building,
   ChevronRight,
   ShieldAlert,
+  ExternalLink,
 } from "lucide-react";
 
 interface MapInnerProps {
@@ -28,7 +28,7 @@ interface MapInnerProps {
   earthquakes: Earthquake[];
   basemap: "esri-dark" | "esri-light" | "osm";
   incidentOnly: boolean;
-  statusFilter: "all" | "danger" | "warning" | "safe";
+  statusFilter: "all" | "PRIORITY_MONITOR" | "MONITOR" | "SAFE";
   selectedStore: Store | null;
   onSelectStore: (store: Store) => void;
   flyToTarget: { lat: number; lng: number; zoom?: number } | null;
@@ -36,6 +36,7 @@ interface MapInnerProps {
   radarTileUrl?: string;
   activeLayer?: "all" | "earthquake" | "stores" | "weather" | "flood";
   floodReports?: any[];
+  theme?: "dark" | "light";
 }
 
 // Controller component to smoothly fly to coordinates when requested
@@ -58,77 +59,93 @@ function MapFlyController({
   return null;
 }
 
-// Component to track map zoom level for dynamic LOD (Level of Detail)
-function ZoomTracker({ onZoomChange }: { onZoomChange: (zoom: number) => void }) {
+// Component to track map viewport bounds and zoom level for dynamic LOD and culling
+function ViewportTracker({ 
+  onZoomChange, 
+  onBoundsChange 
+}: { 
+  onZoomChange: (zoom: number) => void;
+  onBoundsChange: (bounds: L.LatLngBounds) => void;
+}) {
   const map = useMapEvents({
     zoomend: () => {
       onZoomChange(map.getZoom());
+      onBoundsChange(map.getBounds());
+    },
+    moveend: () => {
+      onBoundsChange(map.getBounds());
     },
   });
 
   useEffect(() => {
     onZoomChange(map.getZoom());
-  }, [map, onZoomChange]);
+    onBoundsChange(map.getBounds());
+  }, [map, onZoomChange, onBoundsChange]);
 
   return null;
 }
 
 // Function to generate dynamic Alfamart store markers using L.divIcon
 function createStoreIcon(store: Store, isSelected: boolean = false) {
-  const isDanger = store.status === "danger";
-  const isWarning = store.status === "warning";
-  const isFlood = !!store.floodWarning;
+  const visualStatus = store.visualStatus || (
+    store.status === "PRIORITY_MONITOR" ? "TERDAMPAK" :
+    store.status === "MONITOR" ? "PERLU_PERHATIAN" : "NORMAL"
+  );
 
   let ringColor = "border-emerald-500 shadow-emerald-500/20";
   let pulseClass = "";
   let badgeColor = "bg-emerald-600";
+  let innerColor = "bg-emerald-600";
 
   if (isSelected) {
     ringColor = "border-cyan-400 shadow-cyan-400/80 scale-125";
     pulseClass = "pulse-beacon";
-    badgeColor = isDanger ? "bg-red-600" : isWarning ? "bg-amber-500" : "bg-cyan-500";
-  } else if (isDanger) {
+    badgeColor = "bg-cyan-500";
+    innerColor = "bg-cyan-500";
+  } else if (visualStatus === "TERDAMPAK") {
     ringColor = "border-red-600 shadow-red-600/50";
     pulseClass = "pulse-beacon";
     badgeColor = "bg-red-600";
-  } else if (isWarning) {
-    ringColor = "border-amber-500 shadow-amber-500/30";
-    badgeColor = "bg-amber-500";
-  } else if (isFlood) {
+    innerColor = "bg-red-600";
+  } else if (visualStatus === "DALAM_PENANGANAN") {
     ringColor = "border-blue-500 shadow-blue-500/40";
     pulseClass = "pulse-beacon";
     badgeColor = "bg-blue-600";
+    innerColor = "bg-blue-600";
+  } else if (visualStatus === "PERLU_PERHATIAN") {
+    ringColor = "border-amber-500 shadow-amber-500/30";
+    badgeColor = "bg-amber-500";
+    innerColor = "bg-amber-500";
+  } else if (visualStatus === "SELESAI") {
+    ringColor = "border-teal-500 shadow-teal-500/30";
+    badgeColor = "bg-teal-600";
+    innerColor = "bg-teal-600";
   }
+
+  const isFlood = !!store.floodWarning;
 
   const html = `
     <div class="relative group cursor-pointer flex items-center justify-center">
       ${isSelected
-      ? `<div class="absolute -inset-3 bg-cyan-400/50 rounded-full animate-ping"></div>`
-      : isDanger
+        ? `<div class="absolute -inset-3 bg-cyan-400/50 rounded-full animate-ping"></div>`
+        : visualStatus === "TERDAMPAK"
         ? `<div class="absolute -inset-2 bg-red-600/40 rounded-full animate-ping"></div>`
+        : visualStatus === "DALAM_PENANGANAN"
+        ? `<div class="absolute -inset-2 bg-blue-500/30 rounded-full animate-pulse"></div>`
         : isFlood
-          ? `<div class="absolute -inset-2 bg-blue-500/40 rounded-full animate-ping"></div>`
-          : ""
-    }
+        ? `<div class="absolute -inset-2 bg-blue-500/40 rounded-full animate-ping"></div>`
+        : ""
+      }
       <div class="w-8 h-8 rounded-full bg-slate-900 border-2 ${ringColor} ${pulseClass} flex items-center justify-center shadow-lg transition-transform hover:scale-125 z-20">
-        <div class="w-5 h-5 rounded-full ${isSelected && !isDanger && !isWarning
-      ? "bg-cyan-500"
-      : isDanger
-        ? "bg-red-600"
-        : isWarning
-          ? "bg-amber-500"
-          : isFlood
-            ? "bg-blue-600"
-            : "bg-red-600"
-    } flex items-center justify-center text-[9px] font-black text-white tracking-tighter">
+        <div class="w-5 h-5 rounded-full ${innerColor} flex items-center justify-center text-[9px] font-black text-white tracking-tighter">
           A
         </div>
       </div>
       <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${badgeColor} border border-slate-900 z-30"></div>
       ${isFlood
-      ? `<div class="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-blue-600 border border-slate-900 text-[8px] flex items-center justify-center shadow-md z-30" title="Peringatan Banjir / Hujan Lebat">💧</div>`
-      : ""
-    }
+        ? `<div class="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-blue-600 border border-slate-900 text-[8px] flex items-center justify-center shadow-md z-30" title="Peringatan Banjir / Hujan Lebat">💧</div>`
+        : ""
+      }
     </div>
   `;
 
@@ -207,6 +224,57 @@ function createBranchIcon(branch: BranchAggregation) {
   });
 }
 
+// Function to generate grid cluster icon for Zoom 8–12 (Requirement 12)
+function createClusterIcon(count: number) {
+  const size = count > 100 ? 38 : count > 20 ? 34 : 30;
+  const html = `
+    <div class="relative flex items-center justify-center cursor-pointer group select-none">
+      <div class="w-${size} h-${size} rounded-full bg-slate-900/90 border-2 border-emerald-400 text-emerald-300 shadow-xl flex items-center justify-center font-bold text-xs transition-transform duration-200 group-hover:scale-110">
+        <span class="font-mono text-[11px]">${count}</span>
+      </div>
+    </div>
+  `;
+
+  return L.divIcon({
+    html,
+    className: "custom-grid-cluster",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+}
+
+// Subcomponent to render a clickable cluster marker with smooth flyTo zoom
+function ClusterMarkerItem({
+  cluster,
+  zoom,
+}: {
+  cluster: { lat: number; lng: number; count: number; stores: Store[] };
+  zoom: number;
+}) {
+  const map = useMap();
+
+  return (
+    <Marker
+      position={[cluster.lat, cluster.lng]}
+      icon={createClusterIcon(cluster.count)}
+      eventHandlers={{
+        click: () => {
+          map.flyTo([cluster.lat, cluster.lng], Math.min(14, zoom + 2), {
+            duration: 0.8,
+          });
+        },
+      }}
+    >
+      <Tooltip direction="top" offset={[0, -16]} opacity={0.95}>
+        <div className="text-xs font-semibold text-slate-900 px-1">
+          {cluster.count} Toko — Klik untuk memperbesar
+        </div>
+      </Tooltip>
+    </Marker>
+  );
+}
+
 export default function MapInner({
   stores,
   earthquakes,
@@ -220,8 +288,11 @@ export default function MapInner({
   radarTileUrl,
   activeLayer = "all",
   floodReports = [],
+  theme = "dark",
 }: MapInnerProps) {
+  const isDark = theme === "dark";
   const [currentZoom, setCurrentZoom] = useState(5);
+  const [mapBounds, setMapBounds] = useState<L.LatLngBounds | null>(null);
 
   const showEarthquakes = activeLayer === "all" || activeLayer === "earthquake";
   const showStoresLayer = activeLayer === "all" || activeLayer === "stores";
@@ -247,8 +318,13 @@ export default function MapInner({
     for (const store of stores) {
       const branchName = store.cabang || "Lainnya";
       const existing = map.get(branchName);
-      const isDanger = store.status === "danger";
-      const isWarning = store.status === "warning";
+      const isDanger =
+        store.visualStatus === "TERDAMPAK" ||
+        store.visualStatus === "DALAM_PENANGANAN" ||
+        store.status === "PRIORITY_MONITOR";
+      const isWarning =
+        store.visualStatus === "PERLU_PERHATIAN" ||
+        store.status === "MONITOR";
 
       if (!existing) {
         map.set(branchName, {
@@ -290,27 +366,95 @@ export default function MapInner({
     return result;
   }, [stores, incidentOnly]);
 
-  // Partition stores into high-priority affected (danger & warning) and safe stores
-  const { affectedStores, safeStores } = useMemo(() => {
-    const affected: Store[] = [];
+  // Partition stores into high-priority operational/affected stores vs safe/normal stores
+  // (Requirements 10, 11, 28)
+  const { operationalStores, safeStores } = useMemo(() => {
+    const operational: Store[] = [];
     const safe: Store[] = [];
 
     for (const store of stores) {
-      if (store.status === "danger" || store.status === "warning") {
-        if (statusFilter === "all" || store.status === statusFilter) {
-          affected.push(store);
+      const isPriorityOperational =
+        store.visualStatus === "TERDAMPAK" ||
+        store.visualStatus === "DALAM_PENANGANAN" ||
+        store.visualStatus === "PERLU_PERHATIAN" ||
+        store.status === "PRIORITY_MONITOR" ||
+        store.status === "MONITOR";
+
+      const isResolved = store.visualStatus === "SELESAI";
+
+      if (isPriorityOperational) {
+        if (
+          statusFilter === "all" ||
+          (statusFilter === "PRIORITY_MONITOR" && (store.visualStatus === "TERDAMPAK" || store.status === "PRIORITY_MONITOR")) ||
+          (statusFilter === "MONITOR" && (store.visualStatus === "PERLU_PERHATIAN" || store.status === "MONITOR"))
+        ) {
+          operational.push(store);
+        }
+      } else if (isResolved) {
+        // Requirement 28: Resolved store does not clutter incidentOnly crisis view.
+        if (!incidentOnly && (statusFilter === "all" || statusFilter === "SAFE")) {
+          safe.push(store);
         }
       } else {
-        if (!incidentOnly && (statusFilter === "all" || statusFilter === "safe")) {
+        if (!incidentOnly && (statusFilter === "all" || statusFilter === "SAFE")) {
           safe.push(store);
         }
       }
     }
 
-    return { affectedStores: affected, safeStores: safe };
+    return { operationalStores: operational, safeStores: safe };
   }, [stores, incidentOnly, statusFilter]);
 
-  // 100% Watermark-Free Tile URL Mapping (ESRI World Gray Canvas & OpenStreetMap)
+  // Requirement 12: Spatial Grid Clustering for Safe Stores at Zoom 8–12
+  const clusteredSafeStores = useMemo(() => {
+    if (currentZoom < 8 || currentZoom >= 13) return [];
+
+    // Filter by viewport bounds first for optimal performance
+    const visibleStores = mapBounds
+      ? safeStores.filter((s) => mapBounds.contains([s.latitude, s.longitude]))
+      : safeStores;
+
+    const step =
+      currentZoom <= 8 ? 0.7 :
+      currentZoom === 9 ? 0.35 :
+      currentZoom === 10 ? 0.18 :
+      currentZoom === 11 ? 0.09 : 0.045;
+
+    const gridMap = new Map<
+      string,
+      { sumLat: number; sumLng: number; count: number; stores: Store[] }
+    >();
+
+    for (const s of visibleStores) {
+      const latIdx = Math.floor(s.latitude / step);
+      const lngIdx = Math.floor(s.longitude / step);
+      const key = `${latIdx}_${lngIdx}`;
+
+      const cell = gridMap.get(key);
+      if (!cell) {
+        gridMap.set(key, { sumLat: s.latitude, sumLng: s.longitude, count: 1, stores: [s] });
+      } else {
+        cell.sumLat += s.latitude;
+        cell.sumLng += s.longitude;
+        cell.count += 1;
+        cell.stores.push(s);
+      }
+    }
+
+    const result: Array<{ lat: number; lng: number; count: number; stores: Store[] }> = [];
+    gridMap.forEach((cell) => {
+      result.push({
+        lat: cell.sumLat / cell.count,
+        lng: cell.sumLng / cell.count,
+        count: cell.count,
+        stores: cell.stores,
+      });
+    });
+
+    return result;
+  }, [safeStores, currentZoom, mapBounds]);
+
+  // 100% Watermark-Free Basemap Tile URLs
   const tileUrl = useMemo(() => {
     if (basemap === "esri-dark") {
       return "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}";
@@ -336,14 +480,14 @@ export default function MapInner({
         minZoom={4}
         maxZoom={18}
         scrollWheelZoom={true}
-        zoomControl={false} // Disabled default to prevent overlap with top-left controls
+        zoomControl={false}
         className="w-full h-full z-0"
-        preferCanvas={true} // Enable HTML5 Canvas rendering for high-performance markers
+        preferCanvas={true}
       >
-        {/* Clean, Watermark-Free Basemap Layer */}
+        {/* Basemap Tile Layer */}
         <TileLayer key={tileUrl} url={tileUrl} attribution={tileAttribution} />
 
-        {/* Live RainViewer Doppler Weather Radar Layer */}
+        {/* Live Doppler Weather Radar Layer */}
         {showWeatherLayer && radarTileUrl && (
           <TileLayer
             key={radarTileUrl}
@@ -353,24 +497,22 @@ export default function MapInner({
           />
         )}
 
-        {/* Position Zoom Controls safely at bottom-right corner */}
         <ZoomControl position="bottomright" />
-
         <MapFlyController target={flyToTarget} />
-        <ZoomTracker onZoomChange={setCurrentZoom} />
+        <ViewportTracker onZoomChange={setCurrentZoom} onBoundsChange={setMapBounds} />
 
-        {/* 1. DISASTER EPICENTERS & SCIENTIFIC RADIUS CIRCLES */}
+        {/* 1. DISASTER EPICENTERS & SPARTA MONITORING ZONES (Requirement 30) */}
         {showEarthquakes &&
           earthquakes.map((eq) => {
-            const dangerRadius = eq.dangerRadiusKm || 50;
-            const warningRadius = eq.warningRadiusKm || 110;
+            const priorityRadius = eq.priorityRadiusKm || 50;
+            const monitoringRadius = eq.monitoringRadiusKm || 110;
 
             return (
               <React.Fragment key={eq.id}>
-                {/* Primary Danger Radius Circle (MMI >= VI) */}
+                {/* Zona Prioritas Pantau SPARTA */}
                 <Circle
                   center={[eq.latitude, eq.longitude]}
-                  radius={dangerRadius * 1000} // meters
+                  radius={priorityRadius * 1000}
                   pathOptions={{
                     color: "#dc2626",
                     fillColor: "#dc2626",
@@ -380,10 +522,10 @@ export default function MapInner({
                   }}
                 />
 
-                {/* Secondary Warning Radius Circle (MMI IV - V) */}
+                {/* Zona Pantau SPARTA */}
                 <Circle
                   center={[eq.latitude, eq.longitude]}
-                  radius={warningRadius * 1000} // meters
+                  radius={monitoringRadius * 1000}
                   pathOptions={{
                     color: "#f59e0b",
                     fillColor: "#f59e0b",
@@ -398,52 +540,87 @@ export default function MapInner({
                   position={[eq.latitude, eq.longitude]}
                   icon={createEpicenterIcon(eq)}
                 >
-                  <Popup className="custom-leaflet-popup">
-                    <div className="p-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-2xl w-68 space-y-2 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold text-red-400">
-                        <ShieldAlert className="w-4 h-4 text-red-500" />
-                        <span>Pusat Gempa ({eq.source})</span>
+                  <Popup className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}>
+                    <div className={`p-3.5 rounded-xl border w-72 space-y-2 text-xs transition-colors ${
+                      isDark
+                        ? "bg-slate-900 text-white border-slate-700 shadow-2xl"
+                        : "bg-white text-slate-900 border-slate-200 shadow-xl"
+                    }`}>
+                      <div className={`flex items-center gap-1.5 font-bold ${isDark ? "text-red-400" : "text-red-600"}`}>
+                        <ShieldAlert className={`w-4 h-4 shrink-0 ${isDark ? "text-red-500" : "text-red-600"}`} />
+                        <span>Pusat Gempa ({eq.source || "BMKG"})</span>
                       </div>
 
-                      <p className="font-semibold text-white leading-snug">
-                        {eq.title}
+                      <p className={`font-semibold leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {eq.title || eq.place}
                       </p>
 
-                      <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                      <div className={`grid grid-cols-2 gap-1 text-[11px] pt-1 border-t ${
+                        isDark ? "text-slate-300 border-slate-800" : "text-slate-600 border-slate-100"
+                      }`}>
                         <div>
-                          <span className="text-slate-500">Magnitudo:</span>{" "}
-                          <strong className="text-white">M {eq.magnitude}</strong>
+                          <span className={isDark ? "text-slate-500" : "text-slate-500"}>Magnitudo:</span>{" "}
+                          <strong className={isDark ? "text-white" : "text-slate-900"}>M {eq.magnitude}</strong>
                         </div>
                         <div>
-                          <span className="text-slate-500">Kedalaman:</span>{" "}
-                          <strong className="text-white">{eq.depth}</strong>
+                          <span className={isDark ? "text-slate-500" : "text-slate-500"}>Kedalaman:</span>{" "}
+                          <strong className={isDark ? "text-white" : "text-slate-900"}>{eq.depth}</strong>
                         </div>
                       </div>
 
-                      <div className="p-2 rounded bg-slate-950/70 border border-slate-800 text-[10px] space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-red-400 font-bold">Radius Bahaya (MMI ≥ VI):</span>
-                          <span className="font-mono text-white font-bold">{dangerRadius} km</span>
+                      <div className={`p-2 rounded-lg border text-[10px] space-y-1 ${
+                        isDark ? "bg-slate-950/70 border-slate-800" : "bg-slate-50 border-slate-200 text-slate-700"
+                      }`}>
+                        <div className="flex justify-between items-center">
+                          <span className={`font-bold ${isDark ? "text-red-400" : "text-red-600"}`}>Zona Prioritas Pantau SPARTA:</span>
+                          <span className={`font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{priorityRadius} km</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-amber-400 font-bold">Radius Waspada (MMI IV-V):</span>
-                          <span className="font-mono text-white font-bold">{warningRadius} km</span>
+                        <div className="flex justify-between items-center">
+                          <span className={`font-bold ${isDark ? "text-amber-400" : "text-amber-600"}`}>Zona Pantau SPARTA:</span>
+                          <span className={`font-mono font-bold ${isDark ? "text-white" : "text-slate-900"}`}>{monitoringRadius} km</span>
                         </div>
                       </div>
 
-                      <div className="text-[10px] text-slate-400">
-                        Waktu: {eq.time}
+                      <p className={`text-[9px] italic leading-tight ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        Zona pantau merupakan estimasi operasional SPARTA berdasarkan parameter gempa dari BMKG.
+                      </p>
+
+                      <div className={`text-[10px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                        Waktu: {eq.time || eq.date}
                       </div>
+
+                      {eq.felt && (
+                        <div className={`text-[10px] ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                          Dirasakan: <span className="font-medium">{eq.felt}</span>
+                        </div>
+                      )}
 
                       {eq.potensiText && (
                         <div
-                          className={`p-1.5 rounded text-[10px] font-bold ${eq.potensiTsunami
+                          className={`p-1.5 rounded text-[10px] font-bold ${
+                            eq.potensiTsunami
                               ? "bg-red-600 text-white animate-pulse"
-                              : "bg-slate-800 text-slate-300"
-                            }`}
+                              : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700 border border-slate-200"
+                          }`}
                         >
                           {eq.potensiText}
                         </div>
+                      )}
+
+                      {eq.shakemapUrl && (
+                        <a
+                          href={eq.shakemapUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`w-full mt-2 py-1.5 px-3 rounded-lg font-medium text-xs flex items-center justify-center gap-1.5 transition-colors border ${
+                            isDark
+                              ? "bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700"
+                              : "bg-slate-100 hover:bg-slate-200 text-cyan-700 border-slate-200"
+                          }`}
+                        >
+                          <span>Lihat Shakemap BMKG</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
                       )}
                     </div>
                   </Popup>
@@ -452,10 +629,10 @@ export default function MapInner({
             );
           })}
 
-        {/* 2. STORES LAYER (Titik Percabang on Zoom <= 7, Individual stores on Zoom >= 8) */}
+        {/* 2. STORES LAYER (LOD: Zoom <= 7 Branch Aggregation, Zoom 8–12 Clustering, Zoom >= 13 Individual) */}
         {showStoresLayer && (
           <>
-            {/* LEVEL NASIONAL/PROVINSI (Zoom <= 7): Hanya muncul Titik Percabang (Kantor Cabang / DC) */}
+            {/* LEVEL NASIONAL / PROVINSI (Zoom <= 7): Titik Percabang (Kantor Cabang / DC) */}
             {currentZoom <= 7 &&
               branchAggregations.map((branch) => (
                 <Marker
@@ -478,127 +655,251 @@ export default function MapInner({
                 </Marker>
               ))}
 
-            {/* LEVEL KOTA/KECAMATAN (Zoom >= 8): Muncul titik-titik toko riil */}
-            {currentZoom > 7 &&
+            {/* LEVEL REGIONAL / KABUPATEN (Zoom 8–12): Grid Clustering untuk Normal/Safe Stores (Req 12) */}
+            {currentZoom >= 8 &&
+              currentZoom <= 12 &&
               !incidentOnly &&
-              safeStores.map((store) => (
-                <CircleMarker
-                  key={store.id}
-                  center={[store.latitude, store.longitude]}
-                  radius={currentZoom >= 13 ? 6 : currentZoom >= 10 ? 4 : 3}
-                  pathOptions={{
-                    color: "#059669",
-                    fillColor: "#10b981",
-                    fillOpacity: 0.75,
-                    weight: 1,
-                  }}
-                  eventHandlers={{
-                    click: () => onSelectStore(store),
-                  }}
-                >
-                  <Tooltip direction="top" offset={[0, -5]} opacity={0.9}>
-                    <div className="text-[11px] font-medium text-slate-900 px-1">
-                      <span className="font-bold text-red-600">[{store.kode_toko}]</span>{" "}
-                      {store.nama_toko} ({store.cabang})
-                    </div>
-                  </Tooltip>
-                </CircleMarker>
-              ))}
+              clusteredSafeStores.map((cluster, idx) => {
+                if (cluster.count === 1) {
+                  const s = cluster.stores[0];
+                  return (
+                    <CircleMarker
+                      key={`single-${s.id}`}
+                      center={[s.latitude, s.longitude]}
+                      radius={4}
+                      pathOptions={{
+                        color: "#059669",
+                        fillColor: "#10b981",
+                        fillOpacity: 0.8,
+                        weight: 1,
+                      }}
+                      eventHandlers={{
+                        click: () => onSelectStore(s),
+                      }}
+                    >
+                      <Tooltip direction="top" offset={[0, -5]} opacity={0.9}>
+                        <div className="text-[11px] font-medium text-slate-900 px-1">
+                          <span className="font-bold text-emerald-700">[{s.kode_toko}]</span>{" "}
+                          {s.nama_toko}
+                        </div>
+                      </Tooltip>
+                    </CircleMarker>
+                  );
+                }
+
+                return (
+                  <ClusterMarkerItem
+                    key={`cluster-${cluster.lat.toFixed(3)}_${cluster.lng.toFixed(3)}_${idx}`}
+                    cluster={cluster}
+                    zoom={currentZoom}
+                  />
+                );
+              })}
+
+            {/* LEVEL KOTA / JALAN (Zoom >= 13): Individual Safe Store Markers dengan Viewport Culling */}
+            {currentZoom >= 13 &&
+              !incidentOnly &&
+              safeStores
+                .filter((store) => !mapBounds || mapBounds.contains([store.latitude, store.longitude]))
+                .map((store) => (
+                  <CircleMarker
+                    key={store.id}
+                    center={[store.latitude, store.longitude]}
+                    radius={6}
+                    pathOptions={{
+                      color: "#059669",
+                      fillColor: "#10b981",
+                      fillOpacity: 0.75,
+                      weight: 1.5,
+                    }}
+                    eventHandlers={{
+                      click: () => onSelectStore(store),
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -5]} opacity={0.9}>
+                      <div className="text-[11px] font-medium text-slate-900 px-1">
+                        <span className="font-bold text-emerald-700">[{store.kode_toko}]</span>{" "}
+                        {store.nama_toko} ({store.cabang})
+                      </div>
+                    </Tooltip>
+                  </CircleMarker>
+                ))}
           </>
         )}
 
-        {/* 3. AFFECTED STORES (Selalu Menyala & Berdenyut di SEMUA Level Zoom!) */}
-        {showStoresLayer && affectedStores.map((store) => {
-          const isDanger = store.status === "danger";
-          const isSelected = store.id === selectedStore?.id;
+        {/* 3. OPERATIONAL & AFFECTED STORES (Requirements 10, 11, 31)
+            Always distinctly visible on Zoom >= 8 even if quake >72h old */}
+        {showStoresLayer &&
+          currentZoom >= 8 &&
+          operationalStores.map((store) => {
+            const isDanger =
+              store.visualStatus === "TERDAMPAK" || store.status === "PRIORITY_MONITOR";
+            const isSelected = store.id === selectedStore?.id;
 
-          return (
-            <Marker
-              key={store.id}
-              position={[store.latitude, store.longitude]}
-              icon={createStoreIcon(store, isSelected)}
-              eventHandlers={{
-                click: () => onSelectStore(store),
-              }}
-            >
-              <Tooltip direction="top" offset={[0, -18]} opacity={0.95}>
-                <div className="text-xs font-semibold text-slate-900 px-1 py-0.5">
-                  <span className="font-bold text-red-600">[{store.kode_toko}]</span>{" "}
-                  {store.nama_toko}
-                  {store.distanceFromDisasterKm !== undefined && (
-                    <span className="ml-1 text-slate-600">
-                      ({store.distanceFromDisasterKm} km)
-                    </span>
-                  )}
-                </div>
-              </Tooltip>
-
-              <Popup className="custom-leaflet-popup">
-                <div className="p-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-2xl w-68 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-red-600/20 text-red-400">
-                      {store.kode_toko}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDanger
-                          ? "bg-red-600 text-white animate-pulse"
-                          : "bg-amber-600 text-white"
-                        }`}
-                    >
-                      {isDanger ? "Zona Bahaya" : "Zona Waspada"}
-                    </span>
-                  </div>
-
-                  <h3 className="font-bold text-white text-sm leading-snug">
+            return (
+              <Marker
+                key={store.id}
+                position={[store.latitude, store.longitude]}
+                icon={createStoreIcon(store, isSelected)}
+                eventHandlers={{
+                  click: () => onSelectStore(store),
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -18]} opacity={0.95}>
+                  <div className="text-xs font-semibold text-slate-900 px-1 py-0.5">
+                    <span className="font-bold text-red-600">[{store.kode_toko}]</span>{" "}
                     {store.nama_toko}
-                  </h3>
-
-                  <div className="text-slate-400 text-[11px] flex items-center gap-1">
-                    <Building className="w-3 h-3 text-slate-500" />
-                    <span>Cabang {store.cabang}</span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-slate-300 font-medium">
-                      {store.fr_type === "F" ? "Franchise" : "Reguler"}
-                    </span>
+                    {store.distanceFromDisasterKm !== undefined && (
+                      <span className="ml-1 text-slate-600">
+                        ({store.distanceFromDisasterKm} km)
+                      </span>
+                    )}
                   </div>
+                </Tooltip>
 
-                  {store.distanceFromDisasterKm !== undefined && (
-                    <div className="p-1.5 rounded bg-slate-800/80 border border-slate-700/60 text-[11px] text-slate-300">
-                      Jarak dari episentrum:{" "}
-                      <strong className="text-red-400">
-                        {store.distanceFromDisasterKm} km
-                      </strong>
+                {/* Final Store Popup (Requirement 31) */}
+                <Popup className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}>
+                  <div className={`p-3 rounded-xl border w-72 space-y-2 text-xs transition-colors ${
+                    isDark ? "bg-slate-900 text-white border-slate-700 shadow-2xl" : "bg-white text-slate-900 border-slate-200 shadow-xl"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                        isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}>
+                        {store.kode_toko}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          store.visualStatus === "TERDAMPAK"
+                            ? "bg-red-600 text-white animate-pulse"
+                            : store.visualStatus === "DALAM_PENANGANAN"
+                            ? "bg-blue-600 text-white"
+                            : store.visualStatus === "PERLU_PERHATIAN"
+                            ? "bg-amber-600 text-white"
+                            : store.visualStatus === "SELESAI"
+                            ? "bg-emerald-600 text-white"
+                            : isDark ? "bg-slate-700 text-slate-300" : "bg-slate-200 text-slate-700"
+                        }`}
+                      >
+                        {store.visualStatus === "TERDAMPAK"
+                          ? "Terdampak"
+                          : store.visualStatus === "DALAM_PENANGANAN"
+                          ? "Dalam Penanganan"
+                          : store.visualStatus === "PERLU_PERHATIAN"
+                          ? "Perlu Perhatian"
+                          : store.visualStatus === "SELESAI"
+                          ? "Selesai"
+                          : isDanger
+                          ? "Prioritas Pantau"
+                          : "Perlu Pantau"}
+                      </span>
                     </div>
-                  )}
 
-                  {store.floodWarning && (
-                    <div className="p-1.5 rounded bg-blue-950/80 border border-blue-600/60 text-[10px] text-blue-200 flex items-center gap-1.5">
-                      <span className="text-xs shrink-0">🌧️</span>
-                      <div className="leading-tight">
-                        <span className="font-bold text-blue-300">Waspada Potensi Banjir</span>
-                        {store.rainIntensityMm && (
-                          <span className="block text-slate-300 text-[9px]">
-                            Curah Hujan: {store.rainIntensityMm} mm/jam
-                          </span>
-                        )}
+                    <h3 className={`font-bold text-sm leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
+                      {store.nama_toko}
+                    </h3>
+
+                    <div className={`text-[11px] flex items-center gap-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                      <Building className="w-3 h-3 text-slate-400" />
+                      <span>Cabang {store.cabang}</span>
+                      <span className="text-slate-400">•</span>
+                      <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                        {store.fr_type === "F" ? "Franchise" : "Reguler"}
+                      </span>
+                    </div>
+
+                    {/* 2D Status Details (Requirement 9 & 31) */}
+                    <div className={`p-2 rounded border text-[11px] space-y-1 ${
+                      isDark ? "bg-slate-950/80 border-slate-800" : "bg-slate-50 border-slate-200 text-slate-700"
+                    }`}>
+                      <div className="flex justify-between">
+                        <span className={isDark ? "text-slate-400" : "text-slate-500"}>Status Spasial:</span>
+                        <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}>
+                          {store.spatialRisk === "PRIORITY_MONITOR"
+                            ? "Prioritas Pantau"
+                            : store.spatialRisk === "MONITOR"
+                            ? "Perlu Dipantau"
+                            : "Aman"}
+                        </span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className={isDark ? "text-slate-400" : "text-slate-500"}>Status Operasional:</span>
+                        <span className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-900"}`}>
+                          {store.operationalStatus === "CONFIRMED_AFFECTED"
+                            ? "Terdampak Lapangan"
+                            : store.operationalStatus === "NEED_CONFIRMATION"
+                            ? "Perlu Konfirmasi"
+                            : store.operationalStatus === "IN_PROGRESS" ||
+                              store.operationalStatus === "ESTIMATION" ||
+                              store.operationalStatus === "READY_FOR_WORK"
+                            ? "Dalam Penanganan"
+                            : store.operationalStatus === "RESOLVED" ||
+                              store.operationalStatus === "WORK_COMPLETED"
+                            ? "Selesai"
+                            : "Tidak Ada Laporan"}
+                        </span>
+                      </div>
+                      {store.riskSourceEvent && (
+                        <div className={`flex justify-between text-[10px] pt-1 border-t ${
+                          isDark ? "border-slate-800/80" : "border-slate-200"
+                        }`}>
+                          <span className={isDark ? "text-slate-400" : "text-slate-500"}>Sumber Risiko:</span>
+                          <span
+                            className="font-medium text-amber-600 dark:text-amber-300 text-right truncate max-w-[140px]"
+                            title={store.riskSourceEvent.title}
+                          >
+                            M{store.riskSourceEvent.magnitude} {store.riskSourceEvent.title}
+                          </span>
+                        </div>
+                      )}
+                      {store.distanceFromDisasterKm !== undefined && (
+                        <div className="flex justify-between text-[10px]">
+                          <span className={isDark ? "text-slate-400" : "text-slate-500"}>Jarak Episentrum:</span>
+                          <span className={`font-mono font-bold ${isDark ? "text-slate-200" : "text-slate-900"}`}>
+                            {store.distanceFromDisasterKm} km
+                          </span>
+                        </div>
+                      )}
+                      {store.activeReportProgress !== undefined && (
+                        <div className={`flex justify-between text-[10px] text-blue-500 dark:text-blue-300 pt-1 border-t ${
+                          isDark ? "border-slate-800/80" : "border-slate-200"
+                        }`}>
+                          <span>Progress Penanganan:</span>
+                          <span className="font-mono font-bold">
+                            {store.activeReportProgress}%
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  <button
-                    onClick={() => onSelectStore(store)}
-                    className="w-full mt-2 py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors"
-                  >
-                    <span>Detail & Eskalasi Cabang</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+                    {store.floodWarning && (
+                      <div className="p-1.5 rounded bg-blue-950/80 border border-blue-600/60 text-[10px] text-blue-200 flex items-center gap-1.5">
+                        <span className="text-xs shrink-0">🌧️</span>
+                        <div className="leading-tight">
+                          <span className="font-bold text-blue-300">Waspada Potensi Banjir</span>
+                          {store.rainIntensityMm && (
+                            <span className="block text-slate-300 text-[9px]">
+                              Curah Hujan: {store.rainIntensityMm} mm/jam
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
-        {/* RENDER FLOOD REPORTS */}
+                    <button
+                      onClick={() => onSelectStore(store)}
+                      className="w-full mt-2 py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors"
+                    >
+                      <span>Detail & Aksi Laporan</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+        {/* 4. RENDER FLOOD REPORTS */}
         {(activeLayer === "all" || activeLayer === "weather" || activeLayer === "flood") &&
           floodReports?.map((report) => {
             const floodIcon = L.divIcon({
@@ -614,12 +915,13 @@ export default function MapInner({
 
             return (
               <React.Fragment key={report.id}>
-                {/* Removed fake flood polygon radius. Only rendering the marker per business rule. */}
                 <Marker position={[report.lat, report.lng]} icon={floodIcon}>
-                  <Popup className="custom-leaflet-popup">
-                    <div className="p-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-2xl w-68 space-y-2 text-xs">
+                  <Popup className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}>
+                    <div className={`p-3 rounded-xl border w-68 space-y-2 text-xs transition-colors ${
+                      isDark ? "bg-slate-900 text-white border-slate-700 shadow-2xl" : "bg-white text-slate-900 border-slate-200 shadow-xl"
+                    }`}>
                       <div className="flex items-center justify-between">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600/20 text-blue-500 dark:text-blue-400 border border-blue-500/30">
                           {report.id.length > 8 ? "PB-" + report.id.substring(0, 4).toUpperCase() : report.id}
                         </span>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white animate-pulse">
@@ -627,25 +929,26 @@ export default function MapInner({
                         </span>
                       </div>
 
-                      <h3 className="font-bold text-white text-sm leading-snug">
+                      <h3 className={`font-bold text-sm leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
                         {report.title}
                       </h3>
 
-                      <div className="p-1.5 rounded bg-blue-950/80 border border-blue-600/60 text-[11px] text-blue-200">
+                      <div className={`p-1.5 rounded border text-[11px] ${
+                        isDark ? "bg-blue-950/80 border-blue-600/60 text-blue-200" : "bg-blue-50 border-blue-200 text-blue-900"
+                      }`}>
                         <span className="block mb-0.5 opacity-80">Estimasi Ketinggian Air:</span>
-                        <strong className="text-red-400 text-sm">
+                        <strong className="text-red-500 font-bold text-sm">
                           {report.depth != null ? `${report.depth} cm` : "Data ketinggian air tidak tersedia"}
                         </strong>
                       </div>
 
-                      <div className="text-[10px] text-slate-400 space-y-0.5 mt-2">
+                      <div className={`text-[10px] space-y-0.5 mt-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
                         <p>Source: PetaBencana</p>
                         <p>Waktu: {new Date(report.timestamp).toLocaleString("id-ID")}</p>
                       </div>
 
                       <button
                         onClick={() => {
-                          // Try to fly to it
                           const map = document.querySelector('.leaflet-container');
                           if (map) (map as any)._leaflet_map?.flyTo([report.lat, report.lng], 15);
                         }}
@@ -661,10 +964,9 @@ export default function MapInner({
             );
           })}
 
-        {/* 4. EXPLICIT SELECTED STORE PIN (Always visible even in Crisis Focus Mode!) */}
+        {/* 5. EXPLICIT SELECTED STORE PIN (Always visible even in Crisis Focus Mode!) */}
         {selectedStore &&
-          !affectedStores.some((s) => s.id === selectedStore.id) &&
-          !safeStores.some((s) => s.id === selectedStore.id) && (
+          !operationalStores.some((s) => s.id === selectedStore.id) && (
             <Marker
               key={`selected-${selectedStore.id}`}
               position={[selectedStore.latitude, selectedStore.longitude]}
@@ -681,37 +983,41 @@ export default function MapInner({
                 </div>
               </Tooltip>
 
-              <Popup className="custom-leaflet-popup">
-                <div className="p-3 bg-slate-900 text-white rounded-xl border border-slate-700 shadow-2xl w-68 space-y-2 text-xs">
+              <Popup className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}>
+                <div className={`p-3 rounded-xl border w-68 space-y-2 text-xs transition-colors ${
+                  isDark ? "bg-slate-900 text-white border-slate-700 shadow-2xl" : "bg-white text-slate-900 border-slate-200 shadow-xl"
+                }`}>
                   <div className="flex items-center justify-between">
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-600/20 text-cyan-400 border border-cyan-500/30">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-600/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
                       {selectedStore.kode_toko}
                     </span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600/30 text-emerald-300">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                       Operasional Aman
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-white text-sm leading-snug">
+                  <h3 className={`font-bold text-sm leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
                     {selectedStore.nama_toko}
                   </h3>
 
-                  <div className="text-slate-400 text-[11px] flex items-center gap-1">
-                    <Building className="w-3 h-3 text-slate-500" />
+                  <div className={`text-[11px] flex items-center gap-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <Building className="w-3 h-3 text-slate-400" />
                     <span>Cabang {selectedStore.cabang}</span>
-                    <span className="text-slate-600">•</span>
-                    <span className="text-slate-300 font-medium">
+                    <span className="text-slate-400">•</span>
+                    <span className={`font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>
                       {selectedStore.fr_type === "F" ? "Franchise" : "Reguler"}
                     </span>
                   </div>
 
                   {selectedStore.floodWarning && (
-                    <div className="p-1.5 rounded bg-blue-950/80 border border-blue-600/60 text-[10px] text-blue-200 flex items-center gap-1.5">
+                    <div className={`p-1.5 rounded border text-[10px] flex items-center gap-1.5 ${
+                      isDark ? "bg-blue-950/80 border-blue-600/60 text-blue-200" : "bg-blue-50 border-blue-200 text-blue-900"
+                    }`}>
                       <span className="text-xs shrink-0">🌧️</span>
                       <div className="leading-tight">
-                        <span className="font-bold text-blue-300">Waspada Potensi Banjir</span>
+                        <span className="font-bold text-blue-500">Waspada Potensi Banjir</span>
                         {selectedStore.rainIntensityMm && (
-                          <span className="block text-slate-300 text-[9px]">
+                          <span className={`block text-[9px] ${isDark ? "text-slate-300" : "text-slate-600"}`}>
                             Curah Hujan: {selectedStore.rainIntensityMm} mm/jam
                           </span>
                         )}
@@ -721,7 +1027,7 @@ export default function MapInner({
 
                   <button
                     onClick={() => onSelectStore(selectedStore)}
-                    className="w-full mt-2 py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors"
+                    className="w-full mt-2 py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors shadow-sm"
                   >
                     <span>Buka Detail Gerai</span>
                     <ChevronRight className="w-3.5 h-3.5" />

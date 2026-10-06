@@ -165,18 +165,18 @@ function EarthquakeCard({ eq, isDark, onFocusMap }: EventCardProps) {
             </div>
             <div>
               <div className={`text-[10px] uppercase tracking-wider font-semibold mb-0.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                Radius Bahaya
+                Zona Prioritas
               </div>
               <div className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                ±{eq.dangerRadiusKm} km
+                ±{eq.priorityRadiusKm} km
               </div>
             </div>
             <div>
               <div className={`text-[10px] uppercase tracking-wider font-semibold mb-0.5 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                Radius Waspada
+                Zona Pantau
               </div>
               <div className={`text-sm font-semibold ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                ±{eq.warningRadiusKm} km
+                ±{eq.monitoringRadiusKm} km
               </div>
             </div>
             <div>

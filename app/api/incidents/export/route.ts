@@ -18,10 +18,10 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const search = searchParams.get("search");
 
-    const isHoAdmin = ["ho_admin", "gm_ho", "sm_ho"].includes(sessionUser.role);
+    const canExportAllBranches = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
     
     // Server-side branch enforcement
-    const targetBranch = isHoAdmin 
+    const targetBranch = canExportAllBranches 
       ? (clientBranch && clientBranch !== "all" ? clientBranch : null)
       : sessionUser.branch;
 

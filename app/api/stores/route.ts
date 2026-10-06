@@ -5,6 +5,7 @@ import path from "path";
 
 let cachedStores: Store[] | null = null;
 let lastCacheTime = 0;
+let cachedDataQuality: Record<string, number> | null = null;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours server-side cache
 
 function parseCSVLine(text: string): string[] {
@@ -45,6 +46,17 @@ export async function GET(request: Request) {
       totalLoaded: cachedStores.length,
       source: "cache",
       cachedAt: new Date(lastCacheTime).toISOString(),
+      meta: {
+        dataQuality: cachedDataQuality || {
+          totalRows: cachedStores.length,
+          loadedStores: cachedStores.length,
+          validCoordinates: cachedStores.length,
+          invalidCoordinates: 0,
+          missingCoordinates: 0,
+          duplicateStoreCodes: 0,
+        },
+      },
+      metadata: cachedDataQuality || undefined,
     });
   }
 
@@ -53,7 +65,14 @@ export async function GET(request: Request) {
     const masterCsvPath = path.join(process.cwd(), "data", "stores-master.csv");
     let hasReadMasterCsv = false;
 
-    // 1. Try reading real master CSV (21,550 stores)
+    let totalRows = 0;
+    let validCoordinates = 0;
+    let invalidCoordinates = 0;
+    let missingCoordinates = 0;
+    let duplicateStoreCodes = 0;
+    const seenCodes = new Set<string>();
+
+    // 1. Try reading real master CSV
     try {
       const csvBuffer = await fs.readFile(masterCsvPath, "utf-8");
       const lines = csvBuffer.split(/\r?\n/);
@@ -68,11 +87,23 @@ export async function GET(request: Request) {
 
         const parts = parseCSVLine(line);
         if (parts.length >= 5) {
+          totalRows++;
           const branch = parts[0].trim();
           const kode = parts[1].trim();
           const rawName = parts[2].trim().replace(/^"|"$/g, "");
           const fr = parts[3].trim().toUpperCase();
           const coordStr = parts[4].trim().replace(/^"|"$/g, "");
+
+          if (seenCodes.has(kode)) {
+            duplicateStoreCodes++;
+          } else {
+            seenCodes.add(kode);
+          }
+
+          if (!coordStr || coordStr === "-") {
+            missingCoordinates++;
+            continue;
+          }
 
           // Parse coordinates (supports space or comma separation)
           const coords = coordStr.split(/[\s,]+/);
@@ -84,10 +115,11 @@ export async function GET(request: Request) {
             !isNaN(lat) &&
             !isNaN(lon) &&
             lat >= -15 &&
-            lat <= 10 &&
+            lat <= 15 &&
             lon >= 90 &&
             lon <= 145
           ) {
+            validCoordinates++;
             sanitizedStores.push({
               id: `SAT-${kode}`,
               kode_toko: kode,
@@ -98,8 +130,10 @@ export async function GET(request: Request) {
               longitude: lon,
               fr_type: fr === "F" ? "F" : "R",
               branch_emergency_contact: `Duty Officer DC Cabang ${branch}`,
-              status: "safe",
+              status: "SAFE",
             });
+          } else {
+            invalidCoordinates++;
           }
         }
       }
@@ -117,48 +151,78 @@ export async function GET(request: Request) {
       );
     }
 
-    // 2. Fallback to stores-fallback.json if master CSV not available
+    // 2. Fallback evaluation (Requirement 15: HARD RULE)
+    // NODE_ENV=production -> NEVER load stores-fallback.json, even if ALLOW_DEV_FALLBACK_DATA=true.
+    // Real master failure in production MUST return 503 Service Unavailable.
+    const isProd = process.env.NODE_ENV === "production";
+    const allowDevFallback = process.env.ALLOW_DEV_FALLBACK_DATA === "true";
+
     if (!hasReadMasterCsv || sanitizedStores.length === 0) {
-      const fallbackPath = path.join(process.cwd(), "data", "stores-fallback.json");
-      const fallbackContent = await fs.readFile(fallbackPath, "utf-8");
-      const rawFallback = JSON.parse(fallbackContent);
+      if (isProd) {
+        console.error("[Stores API] HARD RULE ENFORCED: Production environment refused fallback data. Real master unavailable.");
+        return NextResponse.json(
+          {
+            error: "Data lokasi toko sedang tidak tersedia.",
+            reason: "Master store data unavailable in production environment",
+          },
+          { status: 503 }
+        );
+      }
 
-      for (const item of rawFallback) {
-        const lat =
-          typeof item.latitude === "number"
-            ? item.latitude
-            : parseFloat(item.latitude);
-        const lon =
-          typeof item.longitude === "number"
-            ? item.longitude
-            : parseFloat(item.longitude);
+      if (allowDevFallback) {
+        console.warn("[Stores API] Development mode: ALLOW_DEV_FALLBACK_DATA is true. Loading dev fallback.");
+        try {
+          const fallbackPath = path.join(process.cwd(), "data", "stores-fallback.json");
+          const fallbackContent = await fs.readFile(fallbackPath, "utf-8");
+          const rawFallback = JSON.parse(fallbackContent);
 
-        if (
-          !isNaN(lat) &&
-          !isNaN(lon) &&
-          lat >= -15 &&
-          lat <= 15 &&
-          lon >= 90 &&
-          lon <= 145
-        ) {
-          sanitizedStores.push({
-            id: item.id || `SAT-${item.kode_toko}`,
-            kode_toko: String(item.kode_toko || "").trim(),
-            nama_toko: String(item.nama_toko || "Alfamart").trim(),
-            cabang: String(item.cabang || "Nasional").trim(),
-            alamat: String(item.alamat || "").trim(),
-            latitude: lat,
-            longitude: lon,
-            fr_type: item.fr_type || "R",
-            branch_emergency_contact: `Duty Officer DC Cabang ${item.cabang || "Nasional"}`,
-            status: "safe",
-          });
+          for (const item of rawFallback) {
+            const lat = typeof item.latitude === "number" ? item.latitude : parseFloat(item.latitude);
+            const lon = typeof item.longitude === "number" ? item.longitude : parseFloat(item.longitude);
+
+            if (!isNaN(lat) && !isNaN(lon) && lat >= -15 && lat <= 15 && lon >= 90 && lon <= 145) {
+              validCoordinates++;
+              sanitizedStores.push({
+                id: item.id || `SAT-${item.kode_toko}`,
+                kode_toko: String(item.kode_toko || "").trim(),
+                nama_toko: String(item.nama_toko || "Alfamart").trim(),
+                cabang: String(item.cabang || "Nasional").trim(),
+                alamat: String(item.alamat || "").trim(),
+                latitude: lat,
+                longitude: lon,
+                fr_type: item.fr_type || "R",
+                branch_emergency_contact: `Duty Officer DC Cabang ${item.cabang || "Nasional"}`,
+                status: "SAFE",
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("[Stores API] Fallback load failed:", e);
         }
+      } else {
+        console.warn("[Stores API] Master data unavailable. ALLOW_DEV_FALLBACK_DATA is not enabled in development. Returning 503.");
+        return NextResponse.json(
+          {
+            error: "Data lokasi toko sedang tidak tersedia.",
+            reason: "Development fallback disabled (set ALLOW_DEV_FALLBACK_DATA=true to allow in dev)",
+          },
+          { status: 503 }
+        );
       }
     }
 
+    const dataQuality = {
+      totalRows,
+      loadedStores: sanitizedStores.length,
+      validCoordinates,
+      invalidCoordinates,
+      missingCoordinates,
+      duplicateStoreCodes,
+    };
+
     cachedStores = sanitizedStores;
     lastCacheTime = now;
+    cachedDataQuality = dataQuality;
 
     let result = sanitizedStores;
     if (branchFilter && branchFilter !== "all") {
@@ -173,6 +237,10 @@ export async function GET(request: Request) {
       totalLoaded: sanitizedStores.length,
       source: "fresh",
       cachedAt: new Date(lastCacheTime).toISOString(),
+      meta: {
+        dataQuality,
+      },
+      metadata: dataQuality,
     });
   } catch (error: any) {
     console.error("[Stores API] Critical error loading stores:", error);

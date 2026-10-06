@@ -53,8 +53,8 @@ export function SpotlightSearch({
     let danger = 0;
     let warning = 0;
     for (const s of stores) {
-      if (s.status === "danger") danger++;
-      else if (s.status === "warning") warning++;
+      if (s.status === "PRIORITY_MONITOR") danger++;
+      else if (s.status === "MONITOR") warning++;
     }
     return { dangerCount: danger, warningCount: warning };
   }, [stores]);
@@ -237,9 +237,9 @@ export function SpotlightSearch({
             </span>
 
             <button
-              onClick={() => setStatusFilter(statusFilter === "danger" ? "all" : "danger")}
+              onClick={() => setStatusFilter(statusFilter === "PRIORITY_MONITOR" ? "all" : "PRIORITY_MONITOR")}
               className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1 border ${
-                statusFilter === "danger"
+                statusFilter === "PRIORITY_MONITOR"
                   ? "bg-red-600 border-red-500 text-white shadow-md shadow-red-600/30"
                   : isDark
                     ? "bg-slate-850 hover:bg-red-950/50 border-slate-750 text-red-400"
@@ -251,9 +251,9 @@ export function SpotlightSearch({
             </button>
 
             <button
-              onClick={() => setStatusFilter(statusFilter === "warning" ? "all" : "warning")}
+              onClick={() => setStatusFilter(statusFilter === "MONITOR" ? "all" : "MONITOR")}
               className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] font-medium transition-all flex items-center gap-1 border ${
-                statusFilter === "warning"
+                statusFilter === "MONITOR"
                   ? "bg-amber-600 border-amber-500 text-white shadow-md shadow-amber-600/30"
                   : isDark
                     ? "bg-slate-850 hover:bg-amber-950/50 border-slate-750 text-amber-400"
@@ -326,9 +326,9 @@ export function SpotlightSearch({
             </span>
             {statusFilter !== "all" && (
               <span className={`font-sans font-semibold ${
-                statusFilter === "danger" ? "text-red-600" : "text-amber-600"
+                statusFilter === "PRIORITY_MONITOR" ? "text-red-600" : "text-amber-600"
               }`}>
-                Zona {statusFilter.toUpperCase()}
+                Zona {statusFilter === "PRIORITY_MONITOR" ? "PRIORITAS PANTAU" : "PANTAU"}
               </span>
             )}
           </div>
@@ -396,7 +396,7 @@ export function SpotlightSearch({
               <div className="flex justify-center gap-2 pt-4">
                 {dangerCount > 0 && (
                   <button
-                    onClick={() => setStatusFilter("danger")}
+                    onClick={() => setStatusFilter("PRIORITY_MONITOR")}
                     className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
                       isDark 
                         ? "bg-red-950/60 hover:bg-red-900/80 border-red-700/60 text-red-200" 
@@ -410,7 +410,7 @@ export function SpotlightSearch({
 
                 {warningCount > 0 && (
                   <button
-                    onClick={() => setStatusFilter("warning")}
+                    onClick={() => setStatusFilter("MONITOR")}
                     className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
                       isDark 
                         ? "bg-amber-950/60 hover:bg-amber-900/80 border-amber-700/60 text-amber-200" 
@@ -445,8 +445,8 @@ export function SpotlightSearch({
           ) : (
             /* Rendered Result Items (Max 40 items) */
             filteredStores.map((store) => {
-              const isDanger = store.status === "danger";
-              const isWarning = store.status === "warning";
+              const isDanger = store.status === "PRIORITY_MONITOR";
+              const isWarning = store.status === "MONITOR";
 
               return (
                 <div
