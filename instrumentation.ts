@@ -4,22 +4,21 @@ export async function register() {
       return;
     }
 
-    const { validateProductionConfig } = await import('./lib/runtime-config');
-    const { validatePrivateStorage } = await import('./lib/storage-config');
-    const { registerProcessLifecycle } = await import('./lib/process-lifecycle');
-    const { startServerDaemon } = await import('./lib/server-daemon');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isDevDaemonEnabled = process.env.ENABLE_AUTONOMOUS_DAEMON_IN_DEV === 'true';
 
-    if (process.env.NODE_ENV === 'production') {
+    if (isProduction) {
+      const { validateProductionConfig } = await import('./lib/runtime-config');
+      const { validatePrivateStorage } = await import('./lib/storage-config');
       validateProductionConfig();
       await validatePrivateStorage();
     }
 
+    const { registerProcessLifecycle } = await import('./lib/process-lifecycle');
     registerProcessLifecycle();
-    
-    const isProduction = process.env.NODE_ENV === 'production';
-    const isDevDaemonEnabled = process.env.ENABLE_AUTONOMOUS_DAEMON_IN_DEV === 'true';
 
     if (isProduction || isDevDaemonEnabled) {
+      const { startServerDaemon } = await import('./lib/server-daemon');
       startServerDaemon();
     }
   }
