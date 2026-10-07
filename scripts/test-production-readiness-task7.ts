@@ -66,20 +66,46 @@ async function runP1(): Promise<ScenarioResult> {
     validateProductionConfig: (env: NodeJS.ProcessEnv) => unknown;
   }>("../lib/runtime-config.ts");
   if (!mod) return { code: "P1", description: scenarios[0], passed: false, detail: "runtime config module missing" };
+  const validRequiredEnv: NodeJS.ProcessEnv = {
+    NODE_ENV: "production",
+    DATABASE_URL: "postgresql://task7-user:task7-password@db.internal/sparta",
+    JWT_SECRET: "j".repeat(48),
+    SPARTA_INTERNAL_WORKER_SECRET: "w".repeat(48),
+    PRIVATE_STORAGE_ROOT: path.resolve("storage"),
+    DATABASE_SSL_MODE: "require",
+  };
   try {
     mod.validateProductionConfig({ NODE_ENV: "production" });
     return { code: "P1", description: scenarios[0], passed: false, detail: "missing DATABASE_URL was accepted" };
   } catch (error) {
-    return { code: "P1", description: scenarios[0], passed: String(error).includes("DATABASE_URL") };
+    if (!String(error).includes("DATABASE_URL")) {
+      return { code: "P1", description: scenarios[0], passed: false, detail: "wrong missing-env diagnostic" };
+    }
+  }
+  try {
+    mod.validateProductionConfig(validRequiredEnv);
+    return { code: "P1", description: scenarios[0], passed: true };
+  } catch (error) {
+    return { code: "P1", description: scenarios[0], passed: false, detail: `optional SSO URL blocked startup: ${String(error)}` };
   }
 }
 
 async function runP2(): Promise<ScenarioResult> {
   const mod = await dynamicImport<{ getJwtSecret: (env: NodeJS.ProcessEnv) => string }>("../lib/runtime-config.ts");
   if (!mod) return { code: "P2", description: scenarios[1], passed: false, detail: "secret validator missing" };
+  const activeSources = await Promise.all(
+    ["lib/jwt.ts", "proxy.ts", "lib/db.ts"].map((file) => readFile(path.join(process.cwd(), file), "utf8"))
+  );
+  const joinedSources = activeSources.join("\n");
+  if (joinedSources.includes("fallback_development_secret_sparta_siaga")) {
+    return { code: "P2", description: scenarios[1], passed: false, detail: "development JWT fallback remains active" };
+  }
+  if (/postgres(?:ql)?:\/\/[^\s"']+:[^\s"']+@/i.test(joinedSources)) {
+    return { code: "P2", description: scenarios[1], passed: false, detail: "embedded PostgreSQL credential remains active" };
+  }
   try {
-    mod.getJwtSecret({ NODE_ENV: "production" });
-    return { code: "P2", description: scenarios[1], passed: false, detail: "missing JWT_SECRET was accepted" };
+    mod.getJwtSecret({ NODE_ENV: "production", JWT_SECRET: "short" });
+    return { code: "P2", description: scenarios[1], passed: false, detail: "weak JWT_SECRET was accepted" };
   } catch (error) {
     return { code: "P2", description: scenarios[1], passed: String(error).includes("JWT_SECRET") };
   }
@@ -267,4 +293,3 @@ main().catch((error: unknown) => {
   console.error("[FATAL] Task 7 verification harness failed:", error);
   process.exitCode = 1;
 });
-

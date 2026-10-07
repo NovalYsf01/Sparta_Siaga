@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback_development_secret_sparta_siaga"
-);
+import { getJwtSecret } from './lib/runtime-config';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -26,7 +23,8 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(sessionToken, JWT_SECRET);
+    const jwtSecret = new TextEncoder().encode(getJwtSecret());
+    const { payload } = await jwtVerify(sessionToken, jwtSecret);
     if (!payload || !payload.id) {
       throw new Error("Invalid session payload");
     }

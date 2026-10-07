@@ -1,12 +1,12 @@
 import { Pool } from "pg";
+import { getRuntimeConfig } from "./runtime-config";
 
 let pool: Pool | null = null;
 
 export function getDbPool(): Pool {
   if (!pool) {
-    let rawConnectionString =
-      process.env.DATABASE_URL ||
-      "postgres://avnadmin:AVNS_8sX6jLeh-dd1i1HLGnY@sparta-sentinel-db-sparta-sentinel-project.k.aivencloud.com:15196/defaultdb";
+    const config = getRuntimeConfig();
+    const rawConnectionString = config.databaseUrl;
 
     const connectionString = rawConnectionString.replace(/\?sslmode=[^&]+/, "");
 

@@ -1,8 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
+import { getJwtSecret } from "./runtime-config";
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback_development_secret_sparta_siaga"
-);
+function getEncodedJwtSecret(): Uint8Array {
+  return new TextEncoder().encode(getJwtSecret());
+}
 
 export const SESSION_VERSION = 2;
 
@@ -23,13 +24,13 @@ export async function signSession(payload: SessionPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("24h")
-    .sign(JWT_SECRET);
+    .sign(getEncodedJwtSecret());
   return jwt;
 }
 
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, getEncodedJwtSecret());
     return payload as unknown as SessionPayload;
   } catch (error) {
     return null;
