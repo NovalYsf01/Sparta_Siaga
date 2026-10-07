@@ -6,7 +6,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 type ScenarioResult = { code: string; description: string; passed: boolean; detail?: string };
@@ -111,16 +111,33 @@ async function runP2(): Promise<ScenarioResult> {
   }
 }
 
-async function runP3P4(code: "P3" | "P4", description: string): Promise<ScenarioResult> {
+async function runP3(): Promise<ScenarioResult> {
+  const mod = await dynamicImport<{
+    validatePrivateStorage: (root?: string) => Promise<{ root: string; readiness: string; progress: string }>;
+  }>("../lib/storage-config.ts");
+  if (!mod) return { code: "P3", description: scenarios[2], passed: false, detail: "storage validator missing" };
+  try {
+    const tempDir = path.join(process.cwd(), "storage", `test_probe_${Date.now()}`);
+    const paths = await mod.validatePrivateStorage(tempDir);
+    const isValid = paths.readiness.startsWith(tempDir) && paths.progress.startsWith(tempDir);
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    return { code: "P3", description: scenarios[2], passed: isValid };
+  } catch (error) {
+    return { code: "P3", description: scenarios[2], passed: false, detail: String(error) };
+  }
+}
+
+async function runP4(): Promise<ScenarioResult> {
   const mod = await dynamicImport<{
     validatePrivateStorage: (root: string) => Promise<unknown>;
   }>("../lib/storage-config.ts");
-  if (!mod) return { code, description, passed: false, detail: "storage validator missing" };
+  if (!mod) return { code: "P4", description: scenarios[3], passed: false, detail: "storage validator missing" };
   try {
     await mod.validatePrivateStorage(path.join(process.cwd(), "public", "uploads"));
-    return { code, description, passed: false, detail: "public storage root was accepted" };
-  } catch {
-    return { code, description, passed: true };
+    return { code: "P4", description: scenarios[3], passed: false, detail: "public storage root was accepted" };
+  } catch (error: any) {
+    const isExpected = error?.code === "PRIVATE_STORAGE_PUBLIC" || String(error).includes("public");
+    return { code: "P4", description: scenarios[3], passed: isExpected };
   }
 }
 
@@ -266,8 +283,8 @@ async function main(): Promise<void> {
   const results = await Promise.all([
     runP1(),
     runP2(),
-    runP3P4("P3", scenarios[2]),
-    runP3P4("P4", scenarios[3]),
+    runP3(),
+    runP4(),
     runP5(),
     runP6P7("P6", scenarios[5]),
     runP6P7("P7", scenarios[6]),
