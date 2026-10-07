@@ -274,11 +274,43 @@ async function runP12(): Promise<ScenarioResult> {
 }
 
 async function runP13(): Promise<ScenarioResult> {
+  const docs = [
+    "docs/05-production/TASK_7_PRODUCTION_READINESS_CHECKLIST.md",
+    "docs/05-production/DOKPLOY_DEPLOYMENT_GUIDE.md",
+    "docs/05-production/ENVIRONMENT_REQUIREMENTS.md",
+    "docs/05-production/BACKUP_AND_RESTORE.md",
+    "docs/05-production/ROLLBACK_PROCEDURE.md",
+    "docs/05-production/INFRASTRUCTURE_RISK_LIST.md",
+  ];
+  const allExist = (await Promise.all(docs.map(exists))).every(Boolean);
+  if (!allExist) {
+    return { code: "P13", description: scenarios[12], passed: false, detail: "production documentation incomplete" };
+  }
+
+  const [rollbackContent, riskContent] = await Promise.all([
+    readFile(path.join(process.cwd(), "docs/05-production/ROLLBACK_PROCEDURE.md"), "utf8"),
+    readFile(path.join(process.cwd(), "docs/05-production/INFRASTRUCTURE_RISK_LIST.md"), "utf8"),
+  ]);
+
+  const hasRollbackDetails =
+    rollbackContent.includes("Prerequisites") &&
+    rollbackContent.includes("Rollback") &&
+    rollbackContent.includes("Validation");
+
+  const hasRiskCategories =
+    riskContent.includes("APPLICATION BLOCKER") &&
+    riskContent.includes("ENVIRONMENT BLOCKER") &&
+    riskContent.includes("RECOMMENDATION");
+
   return {
     code: "P13",
     description: scenarios[12],
-    passed: await exists("docs/05-production/ROLLBACK_PROCEDURE.md"),
-    detail: "rollback procedure missing",
+    passed: hasRollbackDetails && hasRiskCategories,
+    detail: !hasRollbackDetails
+      ? "rollback procedure missing key sections"
+      : !hasRiskCategories
+      ? "risk list missing required classifications"
+      : undefined,
   };
 }
 
