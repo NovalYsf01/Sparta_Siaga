@@ -15,6 +15,11 @@
 - Do not reset, drop, truncate, or destructively rewrite production data.
 - Keep readiness and progress evidence outside `public/` and persistent across deployments.
 - Production-critical configuration must fail fast; development may retain explicitly marked local conveniences.
+- Production secrets are runtime-only and must never be required by an image build stage or persisted in an image layer/build argument.
+- Classify `SPARTA_API_URL`, `SPARTA_LOGIN_URL`, and `NEXT_PUBLIC_APP_URL` only after auditing their actual consumers; do not make unused or optional integrations startup blockers.
+- Inventory every persistent user-generated artefact, including readiness, progress, final/completion/handover evidence, avatars, and legacy public uploads.
+- Do not force a read-only root filesystem until Next.js/native-library temporary-write behavior is proven compatible.
+- Final diff and secret review use pre-Task-7 baseline `46952b8`, not `HEAD~1`.
 - Task 7 ends after reporting and must not start Task 8.
 
 ---
@@ -72,10 +77,14 @@ Run: `pnpm exec tsx scripts/test-production-readiness-task7.ts`
 
 Expected: exit 1 with P1–P14 failures and a clear P15 result; failures must identify missing production contracts, not syntax/runtime errors in the harness.
 
-- [ ] **Step 3: Commit the RED test**
+- [ ] **Step 3: Make Task 4 SEC1 deterministic**
+
+The current baseline failure has already proven the mtime-based assertion is unstable in a fresh worktree. Replace the five-minute mtime heuristic with a snapshot of filenames in `public/uploads/progress` captured before Task 4 creates progress evidence and compare it with the set after the suite. A newly created public file fails; copied/tracked files with refreshed mtimes do not. Run Task 4 immediately after the edit—without waiting—to prove 36/36 PASS.
+
+- [ ] **Step 4: Commit the RED test and deterministic regression harness**
 
 ```powershell
-git add scripts/test-production-readiness-task7.ts
+git add scripts/test-production-readiness-task7.ts scripts/test-progress-task4.ts
 git commit -m "test(task7): define readiness gates"
 ```
 
@@ -112,6 +121,8 @@ const secretSource = read("lib/jwt.ts") + read("proxy.ts") + read("lib/db.ts");
 assert(!secretSource.includes("fallback_development_secret"), "P2", "no active fallback secret");
 assert(!/postgres(?:ql)?:\/\/[^\s"']+:[^\s"']+@/.test(secretSource), "P2", "no embedded DB credential");
 ```
+
+Before defining required URLs, use `rg` to enumerate every read of `SPARTA_API_URL`, `SPARTA_LOGIN_URL`, and `NEXT_PUBLIC_APP_URL`, classify server/client/build-time usage, and record whether each enabled production path can safely start without it. Keep build stages secret-free and validate runtime configuration only from server startup/request code.
 
 - [ ] **Step 2: Verify P1/P2 fail for the current source**
 
@@ -222,6 +233,8 @@ await lifecycle.shutdown("SIGTERM");
 await lifecycle.shutdown("SIGINT");
 assert(stopDaemonCalls === 1 && closePoolCalls === 1, "P10", "shutdown is idempotent");
 ```
+
+Inventory every filesystem write and persistent path using `rg` over `app`, `lib`, and `scripts`. Explicitly classify readiness, progress, final/completion/handover evidence, avatars, legacy public uploads, logs, temporary files, and test-only artefacts before finalizing the named-volume boundary.
 
 - [ ] **Step 2: Verify P3/P4/P10 fail**
 
@@ -414,7 +427,7 @@ git commit -m "feat(db): add production migration runner"
 
 - [ ] **Step 1: Add failing P14 deployment-contract tests**
 
-Assert a pinned Node 24 image, Corepack/frozen install, standalone runner, non-root user, `NODE_ENV=production`, port 3004, no secret build args, named volume, read-only root filesystem where compatible, `no-new-privileges`, healthcheck, and restart policy.
+Assert a pinned Node 24 image, Corepack/frozen install, standalone runner, non-root user, `NODE_ENV=production`, port 3004, no secret build args or build-time secret requirements, named volume, `no-new-privileges`, healthcheck, and restart policy. Do not require `read_only: true`; document that it remains deferred until runtime temporary-write compatibility is proven.
 
 - [ ] **Step 2: Verify P14 fails**
 
@@ -476,10 +489,11 @@ git commit -m "build(dokploy): add production image"
 **Interfaces:**
 - Backup output: matched timestamped database dump, evidence archive, SHA-256 manifest.
 - Restore input: verified backup directory plus explicit `CONFIRM_RESTORE=YES` guard.
+- Execution context: a Dokploy maintenance/sidecar job with PostgreSQL client tools, runtime-only database credentials, backup destination access, and the application evidence volume mounted read-only for backup/read-write for an approved restore.
 
 - [ ] **Step 1: Add failing P12 tests**
 
-Assert all scripts use `set -Eeuo pipefail`, quote paths, require commands, avoid printing `DATABASE_URL`, generate UTC timestamps, create checksums, verify `pg_restore --list`, include `/app/storage`, and require explicit restore confirmation.
+Assert all scripts use `set -Eeuo pipefail`, quote paths, require commands, avoid printing `DATABASE_URL`, generate UTC timestamps, create checksums, verify `pg_restore --list`, include the complete persistent storage inventory under `/app/storage`, record the consistency window, require quiesced application writes, and require explicit restore confirmation.
 
 - [ ] **Step 2: Verify P12 fails**
 
@@ -487,7 +501,7 @@ Run Task 7 suite; expected missing helper failures.
 
 - [ ] **Step 3: Implement backup and verification scripts**
 
-Backup contract:
+Backup contract (executed only after the app writer is stopped or placed in maintenance mode):
 
 ```sh
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -497,7 +511,7 @@ sha256sum "$target/database.dump" "$target/evidence.tar.gz" > "$target/SHA256SUM
 pg_restore --list "$target/database.dump" >/dev/null
 ```
 
-The implementation must mask command failures and never echo the connection string. Verification checks both artefacts and the manifest.
+The implementation must mask command failures and never echo the connection string. Verification checks both artefacts and the manifest. The manifest records database dump completion and evidence archive start/end times; documentation states that this is a matched quiesced backup set, not an atomic cross-system snapshot.
 
 - [ ] **Step 4: Implement guarded restore**
 
@@ -619,12 +633,14 @@ Run Compose config, image build, container liveness/readiness, non-root identity
 Run:
 
 ```powershell
-git diff --check HEAD~1
-rg -l --hidden -g '!node_modules/**' -g '!.next/**' -g '!.git/**' 'postgres(ql)?://[^[:space:]"'']+:[^[:space:]"'']+@' .
+git diff --check 46952b8..HEAD
+git diff --name-status 46952b8..HEAD
+rg -l --hidden -g '!node_modules/**' -g '!.next/**' -g '!.git/**' -g '!.superpowers/**' 'postgres(ql)?://[^[:space:]"'']+:[^[:space:]"'']+@|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|AKIA[0-9A-Z]{16}|(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*["''][^"'']{12,}["'']' .
+git diff 46952b8..HEAD -- . ':(exclude)pnpm-lock.yaml'
 git status --short
 ```
 
-Only `.env.example` placeholders may match a connection URL pattern. Review all changed files and ensure no Task 8 work or business-flow change slipped in.
+Review every match manually: only documented placeholders or clearly synthetic test fixtures are allowed. Also inspect Docker build arguments/environment, committed private-key extensions, `.env*` tracking, and all changed files since `46952b8`; ensure no Task 8 work or business-flow change slipped in.
 
 - [ ] **Step 7: Write the final Task 7 report**
 
