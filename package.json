@@ -14,6 +14,7 @@
     "start": "next start -p 3004",
     "start:production": "node .next/standalone/server.js",
     "daemon": "tsx scripts/worker-daemon.ts",
+    "worker": "tsx scripts/worker-daemon.ts",
     "migrate": "tsx scripts/migrate-incidents.ts",
     "migrate:report-fields": "tsx scripts/migrate-report-fields.ts",
     "db:deploy": "node scripts/migrate-production.mjs",

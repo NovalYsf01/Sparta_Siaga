@@ -1,8 +1,8 @@
 import { closeDbPool } from "./db";
 
 export interface ProcessLifecycleDependencies {
-  stopDaemon: () => Promise<void>;
   closePool: () => Promise<void>;
+  stopDaemon?: () => Promise<void>;
   exit?: (code?: number) => void;
 }
 
@@ -21,7 +21,9 @@ export function createProcessLifecycle(deps: ProcessLifecycleDependencies): Proc
     isShuttingDown = true;
     try {
       console.log(`[Process Lifecycle] Received ${signal}, starting graceful shutdown...`);
-      await deps.stopDaemon();
+      if (deps.stopDaemon) {
+        await deps.stopDaemon();
+      }
       await deps.closePool();
       shutdownComplete = true;
       console.log(`[Process Lifecycle] Graceful shutdown completed.`);
@@ -43,15 +45,6 @@ export function createProcessLifecycle(deps: ProcessLifecycleDependencies): Proc
 
 const LIFECYCLE_REGISTERED_SYMBOL = Symbol.for("sparta.process.lifecycle.registered");
 
-async function lazyStopDaemon(): Promise<void> {
-  const globalScope = globalThis as Record<string, unknown>;
-  // Only import and stop server daemon if it was actually started in this process
-  if (globalScope.__sparta_daemon_started) {
-    const { stopServerDaemon } = await import("./server-daemon");
-    await stopServerDaemon();
-  }
-}
-
 export function registerProcessLifecycle(customDeps?: Partial<ProcessLifecycleDependencies>): ProcessLifecycle {
   const globalScope = globalThis as unknown as Record<symbol, ProcessLifecycle | undefined>;
   if (globalScope[LIFECYCLE_REGISTERED_SYMBOL]) {
@@ -59,8 +52,8 @@ export function registerProcessLifecycle(customDeps?: Partial<ProcessLifecycleDe
   }
 
   const lifecycle = createProcessLifecycle({
-    stopDaemon: customDeps?.stopDaemon ?? lazyStopDaemon,
     closePool: customDeps?.closePool ?? closeDbPool,
+    stopDaemon: customDeps?.stopDaemon,
     exit: customDeps?.exit ?? ((code = 0) => {
       process.exit(code);
     }),
