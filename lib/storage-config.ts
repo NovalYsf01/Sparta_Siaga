@@ -65,10 +65,11 @@ export async function validatePrivateStorage(rootToCheck?: string): Promise<Stor
       throw new StorageConfigError("Probe readback data mismatch", "STORAGE_PROBE_FAILED");
     }
     await fs.unlink(probePath);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof StorageConfigError) throw error;
+    const message = error instanceof Error ? error.message : "unknown error";
     throw new StorageConfigError(
-      `Private storage write probe failed: ${error?.message || "unknown error"}`,
+      `Private storage write probe failed: ${message}`,
       "STORAGE_PROBE_FAILED"
     );
   }

@@ -1,3 +1,6 @@
+import { stopServerDaemon } from "./server-daemon";
+import { closeDbPool } from "./db";
+
 export interface ProcessLifecycleDependencies {
   stopDaemon: () => Promise<void>;
   closePool: () => Promise<void>;
@@ -42,13 +45,10 @@ export function createProcessLifecycle(deps: ProcessLifecycleDependencies): Proc
 const LIFECYCLE_REGISTERED_SYMBOL = Symbol.for("sparta.process.lifecycle.registered");
 
 export function registerProcessLifecycle(): ProcessLifecycle {
-  const globalScope = globalThis as any;
+  const globalScope = globalThis as unknown as Record<symbol, ProcessLifecycle | undefined>;
   if (globalScope[LIFECYCLE_REGISTERED_SYMBOL]) {
     return globalScope[LIFECYCLE_REGISTERED_SYMBOL];
   }
-
-  const { stopServerDaemon } = require("./server-daemon");
-  const { closeDbPool } = require("./db");
 
   const lifecycle = createProcessLifecycle({
     stopDaemon: stopServerDaemon,

@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 export type NodeEnvironment = "development" | "test" | "production";
 export type DatabaseSslMode = "disable" | "require" | "verify-full";
 
@@ -29,13 +32,58 @@ export class RuntimeConfigError extends Error {
 const DEVELOPMENT_JWT_SECRET = "sparta-siaga-development-jwt-secret-only";
 const DEVELOPMENT_WORKER_SECRET = "sparta-siaga-development-worker-secret-only";
 
+let localEnvCache: Record<string, string> | null = null;
+
+function loadLocalEnvFile(): Record<string, string> {
+  const loaded: Record<string, string> = {};
+  for (const filename of [".env.local", ".env"]) {
+    try {
+      const fullPath = path.join(process.cwd(), filename);
+      if (fs.existsSync(fullPath)) {
+        const content = fs.readFileSync(fullPath, "utf8");
+        for (const line of content.split(/\r?\n/)) {
+          const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)?\s*$/);
+          if (match) {
+            const key = match[1];
+            let val = (match[2] || "").trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.slice(1, -1);
+            }
+            if (loaded[key] === undefined) {
+              loaded[key] = val;
+            }
+            if (process.env[key] === undefined) {
+              process.env[key] = val;
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore missing files
+    }
+  }
+  return loaded;
+}
+
 function getNodeEnvironment(value: string | undefined): NodeEnvironment {
   if (value === "production" || value === "test") return value;
   return "development";
 }
 
-function requireValue(env: NodeJS.ProcessEnv, name: string): string {
-  const value = env[name]?.trim();
+function getEnvValue(env: NodeJS.ProcessEnv, name: string, nodeEnv: NodeEnvironment): string | undefined {
+  const val = env[name]?.trim();
+  if (val) return val;
+  if (nodeEnv !== "production") {
+    if (!localEnvCache) {
+      localEnvCache = loadLocalEnvFile();
+    }
+    return localEnvCache[name];
+  }
+  return undefined;
+}
+
+function requireValue(env: NodeJS.ProcessEnv, name: string, nodeEnv: NodeEnvironment): string {
+  const value = getEnvValue(env, name, nodeEnv);
   if (!value) throw new RuntimeConfigError(`${name} is required`);
   return value;
 }
@@ -57,11 +105,12 @@ function parseOptionalUrl(
   names: string[],
   nodeEnv: NodeEnvironment
 ): URL | undefined {
-  const selectedName = names.find((name) => env[name]?.trim());
+  const selectedName = names.find((name) => getEnvValue(env, name, nodeEnv));
   if (!selectedName) return undefined;
 
   try {
-    const url = new URL(env[selectedName]!.trim());
+    const raw = getEnvValue(env, selectedName, nodeEnv)!;
+    const url = new URL(raw);
     if (nodeEnv === "production" && url.protocol !== "https:") {
       throw new RuntimeConfigError(`${selectedName} must use HTTPS in production`);
     }
@@ -77,9 +126,10 @@ function parseBoundedInteger(
   name: string,
   fallback: number,
   minimum: number,
-  maximum: number
+  maximum: number,
+  nodeEnv: NodeEnvironment
 ): number {
-  const raw = env[name]?.trim();
+  const raw = getEnvValue(env, name, nodeEnv);
   if (!raw) return fallback;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
@@ -92,15 +142,25 @@ function isAbsoluteStoragePath(value: string): boolean {
   return value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value);
 }
 
-function getDatabaseSslMode(env: NodeJS.ProcessEnv, nodeEnv: NodeEnvironment): DatabaseSslMode {
-  const value = env.DATABASE_SSL_MODE?.trim() || (nodeEnv === "production" ? "require" : "disable");
-  if (value !== "disable" && value !== "require" && value !== "verify-full") {
-    throw new RuntimeConfigError("DATABASE_SSL_MODE must be disable, require, or verify-full");
+function getDatabaseSslMode(
+  env: NodeJS.ProcessEnv,
+  nodeEnv: NodeEnvironment,
+  databaseUrl?: string
+): DatabaseSslMode {
+  const value = getEnvValue(env, "DATABASE_SSL_MODE", nodeEnv);
+  if (value) {
+    if (value !== "disable" && value !== "require" && value !== "verify-full") {
+      throw new RuntimeConfigError("DATABASE_SSL_MODE must be disable, require, or verify-full");
+    }
+    if (value === "verify-full" && !getEnvValue(env, "DATABASE_SSL_CA_BASE64", nodeEnv)) {
+      throw new RuntimeConfigError("DATABASE_SSL_CA_BASE64 is required for verify-full");
+    }
+    return value;
   }
-  if (value === "verify-full" && !env.DATABASE_SSL_CA_BASE64?.trim()) {
-    throw new RuntimeConfigError("DATABASE_SSL_CA_BASE64 is required for verify-full");
+  if (databaseUrl && /sslmode=require/i.test(databaseUrl)) {
+    return "require";
   }
-  return value;
+  return nodeEnv === "production" ? "require" : "disable";
 }
 
 export function getJwtSecret(env: NodeJS.ProcessEnv = process.env): string {
@@ -125,8 +185,8 @@ function getWorkerSecret(env: NodeJS.ProcessEnv, nodeEnv: NodeEnvironment): stri
 
 export function getRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const nodeEnv = getNodeEnvironment(env.NODE_ENV);
-  const databaseUrl = parsePostgresUrl(requireValue(env, "DATABASE_URL"));
-  const privateStorageRoot = env.PRIVATE_STORAGE_ROOT?.trim()
+  const databaseUrl = parsePostgresUrl(requireValue(env, "DATABASE_URL", nodeEnv));
+  const privateStorageRoot = getEnvValue(env, "PRIVATE_STORAGE_ROOT", nodeEnv)
     || (nodeEnv === "production" ? "" : "storage");
 
   if (!privateStorageRoot) {
@@ -136,8 +196,8 @@ export function getRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeC
     throw new RuntimeConfigError("PRIVATE_STORAGE_ROOT must be absolute in production");
   }
 
-  const dbSslMode = getDatabaseSslMode(env, nodeEnv);
-  const dbSslCaBase64 = env.DATABASE_SSL_CA_BASE64?.trim();
+  const dbSslMode = getDatabaseSslMode(env, nodeEnv, databaseUrl);
+  const dbSslCaBase64 = getEnvValue(env, "DATABASE_SSL_CA_BASE64", nodeEnv);
 
   return {
     nodeEnv,
@@ -148,20 +208,22 @@ export function getRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeC
     spartaApiUrl: parseOptionalUrl(env, ["SPARTA_API_URL"], nodeEnv),
     spartaLoginUrl: parseOptionalUrl(env, ["SPARTA_LOGIN_URL"], nodeEnv),
     privateStorageRoot,
-    dbPoolMax: parseBoundedInteger(env, "DATABASE_POOL_MAX", 10, 1, 50),
+    dbPoolMax: parseBoundedInteger(env, "DATABASE_POOL_MAX", 10, 1, 50, nodeEnv),
     dbConnectionTimeoutMs: parseBoundedInteger(
       env,
       "DATABASE_CONNECTION_TIMEOUT_MS",
       5_000,
       1_000,
-      120_000
+      120_000,
+      nodeEnv
     ),
     dbIdleTimeoutMs: parseBoundedInteger(
       env,
       "DATABASE_IDLE_TIMEOUT_MS",
       30_000,
       1_000,
-      120_000
+      120_000,
+      nodeEnv
     ),
     dbSslMode,
     dbSslCa: dbSslCaBase64
@@ -173,4 +235,3 @@ export function getRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeC
 export function validateProductionConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   return getRuntimeConfig({ ...env, NODE_ENV: "production" });
 }
-
