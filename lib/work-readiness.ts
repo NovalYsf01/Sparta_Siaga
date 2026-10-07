@@ -374,7 +374,7 @@ export function canTransitionToReadyForWork(
 
 /**
  * Status approval final Manager:
- * BLOCKED — WAITING CONFIRMATION FROM PAK IQBAL
- * Role / jabatan Manager belum di-hardcode.
+ * CONFIRMED_MANAGER_BRANCH
+ * Manager Branch resmi dikonfirmasi dari branch report.
  */
-export const FINAL_MANAGER_APPROVAL_STATUS = "BLOCKED — WAITING CONFIRMATION FROM PAK IQBAL" as const;
+export const FINAL_MANAGER_APPROVAL_STATUS = "CONFIRMED_MANAGER_BRANCH" as const;

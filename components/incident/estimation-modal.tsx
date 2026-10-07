@@ -145,8 +145,8 @@ export function EstimationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh]">
+    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
           <div className="flex items-center gap-3">
@@ -379,17 +379,17 @@ export function EstimationModal({
                       Pelapor Lapangan
                     </span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                      {incident.verification?.confirmedBy || incident.timeline?.[0]?.actor || identity?.name || "Pelapor Lapangan"}
+                      {incident.reporter?.name || incident.verification?.confirmedBy || incident.timeline?.[0]?.actor || "Pelapor Lapangan"}
                     </span>
                   </div>
 
-                  {identity?.nik && (
+                  {Boolean(incident.reporter?.nik || identity?.nik) && (
                     <div>
                       <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
                         NIK Pelapor
                       </span>
                       <span className="font-mono text-slate-800 dark:text-slate-200">
-                        {identity.nik}
+                        {incident.reporter?.nik || (incident.reporter ? "-" : identity?.nik)}
                       </span>
                     </div>
                   )}

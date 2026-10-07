@@ -7,6 +7,7 @@ function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     date: row.date as string,
     disasterType: row.disaster_type as IncidentRecord["disasterType"],
     reportOrigin: (row.report_origin as IncidentRecord["reportOrigin"]) ?? "manual",
+    reporter: (row.reporter as IncidentRecord["reporter"]) ?? undefined,
     earthquakeEventId: (row.earthquake_event_id as string) ?? undefined,
     earthquakeSource: (row.earthquake_source as string) ?? undefined,
     earthquakeProvenance: (row.earthquake_provenance as string) ?? undefined,
@@ -131,24 +132,37 @@ export async function dbFindUnlinkedManualEarthquakeCandidates(
   return rows.map(rowToIncident);
 }
 
+let isReporterColumnEnsured = false;
+async function ensureReporterColumn(pool: ReturnType<typeof getDbPool>) {
+  if (isReporterColumnEnsured) return;
+  try {
+    await pool.query(`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS reporter JSONB;`);
+    isReporterColumnEnsured = true;
+  } catch (err) {
+    console.warn("[incident-db] Failed to alter table incidents for reporter column:", err);
+  }
+}
+
 export async function dbCreateIncident(
   inc: IncidentRecord
 ): Promise<IncidentRecord> {
   const pool = getDbPool();
+  await ensureReporterColumn(pool);
   try {
     const { rows } = await pool.query(
     `INSERT INTO incidents (
-      id, date, disaster_type, report_origin,
+      id, date, disaster_type, report_origin, reporter,
       earthquake_event_id, earthquake_source, earthquake_provenance,
       tkp_type, store_id, store_name, branch, location_city,
       status, progress,
       disaster_metadata, affected_stores, affected_store_count, danger_store_count,
       verification, maintenance_ticket, field_photos,
       timeline, created_at, updated_at, closed_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
     ON CONFLICT (id) DO UPDATE SET
       status                   = EXCLUDED.status,
       progress                 = EXCLUDED.progress,
+      reporter                 = COALESCE(EXCLUDED.reporter, incidents.reporter),
       disaster_metadata        = EXCLUDED.disaster_metadata,
       affected_stores          = EXCLUDED.affected_stores,
       affected_store_count     = EXCLUDED.affected_store_count,
@@ -164,6 +178,7 @@ export async function dbCreateIncident(
       inc.date,
       inc.disasterType,
       inc.reportOrigin ?? "manual",
+      inc.reporter ? JSON.stringify(inc.reporter) : null,
       inc.earthquakeEventId ?? null,
       inc.earthquakeSource ?? null,
       inc.earthquakeProvenance ?? null,
@@ -205,6 +220,7 @@ export async function dbUpdateIncident(
   patch: Partial<IncidentRecord>
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
+  await ensureReporterColumn(pool);
   const setClauses: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -234,6 +250,7 @@ export async function dbUpdateIncident(
   }
 
   const jsonbFieldMap: Record<string, string> = {
+    reporter: "reporter",
     disasterMetadata: "disaster_metadata",
     affectedStores: "affected_stores",
     verification: "verification",

@@ -19,6 +19,9 @@ export const PERMISSION_KEYS = [
   "ESTIMATION_VIEW",
   // WORK READINESS (Task 3)
   "WORK_READINESS_UPDATE",
+  // COMPLETION & APPROVAL (Task 5)
+  "COMPLETION_SUBMIT",
+  "COMPLETION_APPROVE_COORDINATOR",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number];
@@ -114,6 +117,21 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: "Izin mengunggah bukti dan memperbarui persyaratan kesiapan mulai kerja fisik.",
     isOperational: true,
   },
+  // COMPLETION & APPROVAL (Task 5)
+  {
+    key: "COMPLETION_SUBMIT",
+    label: "Ajukan Penyelesaian Pekerjaan",
+    category: "LAPORAN",
+    description: "Izin mengajukan penyelesaian pekerjaan fisik setelah 100% dan bukti serah terima lengkap (PIC Lapangan BMS/BES/BBS).",
+    isOperational: true,
+  },
+  {
+    key: "COMPLETION_APPROVE_COORDINATOR",
+    label: "Approval Penyelesaian Koordinator",
+    category: "LAPORAN",
+    description: "Izin menyetujui atau meminta revisi pengajuan penyelesaian pekerjaan (Koordinator BMC/BEC/BBC).",
+    isOperational: true,
+  },
 ];
 
 // ============================================================
@@ -142,6 +160,8 @@ export const OPERATIONAL_PERMISSIONS: readonly PermissionKey[] = [
   "MANAGEMENT_INSTRUCTION_CREATE",
   "ESTIMATION_TRIGGER",
   "WORK_READINESS_UPDATE",
+  "COMPLETION_SUBMIT",
+  "COMPLETION_APPROVE_COORDINATOR",
 ] as const;
 
 export const MONITORING_PERMISSIONS: readonly PermissionKey[] = [
@@ -186,7 +206,6 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
     "REPORT_VIEW_OWN",
     "REPORT_CONFIRM",
     "REPORT_FOLLOW_UP",
-    "REPORT_UPDATE_PROGRESS",
     "REPORT_CLOSE",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
@@ -195,7 +214,6 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
     "REPORT_VIEW_OWN",
     "REPORT_CONFIRM",
     "REPORT_FOLLOW_UP",
-    "REPORT_UPDATE_PROGRESS",
     "REPORT_CLOSE",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
@@ -203,7 +221,6 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   sparta_maintenance: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
-    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
   ],
@@ -215,25 +232,46 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
     "ESTIMATION_TRIGGER",
     "ESTIMATION_VIEW",
     "WORK_READINESS_UPDATE",
+    "COMPLETION_SUBMIT",
   ],
   bmc: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
-    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
+    "COMPLETION_APPROVE_COORDINATOR",
+  ],
+  bes: [
+    "REPORT_VIEW_OWN",
+    "REPORT_FOLLOW_UP",
+    "NOTIFICATION_VIEW",
+    "ESTIMATION_VIEW",
+    "COMPLETION_SUBMIT",
+  ],
+  bec: [
+    "REPORT_VIEW_OWN",
+    "REPORT_FOLLOW_UP",
+    "NOTIFICATION_VIEW",
+    "ESTIMATION_VIEW",
+    "COMPLETION_APPROVE_COORDINATOR",
+  ],
+  bbs: [
+    "REPORT_VIEW_OWN",
+    "REPORT_FOLLOW_UP",
+    "NOTIFICATION_VIEW",
+    "ESTIMATION_VIEW",
+    "COMPLETION_SUBMIT",
   ],
   bbc: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
-    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
+    "COMPLETION_APPROVE_COORDINATOR",
   ],
   bnm: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
-    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
   ],
@@ -268,7 +306,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_CONFIRM: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_UPDATE_PROGRESS: "ALLOW",
     REPORT_CLOSE: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
@@ -277,7 +314,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_CONFIRM: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_UPDATE_PROGRESS: "ALLOW",
     REPORT_CLOSE: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
@@ -285,7 +321,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   sparta_maintenance: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
   },
@@ -297,25 +332,46 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
     ESTIMATION_TRIGGER: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
     WORK_READINESS_UPDATE: "ALLOW",
+    COMPLETION_SUBMIT: "ALLOW",
   },
   bmc: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
+    COMPLETION_APPROVE_COORDINATOR: "ALLOW",
+  },
+  bes: {
+    REPORT_VIEW_OWN: "ALLOW",
+    REPORT_FOLLOW_UP: "ALLOW",
+    NOTIFICATION_VIEW: "ALLOW",
+    ESTIMATION_VIEW: "ALLOW",
+    COMPLETION_SUBMIT: "ALLOW",
+  },
+  bec: {
+    REPORT_VIEW_OWN: "ALLOW",
+    REPORT_FOLLOW_UP: "ALLOW",
+    NOTIFICATION_VIEW: "ALLOW",
+    ESTIMATION_VIEW: "ALLOW",
+    COMPLETION_APPROVE_COORDINATOR: "ALLOW",
+  },
+  bbs: {
+    REPORT_VIEW_OWN: "ALLOW",
+    REPORT_FOLLOW_UP: "ALLOW",
+    NOTIFICATION_VIEW: "ALLOW",
+    ESTIMATION_VIEW: "ALLOW",
+    COMPLETION_SUBMIT: "ALLOW",
   },
   bbc: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
+    COMPLETION_APPROVE_COORDINATOR: "ALLOW",
   },
   bnm: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
   },

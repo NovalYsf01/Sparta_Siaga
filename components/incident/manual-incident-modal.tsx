@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, AlertTriangle, FileText, Building, User, ChevronRight, CheckCircle2, Eye, Activity } from "lucide-react";
-import { DisasterType } from "@/types/incident";
+import { DisasterType, getRoleDisplayLabel } from "@/types/incident";
 import { Earthquake } from "@/types/disaster";
 import { FieldPhotoUploader, PhotoData } from "./field-photo-uploader";
 import { UserIdentity } from "@/lib/identity";
@@ -12,6 +12,7 @@ interface ManualIncidentModalProps {
   isOpen: boolean;
   onClose: () => void;
   activeRole: string;
+  currentUser?: UserIdentity | null;
   rawStores: any[];
   activeEarthquakes?: Earthquake[];
   onConfirm: (data: any) => void;
@@ -32,6 +33,7 @@ export function ManualIncidentModal({
   isOpen,
   onClose,
   activeRole,
+  currentUser,
   rawStores,
   activeEarthquakes = [],
   onConfirm,
@@ -98,9 +100,13 @@ export function ManualIncidentModal({
     detailDC: emptyPhoto,
   });
 
-  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+  const [identity, setIdentity] = useState<UserIdentity | null>(currentUser || null);
 
   useEffect(() => {
+    if (currentUser) {
+      setIdentity(currentUser);
+      return;
+    }
     if (isOpen) {
       fetch("/api/auth/me")
         .then((res) => (res.ok ? res.json() : null))
@@ -109,7 +115,7 @@ export function ManualIncidentModal({
         })
         .catch(() => {});
     }
-  }, [isOpen]);
+  }, [isOpen, currentUser]);
 
   const isHOScope = identity?.scope === "HO";
 
@@ -118,12 +124,20 @@ export function ManualIncidentModal({
       if (!isHOScope && identity?.branch) {
         const assignedStore = rawStores.find(
           (s) => s.cabang?.toLowerCase() === identity.branch?.toLowerCase()
-        ) || rawStores.find((s) => s.cabang !== "MANUAL");
+        );
         if (assignedStore) {
           setStoreId(assignedStore.id || assignedStore.kode_toko);
+          setSelectedStoreObj(assignedStore);
+          setSearchQuery(`[${assignedStore.kode_toko}] ${assignedStore.nama_toko}`);
+        } else {
+          setStoreId("");
+          setSelectedStoreObj(null);
+          setSearchQuery("");
         }
       } else if (isHOScope) {
         setStoreId("");
+        setSelectedStoreObj(null);
+        setSearchQuery("");
       }
       setStep(1);
     }
@@ -155,6 +169,10 @@ export function ManualIncidentModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (identity?.systemRole === "ADMIN") {
+      alert("Akun System Administrator tidak diizinkan membuat laporan operasional.");
+      return;
+    }
     const store = selectedStoreObj || rawStores.find(
       (s) => s.kode_toko === storeId || s.id === storeId
     );
@@ -177,6 +195,14 @@ export function ManualIncidentModal({
     onConfirm({
       disasterType,
       reportOrigin: "manual",
+      reporter: {
+        userId: identity?.id || identity?.userId,
+        name: identity?.name || "Pelapor Lapangan",
+        nik: identity?.nik || null,
+        role: identity?.businessRole || identity?.role || activeRole,
+        branch: identity?.branch || store?.cabang || null,
+        storeId: storeId || null,
+      },
       earthquakeEventId: selectedEarthquakeEventId ? selectedEarthquakeEventId : undefined,
       earthquakeSource: matchedEq?.source || (selectedEarthquakeEventId ? "BMKG" : undefined),
       earthquakeProvenance: selectedEarthquakeEventId
@@ -215,9 +241,9 @@ export function ManualIncidentModal({
   const store = selectedStoreObj || rawStores.find(s => s.kode_toko === storeId || s.id === storeId);
 
   return (
-    <div className="fixed inset-0 z-[6000] flex md:items-center justify-center p-0 md:p-4 bg-slate-50 md:bg-slate-950/70 md:backdrop-blur-sm animate-in fade-in overscroll-none">
+    <div className="fixed inset-0 z-[6000] flex md:items-center justify-center p-0 md:p-4 bg-slate-50 md:bg-slate-950/70 md:backdrop-blur-sm animate-in fade-in overscroll-none touch-none select-none">
       {/* Full screen on mobile, large dialog on desktop */}
-      <div className="bg-slate-50 md:bg-white w-full h-full md:h-auto md:max-h-[90dvh] md:max-w-4xl md:rounded-[24px] overflow-hidden md:shadow-2xl flex flex-col animate-in slide-in-from-bottom-full md:slide-in-from-bottom-0 md:zoom-in-95 duration-200 ease-out">
+      <div className="bg-slate-50 md:bg-white w-full h-full md:h-auto md:max-h-[90dvh] md:max-w-4xl md:rounded-[24px] overflow-hidden md:shadow-2xl flex flex-col animate-in slide-in-from-bottom-full md:slide-in-from-bottom-0 md:zoom-in-95 duration-200 ease-out touch-auto select-text">
         {/* Header */}
         <div className="flex items-center justify-between px-4 md:px-6 py-4 bg-[#123B6D] text-white shrink-0">
           <div className="flex items-center gap-3">
@@ -262,18 +288,32 @@ export function ManualIncidentModal({
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama</label>
-                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700">
-                      Auto-filled (Session)
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Pelapor</label>
+                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 flex items-center justify-between">
+                      <span className="truncate">{identity?.name || "Memuat..."}</span>
+                      {identity?.nik && (
+                        <span className="text-[10px] font-mono text-slate-400 shrink-0 ml-1">
+                          NIK: {identity.nik}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Peran</label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Peran / Jabatan</label>
                     <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700">
-                      {activeRole.replace(/_/g, ' ').toUpperCase()}
+                      {identity?.systemRole === "ADMIN"
+                        ? "System Admin"
+                        : getRoleDisplayLabel(identity?.businessRole || identity?.role || activeRole)}
                     </div>
                   </div>
                 </div>
+
+                {identity?.systemRole === "ADMIN" && (
+                  <div className="mt-4 p-3.5 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-xs text-red-700 font-semibold">
+                    <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                    <span>Akun System Administrator hanya memiliki hak audit & pemantauan, tidak diizinkan membuat laporan operasional.</span>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -448,7 +488,7 @@ export function ManualIncidentModal({
                       value={photos.detailDC}
                       onChange={(data) => setPhotos({ ...photos, detailDC: data })}
                       storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
-                      reporterName="Noval"
+                      reporterName={identity?.name || "Pelapor Lapangan"}
                     />
                   </div>
                 )}
@@ -459,28 +499,28 @@ export function ManualIncidentModal({
                     value={photos.depan}
                     onChange={(data) => setPhotos({ ...photos, depan: data })}
                     storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
-                    reporterName="Noval"
+                    reporterName={identity?.name || "Pelapor Lapangan"}
                   />
                   <FieldPhotoUploader 
                     label="Foto Tampak 2"
                     value={photos.dalam}
                     onChange={(data) => setPhotos({ ...photos, dalam: data })}
                     storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
-                    reporterName="Noval"
+                    reporterName={identity?.name || "Pelapor Lapangan"}
                   />
                   <FieldPhotoUploader 
                     label="Foto Tampak 3"
                     value={photos.kiri}
                     onChange={(data) => setPhotos({ ...photos, kiri: data })}
                     storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
-                    reporterName="Noval"
+                    reporterName={identity?.name || "Pelapor Lapangan"}
                   />
                   <FieldPhotoUploader 
                     label="Foto Tampak 4"
                     value={photos.kanan}
                     onChange={(data) => setPhotos({ ...photos, kanan: data })}
                     storeName={store?.nama_toko || "Lokasi Tidak Diketahui"}
-                    reporterName="Noval"
+                    reporterName={identity?.name || "Pelapor Lapangan"}
                   />
                 </div>
               </div>
@@ -544,7 +584,8 @@ export function ManualIncidentModal({
             <button
               type="button"
               onClick={handleNext}
-              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] transition-all flex items-center gap-2 shadow-md shadow-blue-500/20"
+              disabled={identity?.systemRole === "ADMIN"}
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md shadow-blue-500/20"
             >
               <span>Lanjut</span>
               <ChevronRight className="w-4 h-4" />
@@ -553,7 +594,8 @@ export function ManualIncidentModal({
             <button
               type="button"
               onClick={handleSubmit}
-              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#D9272E] hover:bg-red-700 transition-all flex items-center gap-2 shadow-md shadow-red-500/20"
+              disabled={identity?.systemRole === "ADMIN"}
+              className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#D9272E] hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md shadow-red-500/20"
             >
               <AlertTriangle className="w-4 h-4" />
               <span>Kirim Laporan Resmi</span>

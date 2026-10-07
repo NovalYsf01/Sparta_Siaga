@@ -149,7 +149,9 @@ export function checkClientPermission(params: ClientPermissionCheckParams): Clie
     permission === "REPORT_UPDATE_PROGRESS" ||
     permission === "REPORT_CLOSE" ||
     permission === "ESTIMATION_TRIGGER" ||
-    permission === "WORK_READINESS_UPDATE";
+    permission === "WORK_READINESS_UPDATE" ||
+    permission === "COMPLETION_SUBMIT" ||
+    permission === "COMPLETION_APPROVE_COORDINATOR";
 
   if (isOperational) {
     // HO roles CANNOT act on branch without explicit branch override

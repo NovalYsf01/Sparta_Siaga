@@ -116,7 +116,6 @@ async function runTestSuiteAtoJ() {
     await updateRolePermissions("bm", {
       REPORT_CONFIRM: "ALLOW",
       REPORT_FOLLOW_UP: "ALLOW",
-      REPORT_UPDATE_PROGRESS: "ALLOW",
       REPORT_CLOSE: "ALLOW",
     }, { id: systemAdminUser.id, name: systemAdminUser.name });
 

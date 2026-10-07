@@ -451,10 +451,13 @@ export class ProgressService {
   }
 
   /**
-   * Menutup laporan (Close Report) dengan validasi lengkap:
-   * 1. Progress = 100%
-   * 2. Foto bukti akhir (FINAL / HANDOVER) tersedia
-   * 3. User memiliki permission REPORT_CLOSE
+   * Menutup laporan (Case Close) melalui alur resmi Task 5:
+   * 1. work_status = COMPLETED (progress 100% + mandatory HANDOVER evidence)
+   * 2. PIC Completion Submission (BMS / BES / BBS)
+   * 3. Coordinator Approval (BMC / BEC / BBC)
+   * 4. Manager Branch Final Approval & Case Close (BM)
+   * 
+   * Direct close tanpa persetujuan koordinator DITOLAK KERAS.
    */
   static async closeReport(params: {
     reportId: string;
@@ -468,93 +471,12 @@ export class ProgressService {
     };
     reason?: string;
   }): Promise<IncidentRecord> {
-    const report = await dbGetIncidentById(params.reportId);
-    if (!report) {
-      const err: any = new Error("Laporan tidak ditemukan.");
-      err.status = 404;
-      throw err;
-    }
-
-    // 1. Permission Check REPORT_CLOSE
-    const permCheck = await checkUserPermission({
-      user: params.actor as any,
-      permission: "REPORT_CLOSE",
-      report,
+    const { CompletionApprovalService } = await import("./completion-approval-service");
+    return await CompletionApprovalService.approveByManager({
+      reportId: params.reportId,
+      actor: params.actor,
+      notes: params.reason,
     });
-
-    if (!permCheck.authorized) {
-      const err: any = new Error(
-        permCheck.reason || "Unauthorized: Anda tidak memiliki izin untuk menutup laporan ini (REPORT_CLOSE)."
-      );
-      err.status = 403;
-      err.code = "CLOSE_FORBIDDEN";
-      throw err;
-    }
-
-    // 2. Progress must be 100%
-    const currentStatus = await this.getLatestProgress(params.reportId);
-    if (currentStatus.latestPercentage < 100) {
-      const err: any = new Error(
-        `Laporan belum dapat ditutup karena progress pekerjaan belum mencapai 100% (saat ini ${currentStatus.latestPercentage}%).`
-      );
-      err.status = 400;
-      err.code = "PROGRESS_INCOMPLETE";
-      throw err;
-    }
-
-    // 3. Final evidence check
-    const hasFinalEvidence = await this.hasFinalOrHandoverEvidence(params.reportId);
-    if (!hasFinalEvidence) {
-      const err: any = new Error(
-        "Penutupan laporan wajib menyertakan foto bukti akhir pekerjaan (FINAL atau HANDOVER)."
-      );
-      err.status = 400;
-      err.code = "FINAL_EVIDENCE_MISSING";
-      throw err;
-    }
-
-    // 4. Update incident status to resolved
-    const nowWib = formatServerTimestampWib();
-    const closeTimelineEntry = {
-      stage: "Laporan Ditutup",
-      label: "Pekerjaan Selesai & Laporan Ditutup",
-      timestamp: nowWib,
-      actor: params.actor.name,
-      notes: params.reason || "Pekerjaan telah mencapai 100% dan bukti akhir telah diverifikasi.",
-    };
-
-    const updated = await dbUpdateIncident(params.reportId, {
-      status: "resolved",
-      progress: 100,
-      timeline: [...(report.timeline || []), closeTimelineEntry],
-    });
-
-    // 5. Catat Audit Log
-    try {
-      const pool = getDbPool();
-      const auditId = `audit_close_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      await pool.query(
-        `INSERT INTO permission_audit_logs (
-          id, actor_user_id, actor_name, action, target_user_id,
-          permission_key, effect, scope_type, branch_code, reason, created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-        [
-          auditId,
-          params.actor.id,
-          params.actor.name,
-          "REPORT_CLOSED",
-          params.reportId,
-          "REPORT_CLOSE",
-          "ALLOW",
-          "BRANCH",
-          report.branch || null,
-          `Laporan ditutup oleh ${params.actor.name}. Alasan/Catatan: ${params.reason || "Selesai 100%"}`,
-        ]
-      );
-    } catch (auditErr) {
-      console.warn("[ProgressService] Gagal mencatat audit log close:", auditErr);
-    }
-
-    return updated!;
   }
 }
+

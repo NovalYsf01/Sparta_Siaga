@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ClipboardList,
   Search,
@@ -14,6 +14,7 @@ import {
   Calculator,
 } from "lucide-react";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
+import { UserIdentity } from "@/lib/identity";
 import { SelectReportModal } from "../incident/select-report-modal";
 import { EstimationModal } from "../incident/estimation-modal";
 import { ProgressUpdateModal } from "../incident/progress-update-modal";
@@ -32,6 +33,22 @@ export function OperationalReportCenter({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "pending_confirmation" | "investigating" | "in_maintenance">("all");
   const [filterType, setFilterType] = useState<"all" | DisasterType>("all");
+
+  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setIdentity(data.user || data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const isSystemAdmin = identity?.systemRole === "ADMIN";
+  const canTriggerEstimation = !isSystemAdmin && Boolean(identity?.effectivePermissions?.ESTIMATION_TRIGGER);
+  const canUpdateProgress = !isSystemAdmin && Boolean(identity?.effectivePermissions?.REPORT_UPDATE_PROGRESS);
+  const canCreateReport = Boolean(identity) && !isSystemAdmin;
 
   // Entry Point D2 & O states
   const [selectReportPurpose, setSelectReportPurpose] = useState<"ESTIMATION" | "PROGRESS" | null>(null);
@@ -104,27 +121,33 @@ export function OperationalReportCenter({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setSelectReportPurpose("ESTIMATION")}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
-          >
-            <Calculator className="w-4 h-4" />
-            Buat Estimasi
-          </button>
-          <button
-            onClick={() => setSelectReportPurpose("PROGRESS")}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
-          >
-            <Wrench className="w-4 h-4" />
-            Update Progress
-          </button>
-          <button
-            onClick={onOpenReportModal}
-            className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Buat Laporan
-          </button>
+          {canTriggerEstimation && (
+            <button
+              onClick={() => setSelectReportPurpose("ESTIMATION")}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+            >
+              <Calculator className="w-4 h-4" />
+              Buat Estimasi
+            </button>
+          )}
+          {canUpdateProgress && (
+            <button
+              onClick={() => setSelectReportPurpose("PROGRESS")}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+            >
+              <Wrench className="w-4 h-4" />
+              Update Progress
+            </button>
+          )}
+          {canCreateReport && (
+            <button
+              onClick={onOpenReportModal}
+              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Buat Laporan
+            </button>
+          )}
         </div>
       </div>
 
@@ -318,6 +341,7 @@ export function OperationalReportCenter({
         onClose={() => setSelectReportPurpose(null)}
         purpose={selectReportPurpose || "ESTIMATION"}
         incidents={incidents}
+        currentUser={identity}
         onSelectReport={(rep) => {
           if (selectReportPurpose === "ESTIMATION") {
             setSelectedEstimationReport(rep);

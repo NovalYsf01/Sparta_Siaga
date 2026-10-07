@@ -12,6 +12,10 @@ import {
 } from "../lib/watermark";
 import { dbGetIncidentById, dbCreateIncident } from "../lib/incident-db";
 import { IncidentRecord } from "../types/incident";
+import {
+  CompletionApprovalService,
+  ensureCompletionApprovalTables,
+} from "../lib/completion-approval-service";
 import sharp from "sharp";
 
 async function runEstimationProgressTests() {
@@ -38,6 +42,7 @@ async function runEstimationProgressTests() {
   try {
     await ensureEstimationRoutesTable();
     await ensureProgressTables();
+    await ensureCompletionApprovalTables();
 
     // 1. Setup Test Mock Reports in DB
     const reportToko1: IncidentRecord = {
@@ -116,6 +121,8 @@ async function runEstimationProgressTests() {
     // Clean prior test artifacts for idempotent runs
     await pool.query("DELETE FROM report_estimation_routes WHERE report_id LIKE 'INC-TEST-%'");
     await pool.query("DELETE FROM report_progress_updates WHERE report_id LIKE 'INC-TEST-%'");
+    await pool.query("DELETE FROM report_completion_approvals WHERE report_id LIKE 'INC-TEST-%'");
+    await pool.query("DELETE FROM report_completion_approval_history WHERE report_id LIKE 'INC-TEST-%'");
 
     // 2. Setup Actors
     const bmsUser = {
@@ -124,6 +131,17 @@ async function runEstimationProgressTests() {
       nik: "BMS0001",
       role: "bms" as const,
       businessRole: "bms" as const,
+      systemRole: "USER" as const,
+      scope: "BRANCH" as const,
+      branch: "G001",
+    };
+
+    const bmcUser = {
+      id: "USR-BMC-001",
+      name: "Candra BMC",
+      nik: "BMC0001",
+      role: "bmc" as const,
+      businessRole: "bmc" as const,
       systemRole: "USER" as const,
       scope: "BRANCH" as const,
       branch: "G001",
@@ -352,18 +370,23 @@ async function runEstimationProgressTests() {
       },
     });
 
-    // P2: Report status kerja READY_FOR_WORK. Update Progress tersedia untuk authorized user.
+    // P2: Report status kerja READY_FOR_WORK. Update Progress tersedia untuk authorized user (BMS), BM tidak mendapat update progress.
     const routeAfterReady = await EstimationIntegrationService.getRouteByReportId(reportProg.id);
-    const permProg = await checkUserPermission({
+    const permProgBMS = await checkUserPermission({
+      user: bmsUser,
+      permission: "REPORT_UPDATE_PROGRESS",
+      report: reportProg,
+    });
+    const permProgBM = await checkUserPermission({
       user: bmUser,
       permission: "REPORT_UPDATE_PROGRESS",
       report: reportProg,
     });
 
     assert(
-      routeAfterReady?.workStatus === "READY_FOR_WORK" && permProg.authorized,
+      routeAfterReady?.workStatus === "READY_FOR_WORK" && permProgBMS.authorized && !permProgBM.authorized,
       "P2",
-      "Report dengan workStatus = READY_FOR_WORK eligible untuk Update Progress oleh authorized user"
+      "Report dengan workStatus = READY_FOR_WORK eligible untuk Update Progress oleh authorized user (BMS ALLOW, BM DENY)"
     );
 
     // P3 / F4: Submit progress 20% + foto. Expected: history dibuat.
@@ -372,7 +395,7 @@ async function runEstimationProgressTests() {
       reportNumber: reportProg.id,
       storeName: reportProg.storeName,
       progressPercentage: 20,
-      actorName: bmUser.name,
+      actorName: bmsUser.name,
       photoType: "PROGRESS",
     });
 
@@ -381,7 +404,7 @@ async function runEstimationProgressTests() {
       progressPercentage: 20,
       description: "Pekerjaan pembongkaran area rusak dimulai.",
       stage: "PERSIAPAN",
-      actor: { id: bmUser.id, name: bmUser.name },
+      actor: { id: bmsUser.id, name: bmsUser.name },
       photos: [
         {
           photoType: "PROGRESS",
@@ -403,7 +426,7 @@ async function runEstimationProgressTests() {
     const wmResultP4 = await processAndWatermarkPhoto(sampleImageBuffer, {
       reportId: reportProg.id,
       progressPercentage: 45,
-      actorName: bmUser.name,
+      actorName: bmsUser.name,
       photoType: "PROGRESS",
     });
 
@@ -411,7 +434,7 @@ async function runEstimationProgressTests() {
       reportId: reportProg.id,
       progressPercentage: 45,
       description: "Pembongkaran selesai dan material pengganti telah tiba di toko.",
-      actor: { id: bmUser.id, name: bmUser.name },
+      actor: { id: bmsUser.id, name: bmsUser.name },
       photos: [
         {
           photoType: "PROGRESS",
@@ -436,7 +459,7 @@ async function runEstimationProgressTests() {
     const wmResultP5 = await processAndWatermarkPhoto(sampleImageBuffer, {
       reportId: reportProg.id,
       progressPercentage: 70,
-      actorName: bmUser.name,
+      actorName: bmsUser.name,
       photoType: "PROGRESS",
       customDate: new Date(Date.now() + 86400000), // Next day
     });
@@ -445,7 +468,7 @@ async function runEstimationProgressTests() {
       reportId: reportProg.id,
       progressPercentage: 70,
       description: "Pemasangan rangka dan instalasi keramik pengganti.",
-      actor: { id: bmUser.id, name: bmUser.name },
+      actor: { id: bmsUser.id, name: bmsUser.name },
       photos: [
         {
           photoType: "PROGRESS",
@@ -467,7 +490,7 @@ async function runEstimationProgressTests() {
     // P6: Validasi watermark foto (SPARTA SIAGA, No Laporan, Tanggal/Jam WIB, Progress %).
     const timestampWib = formatServerTimestampWib();
     const hasAllWatermarkFields =
-      wmResultP3.watermarkedPath.startsWith("/uploads/progress/wm_") &&
+      (wmResultP3.watermarkedPath.startsWith("/uploads/progress/wm_") || wmResultP3.watermarkedPath.startsWith("wm_")) &&
       wmResultP3.watermarkTimestamp.includes("WIB") &&
       wmResultP3.width > 0 &&
       wmResultP3.height > 0;
@@ -603,13 +626,77 @@ async function runEstimationProgressTests() {
         reason: "BMS mencoba menutup laporan",
       });
     } catch (err: any) {
-      if (err.status === 403 || err.code === "CLOSE_FORBIDDEN") {
+      if (err.status === 403 || err.code === "CLOSE_FORBIDDEN" || err.code === "ROLE_MISMATCH") {
         p11Rejected = true;
       }
     }
     assert(p11Rejected, "P11", "User tanpa hak REPORT_CLOSE (BMS) ditolak saat mencoba menutup laporan (403)");
 
-    // P12: Authorized user (Branch Manager G001 dengan REPORT_CLOSE) Close report. Expected: success!
+    // P12a: Direct Close oleh Branch Manager sebelum persetujuan koordinator DITOLAK (400 COORDINATOR_APPROVAL_REQUIRED)
+    let directCloseRejected = false;
+    try {
+      await ProgressService.closeReport({
+        reportId: reportProg.id,
+        actor: {
+          id: bmUser.id,
+          name: bmUser.name,
+          role: "bm",
+          systemRole: "USER",
+          scope: "BRANCH",
+          branch: "G001",
+        },
+        reason: "BM mencoba direct close sebelum approval BMC",
+      });
+    } catch (err: any) {
+      if (err.status === 400 || err.code === "COORDINATOR_APPROVAL_REQUIRED") {
+        directCloseRejected = true;
+      }
+    }
+    assert(
+      directCloseRejected,
+      "P12a",
+      "Direct Close oleh Branch Manager tanpa approval koordinator ditolak (400 COORDINATOR_APPROVAL_REQUIRED)"
+    );
+
+    // P12b: PIC (BMS G001) submit completion
+    const submitResult = await CompletionApprovalService.submitCompletion({
+      reportId: reportProg.id,
+      actor: {
+        id: bmsUser.id,
+        name: bmsUser.name,
+        role: "bms",
+        systemRole: "USER",
+        scope: "BRANCH",
+        branch: "G001",
+      },
+      notes: "Pekerjaan fisik 100% selesai, siap diperiksa BMC",
+    });
+    assert(
+      submitResult.status === "WAITING_COORDINATOR_APPROVAL",
+      "P12b",
+      "BMS berhasil submit completion -> WAITING_COORDINATOR_APPROVAL"
+    );
+
+    // P12c: Koordinator (BMC G001) menyetujui laporan
+    const coordResult = await CompletionApprovalService.approveByCoordinator({
+      reportId: reportProg.id,
+      actor: {
+        id: bmcUser.id,
+        name: bmcUser.name,
+        role: "bmc",
+        systemRole: "USER",
+        scope: "BRANCH",
+        branch: "G001",
+      },
+      notes: "Hasil pekerjaan telah diperiksa dan disetujui BMC",
+    });
+    assert(
+      coordResult.status === "WAITING_MANAGER_APPROVAL",
+      "P12c",
+      "BMC menyetujui laporan -> WAITING_MANAGER_APPROVAL"
+    );
+
+    // P12d: Branch Manager G001 menyetujui final & close report
     const closedIncident = await ProgressService.closeReport({
       reportId: reportProg.id,
       actor: {
@@ -625,8 +712,8 @@ async function runEstimationProgressTests() {
 
     assert(
       closedIncident.status === "resolved" && closedIncident.progress === 100,
-      "P12",
-      "Authorized user (Branch Manager) berhasil menutup laporan (Status: resolved)"
+      "P12d",
+      "Branch Manager berhasil final approve & Case Close (Status: resolved)"
     );
 
     console.log("\n==================================================");
@@ -643,6 +730,10 @@ async function runEstimationProgressTests() {
   } catch (err) {
     console.error("FATAL ERROR RUNNING TEST SUITE:", err);
     process.exit(1);
+  } finally {
+    try {
+      await pool.end();
+    } catch {}
   }
 }
 

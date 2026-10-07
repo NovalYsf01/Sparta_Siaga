@@ -91,14 +91,23 @@ async function findOrCreateTestReport(): Promise<string> {
   const cleanupId = `TASK4-TEST-${Date.now()}`;
 
   // Create a test incident
-  const { ensureIncidentsTable } = await import("../lib/incident-db");
-  await ensureIncidentsTable();
-
-  await pool.query(`
-    INSERT INTO incidents (id, title, status, severity, location, branch, store_name, store_id, description, date, progress, tkp_type)
-    VALUES ($1, 'Test Task4 Progress', 'in_maintenance', 'high', 'Test Location', 'TEST-BRANCH', 'Toko Test', 'ST-001', 'Test description', '2026-10-06', 0, 'TOKO')
-    ON CONFLICT (id) DO UPDATE SET status = 'in_maintenance', progress = 0
-  `, [cleanupId]);
+  const { dbCreateIncident } = await import("../lib/incident-db");
+  await dbCreateIncident({
+    id: cleanupId,
+    storeId: "ST-001",
+    storeName: "Toko Test",
+    branch: "TEST-BRANCH",
+    locationCity: "Test Location",
+    disasterType: "flood",
+    reportOrigin: "manual",
+    tkpType: "toko",
+    date: "06 Oct 2026",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: "in_maintenance",
+    progress: 0,
+    timeline: [],
+  });
 
   // Create estimation route with ESTIMATION_COMPLETED status
   try {
@@ -483,7 +492,7 @@ async function testP17_WatermarkServerSide() {
     const wmBuf = await fs.readFile(wmResult.watermarkedDiskPath);
 
     const wmTimestamp = wmResult.watermarkTimestamp;
-    const hasTimestamp = wmTimestamp && wmTimestamp.includes("WIB");
+    const hasTimestamp = Boolean(wmTimestamp && wmTimestamp.includes("WIB"));
 
     logResult(id, title, wmBuf.length > origBuf.length && hasTimestamp);
   } catch (err: any) {
@@ -849,13 +858,27 @@ async function testPerm_BMSHasUpdateProgress() {
   }
 }
 
-async function testPerm_BMCHasUpdateProgress() {
+async function testPerm_BMCDoesNotHaveUpdateProgress() {
   const id = "PERM2";
-  const title = "Role BMC memiliki REPORT_UPDATE_PROGRESS di catalog";
+  const title = "Role BMC TIDAK memiliki REPORT_UPDATE_PROGRESS di catalog (Separation of duties: approver != updater)";
   try {
     const catalog = ROLE_PERMISSION_CATALOG["bmc"];
     const has = catalog && (catalog as readonly string[]).includes("REPORT_UPDATE_PROGRESS");
-    logResult(id, title, Boolean(has));
+    logResult(id, title, !has);
+  } catch (err: any) {
+    logResult(id, title, false, err.message);
+  }
+}
+
+async function testPerm_BMAndStoreDoNotHaveUpdateProgress() {
+  const id = "PERM3";
+  const title = "Role BM & Tim Toko TIDAK memiliki REPORT_UPDATE_PROGRESS default di catalog";
+  try {
+    const bmCatalog = ROLE_PERMISSION_CATALOG["bm"];
+    const tokoCatalog = ROLE_PERMISSION_CATALOG["tim_toko"];
+    const bmHas = bmCatalog && (bmCatalog as readonly string[]).includes("REPORT_UPDATE_PROGRESS");
+    const tokoHas = tokoCatalog && (tokoCatalog as readonly string[]).includes("REPORT_UPDATE_PROGRESS");
+    logResult(id, title, !bmHas && !tokoHas);
   } catch (err: any) {
     logResult(id, title, false, err.message);
   }
@@ -919,7 +942,8 @@ async function main() {
 
     console.log("\n── PERMISSION MAPPING TESTS ──");
     await testPerm_BMSHasUpdateProgress();
-    await testPerm_BMCHasUpdateProgress();
+    await testPerm_BMCDoesNotHaveUpdateProgress();
+    await testPerm_BMAndStoreDoNotHaveUpdateProgress();
 
     // Summary
     const total = passed + failed + skipped;
@@ -940,6 +964,11 @@ async function main() {
   } catch (err: any) {
     console.error("\n💥 FATAL ERROR during test execution:", err);
     process.exit(1);
+  } finally {
+    try {
+      const pool = (await import("../lib/db")).getDbPool();
+      await pool.end();
+    } catch {}
   }
 }
 

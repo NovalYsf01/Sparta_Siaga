@@ -60,6 +60,7 @@ export type SpartaRole =
   | "bec"           // Branch Engineering Coordinator
   | "bes"           // Branch Engineering Support
   | "bms"           // Branch Maintenance Support
+  | "bbs"           // Branch Building Support
   | "tim_toko"
   | "tim_maintenance"
   | "sparta_maintenance" // Sparta Maintenance
@@ -155,6 +156,42 @@ export interface ManagementInstruction {
   delivery_log?: string;   // Catatan pengiriman / error detail
 }
 
+export interface IncidentReporter {
+  id?: string;
+  userId?: string;
+  name: string;
+  nik?: string | null;
+  role?: string | null;
+  branch?: string | null;
+  storeId?: string | null;
+}
+
+export function getRoleDisplayLabel(role?: string | null): string {
+  if (!role) return "User";
+  const r = role.toLowerCase();
+  const map: Record<string, string> = {
+    ho_admin: "HO Admin",
+    gm_ho: "GM HO",
+    sm_ho: "SM HO",
+    bm: "Manager Branch",
+    bnm: "BnM",
+    bbc: "BBC",
+    bmc: "BMC",
+    bec: "BEC",
+    bes: "BES",
+    bms: "BMS",
+    bbs: "BBS",
+    tim_toko: "Tim Toko",
+    tim_maintenance: "Tim Maintenance",
+    sparta_maintenance: "Sparta Maintenance",
+    tim_office: "Tim Office",
+    tim_warehouse: "Tim Warehouse",
+    admin: "System Admin",
+    user: "User",
+  };
+  return map[r] || role.replace(/_/g, " ").toUpperCase();
+}
+
 /**
  * Record laporan utama — anchor lifecycle sistem.
  * Nomor Laporan adalah anchor:
@@ -168,6 +205,7 @@ export interface IncidentRecord {
 
   // === Asal Laporan ===
   reportOrigin: ReportOrigin;
+  reporter?: IncidentReporter;   // Source of truth original pelapor
   earthquakeEventId?: string;    // Linked ke earthquake event ID jika auto
   earthquakeSource?: string;     // "BMKG" | "USGS"
   earthquakeProvenance?: string; // Label provenance sesuai prinsip semantik

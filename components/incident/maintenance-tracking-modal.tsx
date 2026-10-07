@@ -25,7 +25,12 @@ import { EstimationStatusCard } from "./estimation-status-card";
 import { EstimationRouteRecord } from "@/lib/estimation-service";
 import { ProgressUpdateModal } from "./progress-update-modal";
 import { ProgressTimeline } from "./progress-timeline";
-import { CloseReportModal } from "./close-report-modal";
+import { CompletionApprovalCard } from "./completion-approval-card";
+import {
+  CompletionApprovalRecord,
+  CompletionApprovalHistoryRecord,
+  ApprovalRouteResolution,
+} from "@/lib/completion-approval-service";
 import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -67,9 +72,6 @@ export function MaintenanceTrackingModal({
   const [hasFinalEvidence, setHasFinalEvidence] = useState(false);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
 
-  // Close report state
-  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
-
   // Permissions state
   const [canUpdateProgress, setCanUpdateProgress] = useState(false);
   const [updateProgressReason, setUpdateProgressReason] = useState("");
@@ -80,6 +82,14 @@ export function MaintenanceTrackingModal({
   const [canUpdateReadiness, setCanUpdateReadiness] = useState(false);
   const [updateReadinessReason, setUpdateReadinessReason] = useState("");
 
+  const [completionApproval, setCompletionApproval] = useState<CompletionApprovalRecord | null>(null);
+  const [completionRoute, setCompletionRoute] = useState<ApprovalRouteResolution | null>(null);
+  const [completionHistory, setCompletionHistory] = useState<CompletionApprovalHistoryRecord[]>([]);
+  const [canSubmitCompletion, setCanSubmitCompletion] = useState(false);
+  const [submitCompletionReason, setSubmitCompletionReason] = useState("");
+  const [canApproveCoordinator, setCanApproveCoordinator] = useState(false);
+  const [approveCoordinatorReason, setApproveCoordinatorReason] = useState("");
+
   const [loading, setLoading] = useState(false);
 
   const loadData = async () => {
@@ -87,11 +97,12 @@ export function MaintenanceTrackingModal({
     setLoading(true);
 
     try {
-      const [meRes, permRes, estRes, progRes] = await Promise.all([
+      const [meRes, permRes, estRes, progRes, compRes] = await Promise.all([
         fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)),
         fetch(`/api/incidents/${incident.id}/permissions`).then((r) => (r.ok ? r.json() : null)),
         fetch(`/api/incidents/${incident.id}/estimation`).then((r) => (r.ok ? r.json() : null)),
         fetch(`/api/incidents/${incident.id}/progress`).then((r) => (r.ok ? r.json() : null)),
+        fetch(`/api/incidents/${incident.id}/completion`).then((r) => (r.ok ? r.json() : null)),
       ]);
 
       if (meRes) setIdentity(meRes.user || meRes);
@@ -105,12 +116,22 @@ export function MaintenanceTrackingModal({
         setTriggerEstimationReason(permRes.data.triggerEstimationReason || "");
         setCanUpdateReadiness(Boolean(permRes.data.canUpdateReadiness));
         setUpdateReadinessReason(permRes.data.updateReadinessReason || "");
+        setCanSubmitCompletion(Boolean(permRes.data.canSubmitCompletion));
+        setSubmitCompletionReason(permRes.data.submitCompletionReason || "");
+        setCanApproveCoordinator(Boolean(permRes.data.canApproveCoordinator));
+        setApproveCoordinatorReason(permRes.data.approveCoordinatorReason || "");
       }
 
       if (estRes?.data) {
         setEstimationRoute(estRes.data);
       } else {
         setEstimationRoute(null);
+      }
+
+      if (compRes?.data) {
+        setCompletionApproval(compRes.data.approval || null);
+        setCompletionRoute(compRes.data.route || null);
+        setCompletionHistory(compRes.data.history || []);
       }
 
       if (progRes?.data) {
@@ -153,8 +174,8 @@ export function MaintenanceTrackingModal({
   const isReportClosed = incident.status === "resolved";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in overscroll-none">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header Modal */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0">
           <div className="flex items-center gap-3">
@@ -237,6 +258,21 @@ export function MaintenanceTrackingModal({
                 <span className="text-[10px] text-slate-400 font-semibold block">Cabang</span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200">
                   {incident.branch} • {incident.locationCity}
+                </span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-[10px] text-slate-400 font-semibold block">Pelapor Lapangan</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <span>
+                    {incident.reporter?.name
+                      ? `${incident.reporter.name} (${incident.reporter.role || "Pelapor"})`
+                      : (incident.timeline?.[0]?.actor || "Pelapor Lapangan")}
+                  </span>
+                  {incident.reporter?.nik && (
+                    <span className="text-[10px] font-mono text-slate-400">
+                      • NIK: {incident.reporter.nik}
+                    </span>
+                  )}
                 </span>
               </div>
             </div>
@@ -368,7 +404,12 @@ export function MaintenanceTrackingModal({
 
               {/* Tombol Update Progress */}
               {!isReadOnly && !isReportClosed && (
-                isWorkReadyForProgress ? (
+                workStatus === "COMPLETED" ? (
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Pekerjaan Fisik Selesai (100%)
+                  </span>
+                ) : isWorkReadyForProgress ? (
                   canUpdateProgress ? (
                     <button
                       type="button"
@@ -380,7 +421,7 @@ export function MaintenanceTrackingModal({
                     </button>
                   ) : (
                     <span className="text-[11px] text-slate-400 flex items-center gap-1" title={updateProgressReason}>
-                      <Lock className="w-3 h-3" /> Update Terkunci (REPORT_UPDATE_PROGRESS)
+                      <Lock className="w-3 h-3" /> Update Terkunci ({updateProgressReason || "REPORT_UPDATE_PROGRESS"})
                     </span>
                   )
                 ) : (
@@ -495,47 +536,25 @@ export function MaintenanceTrackingModal({
             </div>
           )}
 
-          {/* SECTION 8: CLOSE LAPORAN (Section AF) */}
-          {!isReportClosed && (
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    8. Penyelesaian & Penutupan Laporan
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Syarat: Progress 100% + Foto Bukti Akhir + Izin REPORT_CLOSE.
-                  </p>
-                </div>
-
-                {latestProgress === 100 && hasFinalEvidence ? (
-                  canClose ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsCloseModalOpen(true)}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      Close Laporan
-                    </button>
-                  ) : (
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1" title={closeReason}>
-                      <Lock className="w-3.5 h-3.5" /> Close Terkunci (REPORT_CLOSE)
-                    </span>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-400 font-semibold text-xs rounded-xl cursor-not-allowed opacity-60"
-                  >
-                    Syarat Close Belum Lengkap
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {/* SECTION 8: ALUR PERSETUJUAN & PENUTUPAN LAPORAN (TASK 5) */}
+          <CompletionApprovalCard
+            incident={incident}
+            approval={completionApproval}
+            route={completionRoute}
+            history={completionHistory}
+            latestProgress={latestProgress}
+            hasFinalEvidence={hasFinalEvidence}
+            userRole={identity?.role}
+            userBranch={identity?.branch}
+            userSystemRole={identity?.systemRole}
+            canSubmitCompletion={canSubmitCompletion}
+            submitCompletionReason={submitCompletionReason}
+            canApproveCoordinator={canApproveCoordinator}
+            approveCoordinatorReason={approveCoordinatorReason}
+            canClose={canClose}
+            closeReason={closeReason}
+            onRefresh={loadData}
+          />
         </div>
 
         {/* Footer Modal */}
@@ -574,24 +593,6 @@ export function MaintenanceTrackingModal({
         latestProgress={latestProgress}
         onSuccess={() => {
           loadData();
-        }}
-      />
-
-      {/* Sub-Modal: Close Report */}
-      <CloseReportModal
-        isOpen={isCloseModalOpen}
-        onClose={() => {
-          setIsCloseModalOpen(false);
-          loadData();
-        }}
-        incident={incident}
-        latestProgress={latestProgress}
-        hasFinalEvidence={hasFinalEvidence}
-        canClose={canClose}
-        closeReason={closeReason}
-        onSuccess={() => {
-          loadData();
-          onClose();
         }}
       />
     </div>

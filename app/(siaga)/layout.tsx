@@ -84,7 +84,22 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
 
   // Load incidents from database API on mount
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          const user = data.user || data;
+          setCurrentUser(user);
+          if (user.role || user.businessRole) {
+            setActiveRole((user.role || user.businessRole) as RoleType);
+          }
+        }
+      })
+      .catch((err) => console.error("[Layout] Failed to load user session:", err));
+
     fetch("/api/incidents")
       .then((res) => res.json())
       .then((json) => {
@@ -767,10 +782,19 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         isOpen={isManualModalOpen}
         onClose={() => setIsManualModalOpen(false)}
         activeRole={activeRole}
+        currentUser={currentUser}
         rawStores={rawStores}
         activeEarthquakes={disasterData?.activeEarthquakes || []}
         onConfirm={(data) => {
           const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
+          const reporterInfo = data.reporter || {
+            userId: currentUser?.id,
+            name: currentUser?.name || "Pelapor Lapangan",
+            nik: currentUser?.nik || null,
+            role: currentUser?.systemRole === "ADMIN" ? "ADMIN" : (currentUser?.businessRole || currentUser?.role || activeRole),
+            branch: currentUser?.branch || data.branch,
+            storeId: data.storeId,
+          };
           const newIncident: IncidentRecord = {
             id: `INC-MAN-${Date.now()}`,
             storeId: data.storeId,
@@ -779,6 +803,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             locationCity: data.locationCity,
             disasterType: data.disasterType,
             reportOrigin: "manual",
+            reporter: reporterInfo,
             earthquakeEventId: data.earthquakeEventId || undefined,
             earthquakeSource: data.earthquakeSource || (data.earthquakeEventId ? "BMKG" : undefined),
             earthquakeProvenance: data.earthquakeEventId ? `Ditautkan secara manual oleh pelapor ke kejadian ${data.earthquakeEventId}` : undefined,
@@ -789,8 +814,8 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             status: "verifying",
             progress: 15,
             verification: {
-              confirmedBy: activeRole,
-              confirmedAt: timestamp,
+              confirmedBy: "",
+              confirmedAt: "",
               isDamaged: true,
               categories: data.categories,
               severity: data.severity,
@@ -803,7 +828,8 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
                 stage: "Laporan Dibuat",
                 label: "Laporan insiden / kerusakan manual",
                 timestamp,
-                actor: activeRole,
+                actor: reporterInfo.name ? `${reporterInfo.name} (${reporterInfo.role || "Pelapor"})` : "Pelapor Lapangan",
+                notes: data.notes || undefined,
               }
             ]
           };

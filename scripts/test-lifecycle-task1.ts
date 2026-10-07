@@ -373,12 +373,12 @@ async function runTask1LifecycleTests() {
     );
 
     // =============================================================
-    // L11: Tidak ada Manager final role yang di-hardcode
+    // L11: Final Manager Approval resmi dikonfirmasi (Manager Branch)
     // =============================================================
     assert(
-      FINAL_MANAGER_APPROVAL_STATUS === "BLOCKED — WAITING CONFIRMATION FROM PAK IQBAL",
+      FINAL_MANAGER_APPROVAL_STATUS === "CONFIRMED_MANAGER_BRANCH",
       "L11",
-      "Final Manager Approval tidak di-hardcode dan berstatus: BLOCKED — WAITING CONFIRMATION FROM PAK IQBAL"
+      "Final Manager Approval terkonfirmasi resmi: Manager Branch dari cabang laporan (CONFIRMED_MANAGER_BRANCH)"
     );
 
     // =============================================================

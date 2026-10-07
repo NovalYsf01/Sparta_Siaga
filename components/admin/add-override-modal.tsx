@@ -226,8 +226,8 @@ export function AddOverrideModal({
   const categories = ["LAPORAN", "NOTIFIKASI", "MANAGEMENT", "ESTIMASI"] as const;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overscroll-none">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[85dvh] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90dvh] sm:max-h-[85dvh] overflow-hidden touch-auto select-text">
         {/* Header (Section K: Tambah Akses Khusus User) */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 p-6 pb-4 shrink-0">
           <div className="flex items-center gap-2.5">

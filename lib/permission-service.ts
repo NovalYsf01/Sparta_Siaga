@@ -579,14 +579,16 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
     };
   }
 
-  // Operational permissions: REPORT_CONFIRM, REPORT_FOLLOW_UP, REPORT_UPDATE_PROGRESS, REPORT_CLOSE
+  // Operational permissions: REPORT_CONFIRM, REPORT_FOLLOW_UP, REPORT_UPDATE_PROGRESS, REPORT_CLOSE, COMPLETION_SUBMIT, COMPLETION_APPROVE_COORDINATOR
   const isOperationalAction =
     permission === "REPORT_CONFIRM" ||
     permission === "REPORT_FOLLOW_UP" ||
     permission === "REPORT_UPDATE_PROGRESS" ||
     permission === "REPORT_CLOSE" ||
     permission === "ESTIMATION_TRIGGER" ||
-    permission === "WORK_READINESS_UPDATE";
+    permission === "WORK_READINESS_UPDATE" ||
+    permission === "COMPLETION_SUBMIT" ||
+    permission === "COMPLETION_APPROVE_COORDINATOR";
 
   if (isOperationalAction) {
     // HO users CANNOT act on branch without explicit branch override (checked earlier in userAllow)
@@ -721,7 +723,7 @@ export async function canCreateManagementInstructionAsync(
  * Validates against central permission resolver (considering user overrides, role permissions, and branch scope).
  */
 export async function checkMutationAuthorization(
-  action: "confirm" | "act" | "follow_up" | "create_instruction" | "create_estimation" | "update_progress" | "close",
+  action: "confirm" | "act" | "follow_up" | "create_instruction" | "create_estimation" | "update_progress" | "close" | "submit_completion" | "approve_coordinator",
   user: UserContext,
   report: IncidentRecord
 ): Promise<{ authorized: boolean; reason?: string }> {
@@ -743,6 +745,12 @@ export async function checkMutationAuthorization(
       break;
     case "create_estimation":
       permKey = "ESTIMATION_TRIGGER";
+      break;
+    case "submit_completion":
+      permKey = "COMPLETION_SUBMIT";
+      break;
+    case "approve_coordinator":
+      permKey = "COMPLETION_APPROVE_COORDINATOR";
       break;
     case "close":
       permKey = "REPORT_CLOSE";

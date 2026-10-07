@@ -14,6 +14,7 @@ import {
   Lock,
 } from "lucide-react";
 import { IncidentRecord } from "@/types/incident";
+import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 interface SelectReportModalProps {
@@ -22,6 +23,7 @@ interface SelectReportModalProps {
   purpose: "ESTIMATION" | "PROGRESS";
   incidents: IncidentRecord[];
   onSelectReport: (report: IncidentRecord) => void;
+  currentUser?: UserIdentity | null;
 }
 
 export function SelectReportModal({
@@ -30,6 +32,7 @@ export function SelectReportModal({
   purpose,
   incidents,
   onSelectReport,
+  currentUser,
 }: SelectReportModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -43,6 +46,18 @@ export function SelectReportModal({
       // Exclude resolved/archived
       if (inc.status === "resolved" || inc.status === "archived") return false;
 
+      // When purpose is PROGRESS, exclude reports already at 100% completion
+      if (purpose === "PROGRESS" && inc.progress === 100) {
+        return false;
+      }
+
+      // Strict branch isolation for branch scoped actors
+      if (currentUser?.scope === "BRANCH" && currentUser?.branch) {
+        if (inc.branch?.toLowerCase() !== currentUser.branch.toLowerCase()) {
+          return false;
+        }
+      }
+
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -54,13 +69,13 @@ export function SelectReportModal({
 
       return true;
     });
-  }, [incidents, searchQuery]);
+  }, [incidents, searchQuery, purpose, currentUser]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh]">
+    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header (Fixed) */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
           <div className="flex items-center gap-3">
