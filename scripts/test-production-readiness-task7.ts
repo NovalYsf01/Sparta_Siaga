@@ -229,7 +229,48 @@ async function runP11(): Promise<ScenarioResult> {
 async function runP12(): Promise<ScenarioResult> {
   const required = ["ops/backup-production.sh", "ops/verify-backup.sh", "ops/restore-production.sh"];
   const present = await Promise.all(required.map(exists));
-  return { code: "P12", description: scenarios[11], passed: present.every(Boolean), detail: "backup helper set incomplete" };
+  if (!present.every(Boolean)) {
+    return { code: "P12", description: scenarios[11], passed: false, detail: "backup helper set incomplete" };
+  }
+
+  const [backupScript, verifyScript, restoreScript] = await Promise.all([
+    readFile(path.join(process.cwd(), "ops/backup-production.sh"), "utf8"),
+    readFile(path.join(process.cwd(), "ops/verify-backup.sh"), "utf8"),
+    readFile(path.join(process.cwd(), "ops/restore-production.sh"), "utf8"),
+  ]);
+
+  const hasStrictBash = [backupScript, verifyScript, restoreScript].every((s) => s.includes("set -Eeuo pipefail"));
+  const noEchoSecret = !backupScript.includes("echo $DATABASE_URL") && !backupScript.includes("echo \"$DATABASE_URL\"");
+  const backupValid =
+    backupScript.includes("pg_dump") &&
+    backupScript.includes("database.dump") &&
+    backupScript.includes("evidence.tar.gz") &&
+    backupScript.includes("SHA256SUMS") &&
+    backupScript.includes("pg_restore --list");
+  const verifyValid =
+    verifyScript.includes("sha256sum") &&
+    verifyScript.includes("pg_restore --list");
+  const restoreValid =
+    restoreScript.includes("CONFIRM_RESTORE") &&
+    restoreScript.includes("pg_restore");
+
+  const passed = hasStrictBash && noEchoSecret && backupValid && verifyValid && restoreValid;
+  return {
+    code: "P12",
+    description: scenarios[11],
+    passed,
+    detail: !hasStrictBash
+      ? "missing strict bash mode"
+      : !noEchoSecret
+      ? "leaks DATABASE_URL"
+      : !backupValid
+      ? "backup script contract mismatch"
+      : !verifyValid
+      ? "verify script contract mismatch"
+      : !restoreValid
+      ? "restore script contract mismatch"
+      : undefined,
+  };
 }
 
 async function runP13(): Promise<ScenarioResult> {
