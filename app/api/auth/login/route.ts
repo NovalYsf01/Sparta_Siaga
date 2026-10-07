@@ -3,6 +3,7 @@ import { dbGetUserByNik } from "@/lib/user-db";
 import bcrypt from "bcryptjs";
 import { signSession } from "@/lib/jwt";
 import { cookies } from "next/headers";
+import { getSessionCookieOptions } from "@/lib/session-config";
 
 export async function POST(request: Request) {
   try {
@@ -56,11 +57,8 @@ export async function POST(request: Request) {
 
     const cookieStore = await cookies();
     cookieStore.set("siaga_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...getSessionCookieOptions(),
       maxAge: 60 * 60 * 24, // 24 hours
-      path: "/"
     });
 
     return NextResponse.json({ success: true, redirect: "/" });

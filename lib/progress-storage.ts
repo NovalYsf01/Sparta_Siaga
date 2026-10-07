@@ -14,7 +14,13 @@
 import fs from "fs/promises";
 import path from "path";
 
-export const PROGRESS_STORAGE_DIR = path.join(process.cwd(), "storage", "progress");
+import { getPrivateStoragePaths } from "./storage-config";
+
+export function getProgressStorageDir(): string {
+  return getPrivateStoragePaths().progress;
+}
+
+export const PROGRESS_STORAGE_DIR = getProgressStorageDir();
 
 export interface SaveProgressPhotoResult {
   photoId: string;
@@ -38,7 +44,8 @@ export async function saveProgressPhoto(
   mimeType: string,
   originalFilename?: string
 ): Promise<SaveProgressPhotoResult> {
-  await fs.mkdir(PROGRESS_STORAGE_DIR, { recursive: true });
+  const storageDir = getProgressStorageDir();
+  await fs.mkdir(storageDir, { recursive: true });
 
   const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
   const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
@@ -48,8 +55,8 @@ export async function saveProgressPhoto(
   const wmStorageKey = `wm_${sanitizedReportId}_${uniqueId}.${ext}`;
   const origStorageKey = `orig_${sanitizedReportId}_${uniqueId}.${ext}`;
 
-  const wmDiskPath = path.join(PROGRESS_STORAGE_DIR, wmStorageKey);
-  const origDiskPath = path.join(PROGRESS_STORAGE_DIR, origStorageKey);
+  const wmDiskPath = path.join(storageDir, wmStorageKey);
+  const origDiskPath = path.join(storageDir, origStorageKey);
 
   await fs.writeFile(origDiskPath, originalBuffer);
   await fs.writeFile(wmDiskPath, watermarkedBuffer);
@@ -93,7 +100,7 @@ export async function getProgressPhotoFile(
   }
 
   // 2. Resolve di private storage
-  const storageDir = path.resolve(PROGRESS_STORAGE_DIR);
+  const storageDir = path.resolve(getProgressStorageDir());
   const resolvedPath = path.resolve(storageDir, storageKeyOrId);
 
   // Anti-traversal: resolved path HARUS di dalam storage directory

@@ -24,6 +24,9 @@ export const AUTO_EARTHQUAKE_MAX_AGE_MINUTES = parseInt(process.env.AUTO_EARTHQU
 export const MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES = parseInt(process.env.MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES || '120', 10);
 
 let isCycleRunning = false;
+let initialTimer: NodeJS.Timeout | null = null;
+let intervalTimer: NodeJS.Timeout | null = null;
+let isDaemonStopped = false;
 
 interface BranchCentroid {
   cabang: string;
@@ -71,8 +74,10 @@ async function getBranchCentroids(): Promise<BranchCentroid[]> {
  * Autonomous evaluation cycle that runs on the server 24/7
  */
 export async function runAutonomousDisasterCycle(): Promise<void> {
-  if (isCycleRunning) {
-    console.log('[Autonomous Daemon] Previous cycle still running, skipping...');
+  if (isCycleRunning || isDaemonStopped) {
+    if (isCycleRunning) {
+      console.log('[Autonomous Daemon] Previous cycle still running, skipping...');
+    }
     return;
   }
 
@@ -434,6 +439,7 @@ export function startServerDaemon(): void {
   }
 
   globalScope.__sparta_daemon_started = true;
+  isDaemonStopped = false;
   console.log('------------------------------------------------------------');
   console.log('🚀 [SPARTA SIAGA] 24/7 AUTONOMOUS SERVER DAEMON ACTIVATED');
   console.log('   Continuous monitoring: BMKG Quakes (60s), RainViewer & Open-Meteo');
@@ -441,12 +447,34 @@ export function startServerDaemon(): void {
   console.log('------------------------------------------------------------');
 
   // Initial trigger after 4 seconds
-  setTimeout(() => {
+  initialTimer = setTimeout(() => {
+    if (isDaemonStopped) return;
     runAutonomousDisasterCycle().catch(err => console.error('[Autonomous Daemon] Initial run failed:', err));
   }, 4000);
 
   // Interval trigger every 60 seconds (1 minute) 24/7
-  setInterval(() => {
+  intervalTimer = setInterval(() => {
+    if (isDaemonStopped) return;
     runAutonomousDisasterCycle().catch(err => console.error('[Autonomous Daemon] Interval run failed:', err));
   }, 60000);
+}
+
+export async function stopServerDaemon(gracePeriodMs: number = 5000): Promise<void> {
+  isDaemonStopped = true;
+  if (initialTimer) {
+    clearTimeout(initialTimer);
+    initialTimer = null;
+  }
+  if (intervalTimer) {
+    clearInterval(intervalTimer);
+    intervalTimer = null;
+  }
+  const globalScope = globalThis as any;
+  globalScope.__sparta_daemon_started = false;
+
+  const start = Date.now();
+  while (isCycleRunning && Date.now() - start < gracePeriodMs) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  console.log('[Autonomous Daemon] Daemon stopped.');
 }

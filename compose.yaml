@@ -1,0 +1,41 @@
+# ============================================================================
+# SPARTA SIAGA — Dokploy / Docker Compose Deployment Contract
+# ============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sparta-siaga:production
+    container_name: sparta-siaga-app
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      HOSTNAME: 0.0.0.0
+      PRIVATE_STORAGE_ROOT: /app/storage
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      SPARTA_INTERNAL_WORKER_SECRET: ${SPARTA_INTERNAL_WORKER_SECRET}
+      DATABASE_SSL_MODE: ${DATABASE_SSL_MODE:-require}
+      DATABASE_SSL_CA_BASE64: ${DATABASE_SSL_CA_BASE64:-}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      SPARTA_API_URL: ${SPARTA_API_URL:-}
+      SPARTA_LOGIN_URL: ${SPARTA_LOGIN_URL:-}
+    volumes:
+      - sparta_private_storage:/app/storage
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3004/api/health/live').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  sparta_private_storage:
+    name: sparta_private_storage

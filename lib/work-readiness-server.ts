@@ -18,7 +18,13 @@ import {
   WorkReadinessEvaluationResult,
 } from "./work-readiness";
 
-export const READINESS_STORAGE_DIR = path.join(process.cwd(), "storage", "readiness");
+import { getPrivateStoragePaths } from "./storage-config";
+
+export function getReadinessStorageDir(): string {
+  return getPrivateStoragePaths().readiness;
+}
+
+export const READINESS_STORAGE_DIR = getReadinessStorageDir();
 
 export interface SaveReadinessFileResult {
   evidenceId: string;
@@ -40,7 +46,7 @@ export async function saveReadinessEvidenceFile(
   originalFilename: string,
   mimeType: string
 ): Promise<SaveReadinessFileResult> {
-  const uploadDir = READINESS_STORAGE_DIR;
+  const uploadDir = getReadinessStorageDir();
   await fs.mkdir(uploadDir, { recursive: true });
 
   const ext =
@@ -319,7 +325,7 @@ export async function getReadinessEvidenceFile(
   }
 
   // 4. Resolve berkas fisik di private storage
-  const storageDir = path.resolve(READINESS_STORAGE_DIR);
+  const storageDir = path.resolve(getReadinessStorageDir());
   const targetFileName = targetItem.storageKey || (targetItem.fileUrl ? path.basename(targetItem.fileUrl) : null);
   if (!targetFileName) {
     return null;

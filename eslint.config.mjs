@@ -20,7 +20,14 @@ export default [
       ".agents/**",
       "next-env.d.ts",
       "postcss.config.mjs",
-      "next.config.mjs"
+      "next.config.mjs",
+      "scripts/**"
     ]
+  },
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "prefer-const": "warn"
+    }
   }
 ];

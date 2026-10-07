@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionCookieOptions } from "@/lib/session-config";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -34,11 +35,8 @@ export async function GET(request: Request) {
 
     const response = NextResponse.redirect(new URL("/", baseUrl));
     response.cookies.set("siaga_session", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...getSessionCookieOptions(),
       maxAge: 8 * 60 * 60, // 8 hours
-      path: "/",
     });
 
     return response;
@@ -48,10 +46,8 @@ export async function GET(request: Request) {
     if (process.env.NODE_ENV !== "production") {
       const response = NextResponse.redirect(new URL("/", baseUrl));
       response.cookies.set("siaga_session", `dev-session-${Date.now()}`, {
-        httpOnly: true,
-        sameSite: "lax",
+        ...getSessionCookieOptions(),
         maxAge: 8 * 60 * 60,
-        path: "/",
       });
       return response;
     }

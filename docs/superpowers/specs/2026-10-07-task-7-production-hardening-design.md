@@ -52,10 +52,9 @@ A focused server-only configuration module will parse and validate environment v
 - `DATABASE_URL`
 - `JWT_SECRET`, with a minimum strength/length requirement
 - `SPARTA_INTERNAL_WORKER_SECRET`, with a minimum strength/length requirement
-- `NEXT_PUBLIC_APP_URL`, using HTTPS
-- `SPARTA_API_URL`
-- `SPARTA_LOGIN_URL`
 - `PRIVATE_STORAGE_ROOT`, set to `/app/storage` in Dokploy
+
+`NEXT_PUBLIC_APP_URL`, `SPARTA_API_URL`, and `SPARTA_LOGIN_URL` will be classified from their actual server/client usage before implementation. A URL becomes production-required only when the enabled authentication or integration path cannot operate safely without it; otherwise it remains optional with an explicit feature-state response rather than a silent production fallback.
 
 ### Optional with bounded defaults
 
@@ -76,7 +75,7 @@ A focused server-only configuration module will parse and validate environment v
 - persistent private storage path
 - explicit database TLS policy
 
-`.env.example` will contain safe placeholders and explanatory comments only. Real credentials will not be written to repository files, image layers, build arguments, logs, health responses, or test output.
+`.env.example` will contain safe placeholders and explanatory comments only. Real credentials will not be written to repository files, image layers, build arguments, logs, health responses, or test output. Production secrets are runtime-only and no Docker build stage may require them.
 
 The committed database credential currently present as a fallback in `lib/db.ts` will be removed. Because it has existed in source history, rotating/revoking that credential is a mandatory external action and will be recorded as an environment condition.
 
@@ -111,7 +110,7 @@ Rollback documentation will state honestly that additive database migrations are
 
 ## 7. Private Storage
 
-Readiness and progress evidence will resolve beneath the configurable private root:
+All persistent user-generated and evidence storage will be inventoried before the container contract is finalized, including readiness, progress, final/completion/handover photos, avatars, legacy public uploads, and any other generated artefacts. Private operational evidence will resolve beneath the configurable private root, including:
 
 - `/app/storage/readiness`
 - `/app/storage/progress`
@@ -176,7 +175,7 @@ Repository helpers and documentation will define:
 - a restore rehearsal procedure;
 - recovery ordering and application downtime requirements.
 
-Dokploy volume backup will protect the named evidence volume. PostgreSQL backup will use the database provider's managed backup when available plus a tested logical dump procedure. Restore is intentionally operator-driven and guarded because replacing database or evidence state is destructive.
+Dokploy volume backup will protect the named evidence volume. PostgreSQL backup will use the database provider's managed backup when available plus a tested logical dump procedure. Repository backup tooling runs only as a documented maintenance/sidecar job with PostgreSQL client access and the same evidence volume mounted. Application writes are quiesced while the matched database/evidence backup set is captured and verified; the tooling records the consistency window and does not imply an atomic cross-system snapshot. Restore is intentionally operator-driven and guarded because replacing database or evidence state is destructive.
 
 ## 12. Dokploy, HTTPS, and Routing
 

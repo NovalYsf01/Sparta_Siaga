@@ -3,13 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.28.3",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=11 <12"
+  },
   "scripts": {
     "dev": "next dev -p 3004",
     "build": "next build",
     "start": "next start -p 3004",
+    "start:production": "node .next/standalone/server.js",
     "daemon": "tsx scripts/worker-daemon.ts",
     "migrate": "tsx scripts/migrate-incidents.ts",
     "migrate:report-fields": "tsx scripts/migrate-report-fields.ts",
+    "db:deploy": "node scripts/migrate-production.mjs",
     "seed": "tsx scripts/seed-incidents.ts",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

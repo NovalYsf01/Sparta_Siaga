@@ -250,7 +250,7 @@ export function NotificationPermissionDialog({
             <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-600/40 flex items-start gap-2 text-amber-200 text-xs">
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <span>
-                Izin browser sebelumnya ditolak. Anda dapat mengklik icon gembok di sebelah URL browser laptop untuk menyetel notifikasi menjadi <strong>"Allow"</strong>.
+                Izin browser sebelumnya ditolak. Anda dapat mengklik icon gembok di sebelah URL browser laptop untuk menyetel notifikasi menjadi <strong>&quot;Allow&quot;</strong>.
               </span>
             </div>
           )}

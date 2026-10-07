@@ -24,6 +24,20 @@ let passed = 0;
 let failed = 0;
 let skipped = 0;
 
+const publicProgressDir = path.join(process.cwd(), "public", "uploads", "progress");
+
+async function snapshotPublicProgressFiles(): Promise<Set<string>> {
+  try {
+    return new Set(await fs.readdir(publicProgressDir));
+  } catch {
+    return new Set();
+  }
+}
+
+// Capture before the suite performs any progress update. Comparing filenames
+// is deterministic in copied worktrees where tracked-file mtimes are refreshed.
+const initialPublicProgressFiles = snapshotPublicProgressFiles();
+
 function logResult(id: string, title: string, success: boolean, detail?: string) {
   if (success) {
     passed++;
@@ -789,26 +803,10 @@ async function testSec_NoPublicProgressPhotos() {
   const id = "SEC1";
   const title = "Tidak ada foto progress baru di public/uploads/progress/";
   try {
-    const publicDir = path.join(process.cwd(), "public", "uploads", "progress");
-    let publicFiles: string[] = [];
-    try {
-      publicFiles = await fs.readdir(publicDir);
-    } catch {
-      // Directory doesn't exist = PASS
-    }
-
-    // Filter for files created in the last 5 minutes (test artifacts)
-    const recentFiles: string[] = [];
-    for (const f of publicFiles) {
-      try {
-        const stat = await fs.stat(path.join(publicDir, f));
-        if (Date.now() - stat.mtimeMs < 5 * 60 * 1000) {
-          recentFiles.push(f);
-        }
-      } catch {}
-    }
-
-    logResult(id, title, recentFiles.length === 0);
+    const before = await initialPublicProgressFiles;
+    const after = await snapshotPublicProgressFiles();
+    const newPublicFiles = [...after].filter((file) => !before.has(file));
+    logResult(id, title, newPublicFiles.length === 0, newPublicFiles.join(", "));
   } catch (err: any) {
     logResult(id, title, false, err.message);
   }
