@@ -1,0 +1,15 @@
+.git
+.gitignore
+.gitmodules
+.worktrees
+.superpowers
+.env*
+!.env.example
+node_modules
+.next
+coverage
+storage
+tmp
+*.log
+docs
+scripts/test-*

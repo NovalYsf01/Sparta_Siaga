@@ -245,12 +245,39 @@ async function runP14(): Promise<ScenarioResult> {
   const packageJson = JSON.parse(await readFile(path.join(process.cwd(), "package.json"), "utf8")) as {
     scripts?: Record<string, string>;
   };
-  const files = await Promise.all([exists("Dockerfile"), exists("compose.yaml")]);
+  const [dockerfileExists, composeExists] = await Promise.all([exists("Dockerfile"), exists("compose.yaml")]);
+  if (!dockerfileExists || !composeExists || !packageJson.scripts?.["start:production"]) {
+    return {
+      code: "P14",
+      description: scenarios[13],
+      passed: false,
+      detail: "Docker/Compose/start contract incomplete",
+    };
+  }
+
+  const [dockerfileContent, composeContent] = await Promise.all([
+    readFile(path.join(process.cwd(), "Dockerfile"), "utf8"),
+    readFile(path.join(process.cwd(), "compose.yaml"), "utf8"),
+  ]);
+
+  const dockerfileValid =
+    dockerfileContent.includes("node:24") &&
+    dockerfileContent.includes("nextjs") &&
+    dockerfileContent.includes("3004") &&
+    !dockerfileContent.includes("ARG DATABASE_URL") &&
+    !dockerfileContent.includes("ARG JWT_SECRET");
+
+  const composeValid =
+    composeContent.includes("3004") &&
+    composeContent.includes("sparta_private_storage") &&
+    composeContent.includes("no-new-privileges") &&
+    composeContent.includes("unless-stopped");
+
   return {
     code: "P14",
     description: scenarios[13],
-    passed: files.every(Boolean) && Boolean(packageJson.scripts?.["start:production"]),
-    detail: "Docker/Compose/start contract incomplete",
+    passed: dockerfileValid && composeValid,
+    detail: !dockerfileValid ? "Dockerfile contract violation" : !composeValid ? "compose contract violation" : undefined,
   };
 }
 
