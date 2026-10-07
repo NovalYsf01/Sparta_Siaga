@@ -136,10 +136,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       photos: processedPhotos,
     });
 
+    // Transform response photo paths to protected API URLs
+    const protectedResult = {
+      ...createdUpdate,
+      photos: createdUpdate.photos.map((photo) => ({
+        ...photo,
+        watermarkedPath: `/api/incidents/${id}/progress/evidence/${encodeURIComponent(photo.watermarkedPath.split('/').pop() || photo.watermarkedPath)}`,
+        originalPath: `/api/incidents/${id}/progress/evidence/${encodeURIComponent(photo.originalPath.split('/').pop() || photo.originalPath)}`,
+      })),
+    };
+
     return NextResponse.json(
       {
         message: "Bukti akhir pekerjaan berhasil diunggah.",
-        data: createdUpdate,
+        data: protectedResult,
       },
       { status: 201 }
     );

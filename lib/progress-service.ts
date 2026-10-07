@@ -254,11 +254,22 @@ export class ProgressService {
       throw err;
     }
 
+    // COMPLETED Lock (Section AB): Pekerjaan yang sudah COMPLETED tidak boleh menerima update progress baru
+    if (estimationRoute.workStatus === "COMPLETED") {
+      const err: any = new Error(
+        "Pekerjaan telah diselesaikan (COMPLETED). Update progress baru tidak diizinkan."
+      );
+      err.status = 422;
+      err.code = "WORK_ALREADY_COMPLETED";
+      throw err;
+    }
+
     // 3. Validasi Persentase Progress (Section T)
     const percentage = Number(params.progressPercentage);
     if (isNaN(percentage) || percentage < 0 || percentage > 100) {
       const err: any = new Error("Persentase progress harus berada di antara 0% dan 100%.");
       err.status = 400;
+      err.code = "INVALID_PROGRESS";
       throw err;
     }
 
@@ -268,13 +279,13 @@ export class ProgressService {
         `Progress tidak boleh lebih kecil dari progress sebelumnya (${currentStatus.latestPercentage}%).`
       );
       err.status = 400;
-      err.code = "PROGRESS_CANNOT_DECREASE";
+      err.code = "PROGRESS_DECREASE_NOT_ALLOWED";
       throw err;
     }
 
     // 4. Validasi Foto Wajib (Section V)
     if (!params.photos || params.photos.length === 0) {
-      const err: any = new Error("Foto progress wajib dilampirkan.");
+      const err: any = new Error("Foto progress wajib dilampirkan minimal 1 foto.");
       err.status = 400;
       err.code = "PHOTO_REQUIRED";
       throw err;
@@ -366,9 +377,12 @@ export class ProgressService {
       notes: params.description,
     };
 
+    // Section Y/AE: incident.status tetap 'in_maintenance', TIDAK PERNAH auto-resolve.
+    // COMPLETED hanya mengubah work_status, bukan incident.status.
+    // incident.status = 'resolved' hanya terjadi melalui approval chain Task 5.
     await dbUpdateIncident(params.reportId, {
       progress: percentage,
-      status: "in_maintenance", // Ongoing physical maintenance
+      status: "in_maintenance", // NEVER auto-resolve — Task 5 handles Case Close
       timeline: [...(report.timeline || []), timelineEntry],
     });
 

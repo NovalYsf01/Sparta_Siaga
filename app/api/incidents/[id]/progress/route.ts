@@ -46,6 +46,17 @@ export async function GET(_: Request, { params }: RouteContext) {
         estimationRoute.workStatus === "IN_PROGRESS" ||
         estimationRoute.workStatus === "COMPLETED");
 
+    // Transform photo paths to protected endpoint URLs (private storage keys → protected API)
+    const protectedHistory = history.map((entry) => ({
+      ...entry,
+      photos: entry.photos.map((photo) => ({
+        ...photo,
+        // Replace raw storage keys with protected API URLs
+        watermarkedPath: `/api/incidents/${id}/progress/evidence/${encodeURIComponent(photo.watermarkedPath.split('/').pop() || photo.watermarkedPath)}`,
+        originalPath: `/api/incidents/${id}/progress/evidence/${encodeURIComponent(photo.originalPath.split('/').pop() || photo.originalPath)}`,
+      })),
+    }));
+
     return NextResponse.json({
       data: {
         reportId: id,
@@ -54,7 +65,7 @@ export async function GET(_: Request, { params }: RouteContext) {
         latestProgress: latestStatus.latestPercentage,
         workStatus: latestStatus.workStatus,
         hasFinalEvidence,
-        history,
+        history: protectedHistory,
         canUpdateProgress: updateCheck.authorized,
         updateProgressReason: updateCheck.reason || "",
         canClose: closeCheck.authorized,
@@ -131,6 +142,18 @@ export async function POST(request: Request, { params }: RouteContext) {
           error:
             "Progress pekerjaan belum dapat diperbarui. Status pekerjaan saat ini: 'Belum Siap Dikerjakan' (menunggu konfirmasi resmi siap kerja setelah estimasi selesai).",
           code: "WORK_NOT_READY",
+        },
+        { status: 422 }
+      );
+    }
+
+    // COMPLETED Lock (Section AB): work already completed cannot receive new updates
+    if (estimationRoute.workStatus === "COMPLETED") {
+      return NextResponse.json(
+        {
+          error:
+            "Pekerjaan telah diselesaikan (COMPLETED). Update progress baru tidak diizinkan.",
+          code: "WORK_ALREADY_COMPLETED",
         },
         { status: 422 }
       );
@@ -265,10 +288,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       photos: processedPhotos,
     });
 
+    // Transform response photo paths to protected API URLs
+    const protectedResult = {
+      ...createdUpdate,
+      photos: createdUpdate.photos.map((photo) => ({
+        ...photo,
+        watermarkedPath: `/api/incidents/${id}/progress/evidence/${encodeURIComponent(photo.watermarkedPath.split('/').pop() || photo.watermarkedPath)}`,
+        originalPath: `/api/incidents/${id}/progress/evidence/${encodeURIComponent(photo.originalPath.split('/').pop() || photo.originalPath)}`,
+      })),
+    };
+
     return NextResponse.json(
       {
         message: "Progress pekerjaan berhasil diperbarui.",
-        data: createdUpdate,
+        data: protectedResult,
       },
       { status: 201 }
     );

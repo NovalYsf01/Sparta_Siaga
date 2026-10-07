@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
+import { saveProgressPhoto } from "./progress-storage";
 
 export interface WatermarkOptions {
   reportId: string;
@@ -13,8 +14,8 @@ export interface WatermarkOptions {
 }
 
 export interface WatermarkResult {
-  originalPath: string; // URL accessible path, e.g. /uploads/progress/orig_...
-  watermarkedPath: string; // URL accessible path, e.g. /uploads/progress/wm_...
+  originalPath: string; // Private storage key, e.g. orig_REPORT_123456.jpg
+  watermarkedPath: string; // Private storage key, e.g. wm_REPORT_123456.jpg
   originalDiskPath: string;
   watermarkedDiskPath: string;
   mimeType: string;
@@ -180,27 +181,21 @@ export async function processAndWatermarkPhoto(
     ])
     .toBuffer();
 
-  // 6. Ensure upload directory exists
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "progress");
-  await fs.mkdir(uploadDir, { recursive: true });
-
-  const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
-  const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-  const origFileName = `orig_${options.reportId}_${uniqueId}.${ext}`;
-  const wmFileName = `wm_${options.reportId}_${uniqueId}.${ext}`;
-
-  const origDiskPath = path.join(uploadDir, origFileName);
-  const wmDiskPath = path.join(uploadDir, wmFileName);
-
-  // 7. Write both files (non-destructive)
-  await fs.writeFile(origDiskPath, inputBuffer);
-  await fs.writeFile(wmDiskPath, watermarkedBuffer);
+  // 6. Save BOTH files to private storage (storage/progress/)
+  // SECURITY: No files written to public/ directory
+  const saveResult = await saveProgressPhoto(
+    inputBuffer,
+    watermarkedBuffer,
+    options.reportId,
+    mimeType,
+    `progress_${options.reportId}`
+  );
 
   return {
-    originalPath: `/uploads/progress/${origFileName}`,
-    watermarkedPath: `/uploads/progress/${wmFileName}`,
-    originalDiskPath: origDiskPath,
-    watermarkedDiskPath: wmDiskPath,
+    originalPath: saveResult.originalStorageKey,
+    watermarkedPath: saveResult.storageKey,
+    originalDiskPath: saveResult.originalDiskPath,
+    watermarkedDiskPath: saveResult.diskPath,
     mimeType,
     fileSize: inputBuffer.length,
     width,
