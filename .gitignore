@@ -34,7 +34,7 @@ next-env.d.ts
 # ide / agents scratch
 .idea/
 .vscode/
+.worktrees/
 
 # local private storage
 /storage/
-
