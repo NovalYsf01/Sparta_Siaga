@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getSessionCookieOptions } from "@/lib/session-config";
 
 export async function POST() {
   const cookieStore = await cookies();
   cookieStore.set("siaga_session", "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    ...getSessionCookieOptions(),
     maxAge: 0,
-    path: "/"
   });
 
   return NextResponse.json({ success: true });

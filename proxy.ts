@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public paths
-  const publicPaths = ['/login', '/api/auth/login', '/brand', '/_next'];
+  const publicPaths = ['/login', '/api/auth/login', '/brand', '/_next', '/api/health/live', '/api/health/ready'];
   if (publicPaths.some(p => pathname.startsWith(p)) || pathname.endsWith('.png') || pathname.endsWith('.jpg')) {
     return NextResponse.next();
   }
