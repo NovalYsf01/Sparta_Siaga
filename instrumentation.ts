@@ -15,6 +15,12 @@ export async function register() {
     }
 
     registerProcessLifecycle();
-    startServerDaemon();
+    
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isDevDaemonEnabled = process.env.ENABLE_AUTONOMOUS_DAEMON_IN_DEV === 'true';
+
+    if (isProduction || isDevDaemonEnabled) {
+      startServerDaemon();
+    }
   }
 }
