@@ -1,3 +1,6 @@
+// Explicit global marker tracking whether this module has been evaluated in the current Node process
+(globalThis as Record<string, unknown>).__sparta_server_daemon_module_loaded = true;
+
 import { getDbPool } from './db';
 import { fetchDisasterFeed } from './disaster-service';
 import { calculateHaversineDistance, calculateSpartaMonitoringZone } from './haversine';

@@ -38,3 +38,8 @@ next-env.d.ts
 
 # local private storage
 /storage/
+
+# backups & dumps
+/backups/
+*.dump
+

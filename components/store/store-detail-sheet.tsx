@@ -15,12 +15,6 @@ import {
   Calendar,
   Copy,
   Check,
-  Radio,
-  FileCheck2,
-  BellRing,
-  Send,
-  Building2,
-  ShieldAlert,
 } from "lucide-react";
 
 interface StoreDetailSheetProps {
@@ -34,20 +28,12 @@ export function StoreDetailSheet({ store, onClose, theme = "dark" }: StoreDetail
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Branch action states
-  const [ticketCreated, setTicketCreated] = useState<string | null>(null);
-  const [pwaSent, setPwaSent] = useState(false);
-
   useEffect(() => {
     if (!store) {
       setWeather(null);
-      setTicketCreated(null);
-      setPwaSent(false);
       return;
     }
 
-    setTicketCreated(null);
-    setPwaSent(false);
     setLoadingWeather(true);
 
     fetch(
@@ -83,15 +69,6 @@ export function StoreDetailSheet({ store, onClose, theme = "dark" }: StoreDetail
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleCreateTicket = () => {
-    const ticketId = `ESC-${store.kode_toko}-${Math.floor(1000 + Math.random() * 9000)}`;
-    setTicketCreated(ticketId);
-  };
-
-  const handleSendPwaAlert = () => {
-    setPwaSent(true);
-    setTimeout(() => setPwaSent(false), 4000);
-  };
 
   const isFranchise = store.fr_type === "F";
   const isDark = theme === "dark";
@@ -234,53 +211,6 @@ export function StoreDetailSheet({ store, onClose, theme = "dark" }: StoreDetail
           </div>
         </div>
 
-        {/* Official Branch Emergency Escalation (UU PDP Compliant) */}
-        <div className={`rounded-xl p-3.5 border space-y-3 ${isDark ? "bg-slate-800/60 border-slate-700/50" : "bg-slate-100 border-slate-200"}`}>
-          <div className="flex items-center justify-between">
-            <div className={`flex items-center gap-2 text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
-              <Radio className="w-3.5 h-3.5 text-red-500 animate-pulse" />
-              <span>Jalur Komando Krisis Cabang</span>
-            </div>
-            <span className={`text-[10px] font-mono ${isDark ? "text-slate-400" : "text-slate-500"}`}>UU PDP Compliant</span>
-          </div>
-
-          <div className={`p-2.5 rounded-lg border space-y-1 ${isDark ? "bg-slate-900/80 border-slate-700/60" : "bg-white border-slate-300"}`}>
-            <div className={`text-[11px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>Pusat Komando & DC:</div>
-            <div className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-              <Building2 className={`w-3.5 h-3.5 ${isDark ? "text-blue-400" : "text-blue-600"}`} />
-              <span>{store.branch_emergency_contact || `Duty Officer DC Cabang ${store.cabang}`}</span>
-            </div>
-            <div className={`text-[10px] flex items-center gap-1 mt-1 ${isDark ? "text-emerald-400" : "text-emerald-600 font-medium"}`}>
-              <span className={`w-1.5 h-1.5 rounded-full animate-ping ${isDark ? "bg-emerald-400" : "bg-emerald-600"}`} />
-              <span>Standby Jalur Komando Darurat (24/7)</span>
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          {/* Automated Actions Status */}
-          <div className="space-y-2 pt-1">
-            <div className={`p-2.5 rounded-lg border flex flex-col gap-2 ${
-              isDark 
-                ? "bg-emerald-950/30 border-emerald-900/50 text-emerald-200" 
-                : "bg-emerald-50 border-emerald-200 text-emerald-800"
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <FileCheck2 className={`w-4 h-4 shrink-0 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
-                  <span className="font-bold text-[11px]">Tiket Investigasi Otomatis</span>
-                </div>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${isDark ? "bg-emerald-900/80 text-emerald-300" : "bg-emerald-200 text-emerald-800"}`}>#SPM-AUTO</span>
-              </div>
-              <div className={`flex items-center justify-between border-t pt-2 mt-0.5 ${isDark ? "border-emerald-900/60" : "border-emerald-200"}`}>
-                <div className="flex items-center gap-1.5">
-                  <BellRing className={`w-4 h-4 shrink-0 ${isDark ? "text-amber-400" : "text-amber-600"}`} />
-                  <span className="font-bold text-[11px]">Notifikasi Darurat PWA</span>
-                </div>
-                <span className={`text-[10px] font-bold ${isDark ? "text-amber-400" : "text-amber-600"}`}>TERKIRIM (0s)</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Weather Forecast Section */}
         <div className={`rounded-xl p-3 border space-y-3 ${isDark ? "bg-slate-800/60 border-slate-700/50" : "bg-slate-100 border-slate-200"}`}>
