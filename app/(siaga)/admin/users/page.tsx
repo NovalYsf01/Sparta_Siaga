@@ -572,8 +572,7 @@ export default function UserManagementPage() {
                         </div>
                         <div className="flex flex-col gap-0.5 mt-0.5">
                           <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
-                            <span className="font-semibold">NIK:</span> {user.nik ? user.nik : <span className="text-red-400/80 dark:text-red-400/80 italic font-sans">(Tanpa NIK)</span>}
-                            <span className="text-[9px] px-1 py-0.5 ml-1 rounded-sm bg-slate-100 dark:bg-slate-800 text-slate-400 uppercase">{user.source}</span>
+                            <span className="font-semibold">NIK:</span> {user.nik ? user.nik : "---"}
                           </div>
                           {user.email && <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{user.email}</div>}
                         </div>
@@ -694,7 +693,7 @@ export default function UserManagementPage() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+            <div className="p-6 overflow-y-auto overscroll-contain flex-1 space-y-6">
               {formError && (
                 <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-xs font-semibold flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 shrink-0" />
@@ -968,7 +967,7 @@ export default function UserManagementPage() {
       {/* Confirmation Dialog Unsaved Changes */}
       {showConfirmClose && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 overscroll-contain">
             <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50">
                 <AlertTriangle className="w-6 h-6" />

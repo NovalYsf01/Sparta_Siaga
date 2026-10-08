@@ -263,7 +263,7 @@ export function UserOverrideTab() {
           >
             {filteredUsers.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.name} ({u.nik || "Tanpa NIK"}) — {getBusinessRoleLabel(u.businessRole)}
+                {u.name} ({u.nik || "---"}) — {getBusinessRoleLabel(u.businessRole)}
               </option>
             ))}
           </select>
@@ -302,7 +302,7 @@ export function UserOverrideTab() {
                       {selectedUser.name}
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-mono">
-                      NIK: {selectedUser.nik || "-"}
+                      NIK: {selectedUser.nik || "---"}
                     </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
