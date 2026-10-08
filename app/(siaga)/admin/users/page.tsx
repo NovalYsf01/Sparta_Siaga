@@ -18,6 +18,7 @@ import {
   Shield,
   Sliders,
   Lock,
+  AlertTriangle,
 } from "lucide-react";
 import { RolePermissionTab } from "@/components/admin/role-permission-tab";
 import { UserOverrideTab } from "@/components/admin/user-override-tab";
@@ -57,6 +58,7 @@ export default function UserManagementPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<"CREATE" | "EDIT">("CREATE");
+  const [initialEditForm, setInitialEditForm] = useState<any>(null);
   const [editForm, setEditForm] = useState<Partial<User> & { password?: string; confirmPassword?: string }>({
     name: "",
     nik: "",
@@ -73,6 +75,8 @@ export default function UserManagementPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
 
   // Search Branch/Store State
   const [branchQuery, setBranchQuery] = useState("");
@@ -82,6 +86,17 @@ export default function UserManagementPage() {
   const [selectedLocationObj, setSelectedLocationObj] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isModalOpen]);
 
   useEffect(() => {
     fetchUsers();
@@ -182,7 +197,7 @@ export default function UserManagementPage() {
 
   const handleOpenCreate = () => {
     setFormMode("CREATE");
-    setEditForm({
+    const initialState = {
       name: "",
       nik: "",
       email: "",
@@ -193,7 +208,9 @@ export default function UserManagementPage() {
       status: "ACTIVE",
       password: "",
       confirmPassword: ""
-    });
+    };
+    setEditForm(initialState as any);
+    setInitialEditForm(initialState);
     setBranchQuery("");
     setSelectedLocationObj(null);
     setFormError(null);
@@ -206,7 +223,7 @@ export default function UserManagementPage() {
   const handleOpenEdit = async (user: User) => {
     setFormMode("EDIT");
     const derived = deriveScopeFromBusinessRole(user.businessRole) || user.scope;
-    setEditForm({
+    const initialState = {
       id: user.id,
       name: user.name,
       nik: user.nik || "",
@@ -218,7 +235,9 @@ export default function UserManagementPage() {
       status: user.status,
       password: "",
       confirmPassword: ""
-    });
+    };
+    setEditForm(initialState as any);
+    setInitialEditForm(initialState);
     setFormError(null);
     setShowPassword(false);
     setShowConfirmPassword(false);
@@ -276,6 +295,20 @@ export default function UserManagementPage() {
       scope: newScope,
       branch: newBranch
     });
+  };
+
+  const handleCloseModal = () => {
+    const isDirty = JSON.stringify(editForm) !== JSON.stringify(initialEditForm);
+    if (isDirty) {
+      setShowConfirmClose(true);
+    } else {
+      setIsModalOpen(false);
+    }
+  };
+
+  const confirmCloseModal = () => {
+    setShowConfirmClose(false);
+    setIsModalOpen(false);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -520,11 +553,9 @@ export default function UserManagementPage() {
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
-                  <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">User</th>
-                  <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">Kontak</th>
-                  <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">System Role</th>
+                  <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">User Identity</th>
                   <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">Business Role</th>
-                  <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">Scope / Branch</th>
+                  <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">Scope / Cabang</th>
                   <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px]">Status</th>
                   <th className="py-3 px-4 font-semibold uppercase tracking-wider text-[10px] text-right">Aksi</th>
                 </tr>
@@ -539,34 +570,25 @@ export default function UserManagementPage() {
                           {isSystemAdmin && <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />}
                           <span>{user.name}</span>
                         </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">NIK: {user.nik || "-"}</div>
-                      </td>
-                      
-                      <td className="py-3 px-4">
-                        <div className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-[150px]">{user.email || "-"}</div>
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase">{user.source}</div>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {isSystemAdmin ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                            <Lock className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                            ADMIN
-                          </span>
-                        ) : (
-                          <span className="inline-flex px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                            USER
-                          </span>
-                        )}
+                        <div className="flex flex-col gap-0.5 mt-0.5">
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
+                            <span className="font-semibold">NIK:</span> {user.nik ? user.nik : <span className="text-red-400/80 dark:text-red-400/80 italic font-sans">(Tanpa NIK)</span>}
+                            <span className="text-[9px] px-1 py-0.5 ml-1 rounded-sm bg-slate-100 dark:bg-slate-800 text-slate-400 uppercase">{user.source}</span>
+                          </div>
+                          {user.email && <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]">{user.email}</div>}
+                        </div>
                       </td>
 
                       <td className="py-3 px-4">
                         {isSystemAdmin ? (
-                          <div className="text-xs text-purple-700 dark:text-purple-400 font-semibold italic flex items-center gap-1">
-                            <span>Technical Administrator</span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                              <Lock className="w-3 h-3 text-purple-600 dark:text-purple-400" /> ADMIN
+                            </span>
+                            <span className="text-[10px] text-purple-600 dark:text-purple-400 italic">Technical Administrator</span>
                           </div>
                         ) : (
-                          <span className="font-bold text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/80 px-2 py-1 rounded border border-slate-200/60 dark:border-slate-700/60">
+                          <span className="font-bold text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-200/60 dark:border-slate-700/60 inline-block max-w-[200px] truncate" title={getRoleDisplayLabel(user.businessRole)}>
                             {getRoleDisplayLabel(user.businessRole)}
                           </span>
                         )}
@@ -622,7 +644,7 @@ export default function UserManagementPage() {
                 })}
                 {filteredUsers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center">
+                    <td colSpan={5} className="py-12 text-center">
                       <div className="text-slate-400 dark:text-slate-500 mb-2">Belum ada pengguna ditemukan.</div>
                       <button onClick={handleOpenCreate} className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
                         + Tambah User
@@ -664,7 +686,7 @@ export default function UserManagementPage() {
                 </div>
               </div>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={handleCloseModal}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -694,9 +716,9 @@ export default function UserManagementPage() {
               )}
 
               <form id="user-form" onSubmit={handleSave} className="space-y-6">
-                {/* Section: Data Pengguna */}
+                {/* SECTION A: Informasi Pengguna */}
                 <div className="space-y-4">
-                  <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Data Pengguna</h3>
+                  <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Informasi Pengguna</h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-1.5">
@@ -720,7 +742,7 @@ export default function UserManagementPage() {
                         className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100" 
                         placeholder="Mis. 24001234 atau DEMO-BMS-01" 
                       />
-                      <div className="text-[10px] text-slate-400">Digunakan untuk login identitas lokal.</div>
+                      <div className="text-[10px] text-slate-400">Digunakan untuk identitas lokal.</div>
                     </div>
                   </div>
 
@@ -734,10 +756,110 @@ export default function UserManagementPage() {
                       placeholder="user@sparta.com" 
                     />
                   </div>
+                </div>
 
-                  {/* Password fields for CREATE mode */}
-                  {formMode === "CREATE" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
+                {/* SECTION B: Peran & Penempatan */}
+                {editForm.systemRole !== "ADMIN" && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Peran & Penempatan</h3>
+                      {formMode === "CREATE" && (
+                        <span className="text-[10px] text-slate-400 font-medium italic">Akun baru adalah pengguna operasional (USER)</span>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Business Role *</label>
+                        <select 
+                          value={editForm.businessRole || "tim_toko"} 
+                          onChange={handleBusinessRoleChange} 
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100 font-semibold"
+                        >
+                          <optgroup label="HEAD OFFICE (Cakupan Nasional)">
+                            {HUMAN_SELECTABLE_HO_ROLES.map((r) => (
+                              <option key={r.key} value={r.key}>{r.label}</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="BRANCH / CABANG (Cakupan Wilayah)">
+                            {HUMAN_SELECTABLE_BRANCH_ROLES.map((r) => (
+                              <option key={r.key} value={r.key}>{r.fullLabel ? `${r.label} \u2014 ${r.fullLabel}` : r.label}</option>
+                            ))}
+                          </optgroup>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Otorisasi Scope</label>
+                        <div className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold flex items-center justify-between">
+                          <span>{editForm.scope}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">
+                            {editForm.scope === "HO" ? "Nasional (HO)" : "Terbatas Cabang"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {editForm.scope === "BRANCH" && (
+                      <div className="space-y-1.5 relative" ref={dropdownRef}>
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Cabang Wilayah Operasional *</label>
+                        <div className="relative">
+                          <input 
+                            placeholder="Ketik nama cabang (misal: CIKOKOL)..." 
+                            value={branchQuery} 
+                            onChange={e => {
+                              setBranchQuery(e.target.value);
+                              if (editForm.branch) setEditForm({ ...editForm, branch: "" });
+                              setIsBranchDropdownOpen(true);
+                            }} 
+                            onFocus={() => {
+                              if (branchQuery.length >= 2) setIsBranchDropdownOpen(true);
+                            }}
+                            className={`w-full border ${(!editForm.branch && branchQuery) ? 'border-amber-400' : 'border-slate-200 dark:border-slate-700'} rounded-xl pl-10 pr-4 py-2.5 text-sm bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100`}
+                          />
+                          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          
+                          {/* Search Dropdown */}
+                          {isBranchDropdownOpen && (branchQuery.length >= 2 || isSearchingBranch) && (
+                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-64 overflow-y-auto text-sm animate-in fade-in slide-in-from-top-2">
+                              {isSearchingBranch ? (
+                                <div className="p-4 text-center text-slate-500 flex items-center justify-center gap-2">
+                                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> Mencari data...
+                                </div>
+                              ) : branchResults.length > 0 ? (
+                                <ul className="py-1">
+                                  {branchResults.map((loc, idx) => {
+                                    const code = loc.cabang || loc.kode_toko;
+                                    const name = loc.nama_toko || loc.alamat || "Cabang";
+                                    return (
+                                      <li 
+                                        key={idx} 
+                                        onClick={() => handleLocationSelect(loc)}
+                                        className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex flex-col border-b border-slate-50 dark:border-slate-800/50 last:border-0"
+                                      >
+                                        <div className="font-bold text-slate-800 dark:text-slate-200">{code}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{name}</div>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              ) : (
+                                <div className="p-4 text-center text-slate-500">Cabang tidak ditemukan</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SECTION C: Keamanan Akun */}
+                {(formMode === "CREATE" || (formMode === "EDIT" && isResetPasswordOpen)) && (
+                  <div className="space-y-4">
+                    <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Keamanan Akun</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password *</label>
                         <div className="relative">
@@ -752,7 +874,7 @@ export default function UserManagementPage() {
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                           >
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
@@ -773,220 +895,36 @@ export default function UserManagementPage() {
                           <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
                           >
                             {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                )}
+                
+                {formMode === "EDIT" && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsResetPasswordOpen(!isResetPasswordOpen);
+                        setEditForm({ ...editForm, password: "", confirmPassword: "" });
+                      }}
+                      className="inline-flex items-center gap-2 text-xs font-bold text-[#1D5AA6] dark:text-blue-400 hover:underline"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      {isResetPasswordOpen ? "Batal Ubah Password" : "Reset / Ubah Password"}
+                    </button>
+                  </div>
+                )}
 
-                  {/* Password Reset for EDIT mode */}
-                  {formMode === "EDIT" && (
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsResetPasswordOpen(!isResetPasswordOpen);
-                          setEditForm({ ...editForm, password: "", confirmPassword: "" });
-                        }}
-                        className="inline-flex items-center gap-2 text-xs font-bold text-[#1D5AA6] dark:text-blue-400 hover:underline"
-                      >
-                        <KeyRound className="w-3.5 h-3.5" />
-                        {isResetPasswordOpen ? "Batal Ubah Password" : "Reset / Ubah Password"}
-                      </button>
-
-                      {isResetPasswordOpen && (
-                        <div className="mt-3 p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-3 animate-in fade-in slide-in-from-top-1">
-                          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                            Masukkan password baru untuk user ini (minimal 8 karakter).
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Password Baru *</label>
-                              <div className="relative">
-                                <input
-                                  type={showPassword ? "text" : "password"}
-                                  value={editForm.password || ""}
-                                  onChange={e => setEditForm({...editForm, password: e.target.value})}
-                                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl pl-4 pr-10 py-2.5 text-sm bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100"
-                                  placeholder="Min. 8 karakter"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowPassword(!showPassword)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                                >
-                                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                              </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Konfirmasi Password Baru *</label>
-                              <div className="relative">
-                                <input
-                                  type={showConfirmPassword ? "text" : "password"}
-                                  value={editForm.confirmPassword || ""}
-                                  onChange={e => setEditForm({...editForm, confirmPassword: e.target.value})}
-                                  className="w-full border border-slate-200 dark:border-slate-700 rounded-xl pl-4 pr-10 py-2.5 text-sm bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100"
-                                  placeholder="Ulangi password baru"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                                >
-                                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Section: Akses & Peran (Hanya jika bukan System Admin) */}
-                {editForm.systemRole !== "ADMIN" ? (
-                  <>
-                    <div className="space-y-4">
-                      <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Akses & Peran</h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">System Role</label>
-                          <select 
-                            value="USER" 
-                            disabled={true}
-                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-800 cursor-not-allowed opacity-70 text-slate-900 dark:text-slate-100"
-                          >
-                            <option value="USER">USER</option>
-                          </select>
-                          <div className="text-[10px] text-slate-500 mt-1">Pengguna operasional selalu berjenis USER.</div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Business Role *</label>
-                          <select 
-                            value={editForm.businessRole || "tim_toko"} 
-                            onChange={handleBusinessRoleChange} 
-                            className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100 font-semibold"
-                          >
-                            <optgroup label="HEAD OFFICE (Cakupan Nasional)">
-                              {HUMAN_SELECTABLE_HO_ROLES.map((r) => (
-                                <option key={r.key} value={r.key}>
-                                  {r.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                            <optgroup label="BRANCH / CABANG (Cakupan Wilayah)">
-                              {HUMAN_SELECTABLE_BRANCH_ROLES.map((r) => (
-                                <option key={r.key} value={r.key}>
-                                  {r.fullLabel ? `${r.label} — ${r.fullLabel}` : r.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section: Penempatan */}
-                    <div className="space-y-4">
-                      <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Penempatan</h3>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Scope</label>
-                          <div className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-bold flex items-center justify-between">
-                            <span>{editForm.scope}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">
-                              {editForm.scope === "HO" ? "Nasional / Bebas Cabang" : "Terikat Wilayah Cabang"}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-500 mt-1">Scope terisi otomatis secara otoritatif dari Business Role.</div>
-                        </div>
-                        
-                        {editForm.scope === "BRANCH" ? (
-                          <div className="space-y-1.5 relative" ref={dropdownRef}>
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Cabang Wilayah Operasional *</label>
-                            <div className="relative">
-                              <input 
-                                placeholder="Ketik nama cabang (misal: CIKOKOL, BANDUNG)..." 
-                                value={branchQuery} 
-                                onChange={e => {
-                                  setBranchQuery(e.target.value);
-                                  if (editForm.branch) {
-                                    setEditForm({ ...editForm, branch: "" });
-                                  }
-                                  setIsBranchDropdownOpen(true);
-                                }} 
-                                onFocus={() => {
-                                  if (branchQuery.length >= 2) setIsBranchDropdownOpen(true);
-                                }}
-                                className={`w-full border ${(!editForm.branch && branchQuery) ? 'border-amber-400' : 'border-slate-200 dark:border-slate-700'} rounded-xl pl-10 pr-4 py-2.5 text-sm bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100`}
-                              />
-                              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                              
-                              {/* Search Dropdown */}
-                              {isBranchDropdownOpen && (branchQuery.length >= 2 || isSearchingBranch) && (
-                                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-64 overflow-y-auto text-sm animate-in fade-in slide-in-from-top-2">
-                                  {isSearchingBranch ? (
-                                    <div className="p-4 text-center text-slate-500 flex items-center justify-center gap-2">
-                                      <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> Mencari data cabang...
-                                    </div>
-                                  ) : branchResults.length > 0 ? (
-                                    <ul className="py-1">
-                                      {branchResults.map((loc, idx) => {
-                                        const code = loc.cabang || loc.kode_toko;
-                                        const name = loc.nama_toko || loc.alamat || "Cabang";
-                                        return (
-                                          <li 
-                                            key={idx} 
-                                            onClick={() => handleLocationSelect(loc)}
-                                            className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex flex-col border-b border-slate-50 dark:border-slate-800/50 last:border-0"
-                                          >
-                                            <div className="font-bold text-slate-800 dark:text-slate-200">{code}</div>
-                                            <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{name}</div>
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  ) : (
-                                    <div className="p-4 text-center text-slate-500">Cabang tidak ditemukan</div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {editForm.scope === "BRANCH" && !editForm.branch && branchQuery && !isBranchDropdownOpen && (
-                              <div className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 flex items-center gap-1">
-                                <ShieldAlert className="w-3 h-3" /> Silakan klik pilihan dari dropdown suggestion
-                              </div>
-                            )}
-                            {branchQuery.length < 2 && (
-                              <div className="text-[10px] text-slate-400 mt-1">Ketik minimal 2 karakter untuk mencari</div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Cabang / Wilayah</label>
-                            <div className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 italic">
-                              Tidak Diperlukan (Cakupan Nasional Head Office)
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-
-                {/* Section: Status */}
+                {/* SECTION D: Status */}
                 <div className="space-y-4">
                   <h3 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Status Akun</h3>
-                  <div className="space-y-1.5 w-1/2 pr-2">
+                  <div className="space-y-1.5 w-full md:w-1/2 pr-0 md:pr-2">
                     <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Status *</label>
                     <select 
                       disabled={editForm.systemRole === "ADMIN"}
@@ -1010,7 +948,7 @@ export default function UserManagementPage() {
             <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-900/50">
               <button 
                 type="button" 
-                onClick={() => setIsModalOpen(false)} 
+                onClick={handleCloseModal} 
                 className="px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors"
               >
                 Batal
@@ -1020,7 +958,42 @@ export default function UserManagementPage() {
                 form="user-form" 
                 className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
               >
-                <CheckCircle className="w-4 h-4" /> {formMode === "CREATE" ? "Simpan User" : "Simpan Perubahan"}
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} {isSubmitting ? "Menyimpan..." : (formMode === "CREATE" ? "Simpan User" : "Simpan Perubahan")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Unsaved Changes */}
+      {showConfirmClose && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
+              <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Perubahan Belum Disimpan
+              </h3>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Ada perubahan yang belum disimpan. Apakah Anda yakin ingin menutup tanpa menyimpan?
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmClose(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmCloseModal}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+              >
+                Ya, Tutup
               </button>
             </div>
           </div>

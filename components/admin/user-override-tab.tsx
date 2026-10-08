@@ -33,6 +33,7 @@ import {
   PermissionDefinition,
   ROLE_PERMISSION_CATALOG,
 } from "@/types/permission";
+import { CANONICAL_HUMAN_ROLES } from "@/lib/role-catalog";
 import { AddOverrideModal } from "./add-override-modal";
 
 interface UserSummary {
@@ -153,6 +154,12 @@ export function UserOverrideTab() {
     return d ? d.label : key;
   };
 
+  const getBusinessRoleLabel = (roleKey: string | null) => {
+    if (!roleKey) return "Tanpa Role";
+    const role = CANONICAL_HUMAN_ROLES.find((r) => r.key === roleKey);
+    return role ? role.label : roleKey.toUpperCase();
+  };
+
   const isOverrideActive = (ov: UserPermissionOverrideRecord) => {
     if (ov.revokedAt) return false;
     const now = new Date();
@@ -256,7 +263,7 @@ export function UserOverrideTab() {
           >
             {filteredUsers.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.name} ({u.nik || "Tanpa NIK"}) — {u.businessRole || "Tanpa Role"}
+                {u.name} ({u.nik || "Tanpa NIK"}) — {getBusinessRoleLabel(u.businessRole)}
               </option>
             ))}
           </select>
@@ -300,7 +307,7 @@ export function UserOverrideTab() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
                     <span className="font-semibold text-blue-600 dark:text-blue-400">
-                      Role: {selectedUser.businessRole || "Tanpa Role"}
+                      Role: {getBusinessRoleLabel(selectedUser.businessRole)}
                     </span>
                     <span>•</span>
                     <span className="flex items-center gap-1">
