@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useSiaga } from "@/components/layout/siaga-context";
-import { Bell, Monitor, Moon, Sun, Smartphone, Server, Camera, Image as ImageIcon, Trash2, X, Loader2 } from "lucide-react";
+import { Bell, Monitor, Moon, Sun, Smartphone, Server, Camera, Image as ImageIcon, Trash2, X, Loader2, MapPin, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { getNotificationPermission, requestDesktopNotificationPermission, triggerDesktopPopup } from "@/lib/desktop-notification";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { theme, handleToggleTheme } = useSiaga();
@@ -21,12 +22,70 @@ export default function SettingsPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Device Permissions State
+  const [cameraPermission, setCameraPermission] = useState<string>("Belum Diperiksa");
+  const [locationPermission, setLocationPermission] = useState<string>("Belum Diperiksa");
+  const [isTestingLocation, setIsTestingLocation] = useState(false);
+  const [locationResult, setLocationResult] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setPermission(getNotificationPermission());
+      checkDevicePermissions();
     }
     fetchIdentity();
   }, []);
+
+  const checkDevicePermissions = async () => {
+    if (navigator.permissions) {
+      try {
+        const camStatus = await navigator.permissions.query({ name: 'camera' as any });
+        setCameraPermission(camStatus.state === 'granted' ? 'Siap Digunakan' : camStatus.state === 'prompt' ? 'Perlu Izin' : 'Akses Diblokir');
+        camStatus.onchange = () => {
+          setCameraPermission(camStatus.state === 'granted' ? 'Siap Digunakan' : camStatus.state === 'prompt' ? 'Perlu Izin' : 'Akses Diblokir');
+        };
+      } catch {
+        setCameraPermission('Status belum dapat dipastikan');
+      }
+
+      try {
+        const locStatus = await navigator.permissions.query({ name: 'geolocation' });
+        setLocationPermission(locStatus.state === 'granted' ? 'Siap Digunakan' : locStatus.state === 'prompt' ? 'Perlu Izin' : 'Akses Diblokir');
+        locStatus.onchange = () => {
+          setLocationPermission(locStatus.state === 'granted' ? 'Siap Digunakan' : locStatus.state === 'prompt' ? 'Perlu Izin' : 'Akses Diblokir');
+        };
+      } catch {
+        setLocationPermission('Status belum dapat dipastikan');
+      }
+    } else {
+      setCameraPermission('Browser tidak mendukung');
+      setLocationPermission('Browser tidak mendukung');
+    }
+  };
+
+  const handleTestLocation = () => {
+    setIsTestingLocation(true);
+    setLocationResult(null);
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocationResult({ type: 'success', text: `Akses lokasi berhasil (Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)})` });
+          setIsTestingLocation(false);
+          toast.success("Akses lokasi berhasil", { description: "Sistem berhasil mendapatkan koordinat." });
+        },
+        (err) => {
+          setLocationResult({ type: 'error', text: "Lokasi tidak dapat diperoleh. Periksa izin perangkat." });
+          setIsTestingLocation(false);
+          toast.error("Lokasi tidak dapat diperoleh", { description: err.message });
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      setLocationResult({ type: 'error', text: "Geolokasi tidak didukung browser" });
+      setIsTestingLocation(false);
+      toast.error("Geolokasi tidak didukung browser");
+    }
+  };
 
   const fetchIdentity = async () => {
     try {
@@ -313,6 +372,96 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* PERANGKAT & IZIN AKSES */}
+        <section className={`rounded-2xl border overflow-hidden ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
+          <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50/50"}`}>
+            <Smartphone className={`w-4 h-4 ${isDark ? "text-slate-400" : "text-slate-500"}`} />
+            <h2 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              Perangkat & Izin Akses
+            </h2>
+          </div>
+          <div className="p-5 space-y-6">
+            
+            {/* Kamera */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}>
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className={`font-semibold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>Kamera</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Izin kamera untuk pengambilan bukti kejadian.</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 self-end sm:self-auto">
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                    cameraPermission === "Siap Digunakan" ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" :
+                    cameraPermission === "Akses Diblokir" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800" :
+                    "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                  }`}>
+                    {cameraPermission}
+                  </span>
+                  <button onClick={startCamera} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+                    Uji Kamera
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <hr className={`border-t ${isDark ? "border-slate-800" : "border-slate-100"}`} />
+
+            {/* Lokasi */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600"}`}>
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className={`font-semibold text-sm ${isDark ? "text-white" : "text-slate-900"}`}>Lokasi (GPS)</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Izin lokasi untuk memastikan keaslian laporan.</div>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:items-end gap-2">
+                  <div className="flex items-center gap-3 self-end sm:self-auto">
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                      locationPermission === "Siap Digunakan" ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" :
+                      locationPermission === "Akses Diblokir" ? "bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800" :
+                      "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+                    }`}>
+                      {locationPermission}
+                    </span>
+                    <button onClick={handleTestLocation} disabled={isTestingLocation} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1.5 disabled:opacity-50">
+                      {isTestingLocation ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      Uji Lokasi
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Location Result Box */}
+              {locationResult && (
+                <div className={`ml-12 p-3 mt-2 rounded-xl text-xs font-medium border flex items-start gap-2 ${
+                  locationResult.type === 'success' 
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-400"
+                    : "bg-rose-50 border-rose-200 text-rose-700 dark:bg-rose-950/30 dark:border-rose-900/50 dark:text-rose-400"
+                }`}>
+                  {locationResult.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                  <span>{locationResult.text}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className={`p-3 rounded-xl flex items-start gap-3 text-xs leading-relaxed ${isDark ? "bg-blue-950/30 text-blue-300" : "bg-blue-50 text-blue-800"}`}>
+              <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+              <div>
+                <strong>Catatan:</strong> SPARTA SIAGA tidak dapat memaksa mengaktifkan izin dari aplikasi. Jika status &quot;Akses Diblokir&quot;, Anda harus mengaktifkannya secara manual melalui pengaturan izin situs (Site Settings) pada browser Anda.
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* INFORMASI SISTEM */}
         <section className={`rounded-2xl border overflow-hidden ${isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}>
           <div className={`px-5 py-4 border-b ${isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50/50"}`}>
@@ -369,7 +518,7 @@ export default function SettingsPage() {
                     <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <Camera className="w-6 h-6" />
                     </div>
-                    <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">Kamera</span>
+                    <span className="font-semibold text-sm text-slate-700 dark:text-slate-300">Ambil Foto / Uji Kamera</span>
                   </button>
 
                   <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="flex flex-col items-center justify-center gap-3 p-6 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group disabled:opacity-50">
