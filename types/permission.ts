@@ -244,6 +244,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   bes: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
+    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
     "COMPLETION_SUBMIT",
@@ -258,6 +259,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   bbs: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
+    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
     "COMPLETION_SUBMIT",
@@ -344,6 +346,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   bes: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
+    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
     COMPLETION_SUBMIT: "ALLOW",
@@ -358,6 +361,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   bbs: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
+    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
     COMPLETION_SUBMIT: "ALLOW",

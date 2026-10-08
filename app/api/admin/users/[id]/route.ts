@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { dbAdminUpdateUser, dbGetUserById } from "@/lib/user-db";
+import {
+  dbAdminUpdateUser,
+  dbGetUserById,
+  dbGetUserByNik,
+  dbCheckUserDependencies,
+  dbDeleteUser,
+} from "@/lib/user-db";
+import { isValidHumanBusinessRole, deriveScopeFromBusinessRole } from "@/lib/role-catalog";
 import bcrypt from "bcryptjs";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -10,7 +17,10 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const sessionUser = await getSessionUser();
     
     if (!sessionUser || sessionUser.systemRole !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Hanya ADMIN yang dapat mengubah data user." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Hanya System Administrator yang dapat mengubah data user." },
+        { status: 403 }
+      );
     }
 
     const { id } = await params;
@@ -21,51 +31,86 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
 
-    // Prevent duplicate NIK
-    if (body.nik && typeof body.nik === "string" && body.nik.trim() !== existingUser.nik) {
-      const existingUserWithNik = await import("@/lib/user-db").then(m => m.dbGetUserByNik(body.nik.trim()));
-      if (existingUserWithNik && existingUserWithNik.id !== id) {
-        return NextResponse.json({ error: "NIK sudah terdaftar oleh pengguna lain." }, { status: 400 });
+    // 1. Validasi & Proteksi NIK
+    if (body.nik !== undefined) {
+      if (!body.nik || typeof body.nik !== "string" || !body.nik.trim()) {
+        return NextResponse.json({ error: "NIK tidak boleh kosong." }, { status: 400 });
+      }
+      body.nik = body.nik.trim();
+      if (body.nik !== existingUser.nik) {
+        const existingUserWithNik = await dbGetUserByNik(body.nik);
+        if (existingUserWithNik && existingUserWithNik.id !== id) {
+          return NextResponse.json({ error: "NIK sudah terdaftar oleh pengguna lain." }, { status: 400 });
+        }
       }
     }
 
-    // Prevent deactivating oneself
+    // 2. Cegah menonaktifkan akun sendiri
     if (id === sessionUser.id && body.status === "INACTIVE") {
       return NextResponse.json({ error: "Action Denied: Tidak dapat menonaktifkan diri sendiri." }, { status: 400 });
     }
 
-    // Enforce role normalization
-    if (existingUser.systemRole === "ADMIN") {
+    // 3. PROTEKSI SYSTEM ADMIN (Zero Operational Bypass & Immutability)
+    if (id === "usr_seed_admin" || existingUser.systemRole === "ADMIN") {
       if (body.systemRole === "USER") {
-        return NextResponse.json({ error: "Action Denied: Tidak dapat mencabut hak akses ADMIN dari UI." }, { status: 400 });
+        return NextResponse.json({ error: "Action Denied: Tidak dapat mencabut hak akses ADMIN dari antarmuka ini." }, { status: 400 });
       }
+      if (body.businessRole !== undefined && body.businessRole !== null) {
+        return NextResponse.json({ error: "Action Denied: System Admin tidak dapat diberikan Business Role." }, { status: 400 });
+      }
+      if (body.branch !== undefined && body.branch !== null) {
+        return NextResponse.json({ error: "Action Denied: System Admin tidak dapat diberikan Cabang/Branch." }, { status: 400 });
+      }
+      if (body.scope !== undefined && body.scope !== null) {
+        return NextResponse.json({ error: "Action Denied: System Admin tidak dapat diberikan Scope operasional." }, { status: 400 });
+      }
+      if (body.status === "INACTIVE") {
+        return NextResponse.json({ error: "Action Denied: Akun System Administrator dilindungi dan tidak dapat dinonaktifkan." }, { status: 400 });
+      }
+
       body.systemRole = "ADMIN";
       body.businessRole = null;
       body.scope = null;
       body.branch = null;
     } else {
+      // 4. ATURAN PENGGUNA NORMAL (USER)
       if (body.systemRole === "ADMIN") {
-        return NextResponse.json({ error: "Action Denied: Tidak dapat meng-upgrade USER menjadi ADMIN dari UI." }, { status: 400 });
+        return NextResponse.json({ error: "Action Denied: Tidak dapat meng-upgrade USER menjadi ADMIN dari antarmuka ini." }, { status: 400 });
       }
       body.systemRole = "USER";
       
       if (body.businessRole !== undefined) {
-        if (["ho_admin", "gm_ho", "sm_ho"].includes(body.businessRole)) {
-          body.scope = "HO";
+        const roleKey = typeof body.businessRole === "string" ? body.businessRole.trim().toLowerCase() : "";
+        if (!isValidHumanBusinessRole(roleKey)) {
+          return NextResponse.json({ error: `Business Role '${body.businessRole}' tidak valid atau bukan peran persona pengguna aktif.` }, { status: 400 });
+        }
+
+        const derivedScope = deriveScopeFromBusinessRole(roleKey);
+        body.businessRole = roleKey;
+        body.scope = derivedScope;
+
+        if (derivedScope === "HO") {
           body.branch = null;
-        } else if (["bm", "tim_toko", "sparta_maintenance"].includes(body.businessRole)) {
-          body.scope = "BRANCH";
-          const branchToCheck = body.branch !== undefined ? body.branch : existingUser.branch;
-          if (!branchToCheck) {
-            return NextResponse.json({ error: "Cabang/Toko wajib diisi untuk role berscope BRANCH" }, { status: 400 });
-          }
         } else {
-          return NextResponse.json({ error: "Business Role tidak valid" }, { status: 400 });
+          const branchToCheck = body.branch !== undefined ? body.branch : existingUser.branch;
+          if (!branchToCheck || typeof branchToCheck !== "string" || !branchToCheck.trim()) {
+            return NextResponse.json({ error: "Cabang wajib diisi untuk role dengan cakupan BRANCH." }, { status: 400 });
+          }
+          body.branch = branchToCheck.trim();
+        }
+      } else if (body.branch !== undefined) {
+        if (existingUser.scope === "HO") {
+          body.branch = null;
+        } else {
+          if (!body.branch || typeof body.branch !== "string" || !body.branch.trim()) {
+            return NextResponse.json({ error: "Cabang wajib diisi untuk role dengan cakupan BRANCH." }, { status: 400 });
+          }
+          body.branch = body.branch.trim();
         }
       }
     }
 
-    // Handle password reset if provided
+    // 5. Reset Password jika dikirimkan
     if (body.password !== undefined && body.password !== null && body.password !== "") {
       if (typeof body.password !== "string" || body.password.length < 8) {
         return NextResponse.json({ error: "Password minimal 8 karakter." }, { status: 400 });
@@ -99,7 +144,7 @@ export async function DELETE(_: Request, { params }: RouteContext) {
     const sessionUser = await getSessionUser();
     
     if (!sessionUser || sessionUser.systemRole !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Hanya ADMIN yang dapat menghapus user." }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden: Hanya System Administrator yang dapat menghapus user." }, { status: 403 });
     }
 
     const { id } = await params;
@@ -108,19 +153,36 @@ export async function DELETE(_: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Action Denied: Tidak dapat menghapus akun sendiri." }, { status: 400 });
     }
 
-    const existingUser = await import("@/lib/user-db").then(m => m.dbGetUserById(id));
-    if (existingUser && existingUser.systemRole === "ADMIN") {
-       return NextResponse.json({ error: "Action Denied: System ADMIN tidak dapat dihapus melalui UI." }, { status: 400 });
+    const existingUser = await dbGetUserById(id);
+    if (!existingUser) {
+      return NextResponse.json({ error: "User tidak ditemukan" }, { status: 404 });
     }
 
-    const success = await import("@/lib/user-db").then(m => m.dbDeleteUser(id));
+    // PROTEKSI SYSTEM ADMIN
+    if (id === "usr_seed_admin" || existingUser.systemRole === "ADMIN") {
+      return NextResponse.json({ error: "Action Denied: System ADMIN dilindungi dan tidak dapat dihapus." }, { status: 400 });
+    }
+
+    // Pemeriksaan dependensi audit & data historis
+    const { hasDependencies, reasons } = await dbCheckUserDependencies(id);
+    if (hasDependencies) {
+      return NextResponse.json(
+        {
+          error: `User tidak dapat dihapus permanen karena memiliki riwayat audit/operasional (${reasons.join(", ")}). Silakan ubah status user menjadi INACTIVE (Nonaktifkan) alih-alih menghapus data fisik.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const success = await dbDeleteUser(id);
     if (!success) {
-      return NextResponse.json({ error: "User tidak ditemukan atau berasal dari SSO sehingga tidak dapat di hard-delete." }, { status: 400 });
+      return NextResponse.json({ error: "User tidak dapat dihapus." }, { status: 400 });
     }
 
     return NextResponse.json({ data: { success: true } });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[DELETE /api/admin/users/:id]", error);
-    return NextResponse.json({ error: "Gagal menghapus user" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Gagal menghapus user";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -109,7 +109,7 @@ export async function dbCreateUser(user: Partial<UserModel> & { id: string, name
   const isSystemAdmin = user.systemRole === "ADMIN";
   const businessRole = isSystemAdmin ? null : user.businessRole;
   const scope = isSystemAdmin ? null : user.scope;
-  let branch = isSystemAdmin || scope === "HO" ? null : (user.branch || null);
+  const branch = isSystemAdmin || scope === "HO" ? null : (user.branch || null);
 
   const { rows } = await pool.query(
     `INSERT INTO users (id, external_user_id, nik, name, email, system_role, business_role, scope, branch, status, source, password_hash)
@@ -196,7 +196,45 @@ export async function dbAdminUpdateUser(id: string, updates: Partial<UserModel>)
   return rowToUser(rows[0]);
 }
 
+export async function dbCheckUserDependencies(id: string): Promise<{ hasDependencies: boolean; reasons: string[] }> {
+  const pool = getDbPool();
+  const reasons: string[] = [];
+
+  // Check overrides
+  const overridesRes = await pool.query(
+    `SELECT COUNT(*)::int as count FROM user_permission_overrides WHERE user_id = $1`,
+    [id]
+  );
+  const overrideCount = overridesRes.rows[0]?.count || 0;
+  if (overrideCount > 0) {
+    reasons.push(`${overrideCount} catatan hak akses khusus (user overrides)`);
+  }
+
+  // Check audit logs
+  const auditRes = await pool.query(
+    `SELECT COUNT(*)::int as count FROM permission_audit_logs WHERE actor_user_id = $1 OR target_user_id = $1`,
+    [id]
+  );
+  const auditCount = auditRes.rows[0]?.count || 0;
+  if (auditCount > 0) {
+    reasons.push(`${auditCount} riwayat audit log perizinan`);
+  }
+
+  return {
+    hasDependencies: reasons.length > 0,
+    reasons,
+  };
+}
+
 export async function dbDeleteUser(id: string): Promise<boolean> {
+  if (id === "usr_seed_admin") {
+    throw new Error("System Admin dilindungi dan tidak dapat dihapus.");
+  }
+  const existing = await dbGetUserById(id);
+  if (existing?.systemRole === "ADMIN") {
+    throw new Error("Akun dengan System Role ADMIN tidak dapat dihapus.");
+  }
+
   const pool = getDbPool();
   const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1 AND source = 'LOCAL'`, [id]);
   return (rowCount ?? 0) > 0;
