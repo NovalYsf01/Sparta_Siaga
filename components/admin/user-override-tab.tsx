@@ -474,9 +474,9 @@ export function UserOverrideTab() {
                   if (ov.scopeType === "SPECIFIC_BRANCH") {
                     scopeDisplayText = `Branch ${ov.branchCode || "N/A"}`;
                   } else if (ov.scopeType === "ALL_BRANCHES") {
-                    scopeDisplayText = "Semua Branch (Nasional)";
+                    scopeDisplayText = "Seluruh Cabang (Nasional)";
                   } else if (ov.scopeType === "OWN_SCOPE") {
-                    scopeDisplayText = `Scope User (${selectedUser.scope || "N/A"})`;
+                    scopeDisplayText = `Cabang Pengguna (${selectedUser.branch || selectedUser.scope || "N/A"})`;
                   }
 
                   return (
@@ -654,6 +654,7 @@ export function UserOverrideTab() {
           userName={selectedUser.name}
           userRole={selectedUser.businessRole}
           userScope={selectedUser.scope}
+          userBranch={selectedUser.branch}
           onSuccess={() => {
             toast.success("Akses khusus berhasil ditambahkan");
             handleSelectUser(selectedUser);

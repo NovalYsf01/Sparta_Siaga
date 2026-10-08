@@ -15,6 +15,7 @@ import {
   PermissionAuditLogRecord,
   isOperationalPermission,
   isMonitoringPermission,
+  getPermissionScopeRule,
 } from "@/types/permission";
 
 // In-memory cache for role permissions to prevent excessive DB queries
@@ -205,10 +206,31 @@ export async function createUserOverride(data: {
     throw new Error("Alasan wajib diisi untuk setiap user permission override.");
   }
 
+  // Canonical scope rule validation
+  const scopeRule = getPermissionScopeRule(data.permissionKey);
+  if (!scopeRule.allowedScopes.includes(data.scopeType)) {
+    throw new Error(
+      `Cakupan '${data.scopeType}' tidak diizinkan untuk hak akses '${data.permissionKey}'. Cakupan yang valid: ${scopeRule.allowedScopes.join(", ")}.`
+    );
+  }
+
+  // Operational permissions must NEVER have ALL_BRANCHES scope
+  if (isOperationalPermission(data.permissionKey) && data.scopeType === "ALL_BRANCHES") {
+    throw new Error("Cakupan 'Semua Branch' tidak diizinkan untuk hak akses operasional.");
+  }
+
   const pool = getDbPool();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    // Supersede any existing active override for this user & permissionKey
+    await client.query(
+      `UPDATE user_permission_overrides
+       SET revoked_at = NOW(), revoked_by = $1, updated_at = NOW()
+       WHERE user_id = $2 AND permission_key = $3 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())`,
+      [`${data.actor.name} (Digantikan)`, data.userId, data.permissionKey]
+    );
 
     const id = `ovr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const startsAt = data.startsAt ? new Date(data.startsAt) : new Date();
@@ -484,6 +506,10 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
 
   // Helper to check if override applies to context branch
   const doesOverrideScopeMatch = (ov: UserPermissionOverrideRecord): boolean => {
+    // Operational actions cannot match ALL_BRANCHES (must be specific branch or own branch)
+    if (isOperationalPermission(permission) && ov.scopeType === "ALL_BRANCHES") {
+      return false;
+    }
     if (ov.scopeType === "ALL_BRANCHES") {
       return true;
     }

@@ -179,6 +179,146 @@ export function isMonitoringPermission(key: PermissionKey): boolean {
 }
 
 // ============================================================
+// CANONICAL SCOPE POLICIES PER PERMISSION
+// ============================================================
+
+export type ScopePolicyType = "FIXED_NATIONAL" | "FIXED_OWN" | "BRANCH_SCOPED";
+
+export interface PermissionScopeRule {
+  key: PermissionKey;
+  policy: ScopePolicyType;
+  allowedScopes: readonly ScopeType[];
+  defaultScope: ScopeType;
+  scopeSummary: (userContext?: { branch?: string | null; scope?: string | null }) => string;
+  description: string;
+}
+
+export const PERMISSION_SCOPE_RULES: Record<PermissionKey, PermissionScopeRule> = {
+  REPORT_VIEW_ALL: {
+    key: "REPORT_VIEW_ALL",
+    policy: "FIXED_NATIONAL",
+    allowedScopes: ["ALL_BRANCHES"],
+    defaultScope: "ALL_BRANCHES",
+    scopeSummary: () => "Seluruh Cabang (Nasional)",
+    description: "Izin monitoring baca seluruh laporan cabang secara nasional.",
+  },
+  REPORT_VIEW_OWN: {
+    key: "REPORT_VIEW_OWN",
+    policy: "FIXED_OWN",
+    allowedScopes: ["OWN_SCOPE"],
+    defaultScope: "OWN_SCOPE",
+    scopeSummary: (u) => `Cabang Pengguna (${u?.branch || "Scope User"})`,
+    description: "Izin melihat laporan cabang/toko penugasan sendiri.",
+  },
+  NOTIFICATION_VIEW: {
+    key: "NOTIFICATION_VIEW",
+    policy: "FIXED_OWN",
+    allowedScopes: ["OWN_SCOPE"],
+    defaultScope: "OWN_SCOPE",
+    scopeSummary: () => "Global / Seluruh Notifikasi Bencana",
+    description: "Izin memantau feed notifikasi peringatan bencana.",
+  },
+  MANAGEMENT_INSTRUCTION_CREATE: {
+    key: "MANAGEMENT_INSTRUCTION_CREATE",
+    policy: "FIXED_NATIONAL",
+    allowedScopes: ["ALL_BRANCHES"],
+    defaultScope: "ALL_BRANCHES",
+    scopeSummary: () => "Seluruh Cabang (Nasional)",
+    description: "Izin menerbitkan instruksi tanggap darurat manajemen HO.",
+  },
+  ESTIMATION_VIEW: {
+    key: "ESTIMATION_VIEW",
+    policy: "FIXED_OWN",
+    allowedScopes: ["OWN_SCOPE"],
+    defaultScope: "OWN_SCOPE",
+    scopeSummary: (u) => `Cabang Pengguna (${u?.branch || "Scope User"})`,
+    description: "Izin melihat status tiket estimasi perbaikan.",
+  },
+  REPORT_CONFIRM: {
+    key: "REPORT_CONFIRM",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin konfirmasi kondisi kerusakan di lapangan.",
+  },
+  REPORT_FOLLOW_UP: {
+    key: "REPORT_FOLLOW_UP",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin investigasi dan tindak lanjut penanganan insiden.",
+  },
+  REPORT_UPDATE_PROGRESS: {
+    key: "REPORT_UPDATE_PROGRESS",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin pembaruan persentase progress perbaikan teknis.",
+  },
+  REPORT_CLOSE: {
+    key: "REPORT_CLOSE",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin penyelesaian dan penutupan laporan insiden.",
+  },
+  ESTIMATION_TRIGGER: {
+    key: "ESTIMATION_TRIGGER",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin pembuatan tiket estimasi perbaikan fisik.",
+  },
+  WORK_READINESS_UPDATE: {
+    key: "WORK_READINESS_UPDATE",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin verifikasi kesiapan kerja fisik di toko.",
+  },
+  COMPLETION_SUBMIT: {
+    key: "COMPLETION_SUBMIT",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin pengajuan penyelesaian pekerjaan fisik (PIC).",
+  },
+  COMPLETION_APPROVE_COORDINATOR: {
+    key: "COMPLETION_APPROVE_COORDINATOR",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin approval penyelesaian pekerjaan (Koordinator).",
+  },
+};
+
+export function getPermissionScopeRule(key: PermissionKey): PermissionScopeRule {
+  return (
+    PERMISSION_SCOPE_RULES[key] || {
+      key,
+      policy: "BRANCH_SCOPED",
+      allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+      defaultScope: "SPECIFIC_BRANCH",
+      scopeSummary: (u) => `Cabang (${u?.branch || "N/A"})`,
+      description: "Pengaturan izin operasional cabang.",
+    }
+  );
+}
+
+export function isFixedScopePermission(key: PermissionKey): boolean {
+  const rule = getPermissionScopeRule(key);
+  return rule.policy === "FIXED_NATIONAL" || rule.policy === "FIXED_OWN";
+}
+
+// ============================================================
 // ROLE PERMISSION CATALOG (INHERENT PERMISSIONS PER BUSINESS ROLE)
 // ============================================================
 // Menentukan permission apa saja yang memang secara business rule
