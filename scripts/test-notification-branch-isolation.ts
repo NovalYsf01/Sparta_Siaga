@@ -114,35 +114,34 @@ async function run() {
   const ownBranchBody = await responseJson(ownBranchResponse);
   assert(
     ownBranchResponse.status === 200 &&
-      ownBranchBody.logs?.length === 1 &&
-      ownBranchBody.logs[0].branch === "G001",
+      ownBranchBody.logs?.length === 2,
     "N1",
-    "Branch G001 hanya menerima notification G001"
+    "Branch G001 menerima seluruh informasi bencana global (G001 dan G002)"
   );
 
-  const manipulatedResponse = await branchHandler(
+  const narrowedBranchResponse = await branchHandler(
     new Request("http://localhost/api/notifications/logs?limit=100&branch=G002")
   );
-  const manipulatedBody = await responseJson(manipulatedResponse);
+  const narrowedBranchBody = await responseJson(narrowedBranchResponse);
   assert(
-    manipulatedResponse.status === 200 &&
-      manipulatedBody.logs?.length === 1 &&
-      manipulatedBody.logs[0].branch === "G001",
+    narrowedBranchResponse.status === 200 &&
+      narrowedBranchBody.logs?.length === 1 &&
+      narrowedBranchBody.logs[0].branch === "G002",
     "N2",
-    "Manipulasi query branch G002 diabaikan untuk user G001"
+    "Filter query branch G002 dapat digunakan untuk mempersempit pantauan kejadian"
   );
 
   const normalizedBranchResponse = await buildHandler({
     ...branchUser,
     branch: " g001 ",
-  })(new Request("http://localhost/api/notifications/logs?limit=100"));
+  })(new Request("http://localhost/api/notifications/logs?limit=100&branch=g001"));
   const normalizedBranchBody = await responseJson(normalizedBranchResponse);
   assert(
     normalizedBranchResponse.status === 200 &&
       normalizedBranchBody.logs?.length === 1 &&
       normalizedBranchBody.logs[0].branch === "G001",
     "N3",
-    "Branch session dinormalisasi agar konsisten dengan branch database"
+    "Branch query dinormalisasi agar konsisten dengan branch database"
   );
 
   const hoResponse = await buildHandler(hoUser)(

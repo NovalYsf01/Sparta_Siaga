@@ -28,13 +28,140 @@ export default function SettingsPage() {
   const [isTestingLocation, setIsTestingLocation] = useState(false);
   const [locationResult, setLocationResult] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  // Dedicated Camera Diagnostic State
+  const [isTestingCamera, setIsTestingCamera] = useState(false);
+  const [cameraResult, setCameraResult] = useState<{
+    type: 'success' | 'error';
+    text: string;
+    errorName?: string;
+    details?: string;
+    recommendation?: string;
+  } | null>(null);
+  const [testCameraStream, setTestCameraStream] = useState<MediaStream | null>(null);
+  const testVideoRef = useRef<HTMLVideoElement>(null);
+
+  const stopTestCamera = () => {
+    if (testCameraStream) {
+      testCameraStream.getTracks().forEach((track) => track.stop());
+      setTestCameraStream(null);
+    }
+  };
+
+  useEffect(() => {
+    if (testCameraStream && testVideoRef.current) {
+      testVideoRef.current.srcObject = testCameraStream;
+    }
+  }, [testCameraStream]);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setPermission(getNotificationPermission());
       checkDevicePermissions();
     }
     fetchIdentity();
+
+    return () => {
+      stopTestCamera();
+    };
   }, []);
+
+  const handleTestCamera = async () => {
+    setIsTestingCamera(true);
+    setCameraResult(null);
+    stopTestCamera();
+
+    const isSecure = typeof window !== "undefined" ? window.isSecureContext : false;
+    if (!isSecure) {
+      setIsTestingCamera(false);
+      setCameraPermission('Akses Diblokir');
+      setCameraResult({
+        type: 'error',
+        text: 'Konteks tidak aman (Insecure Context HTTP). Akses kamera browser diblokir.',
+        errorName: 'SecurityError',
+        details: 'window.isSecureContext bernilai false.',
+        recommendation: 'Akses web melalui HTTPS atau http://localhost agar browser mengizinkan API MediaDevices.'
+      });
+      toast.error("Konteks Browser Tidak Aman", {
+        description: "Gunakan HTTPS atau localhost agar browser mengizinkan kamera."
+      });
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setIsTestingCamera(false);
+      setCameraPermission('Browser tidak mendukung');
+      setCameraResult({
+        type: 'error',
+        text: 'Browser ini tidak mendukung navigator.mediaDevices.getUserMedia.',
+        errorName: 'NotSupportedError',
+        recommendation: 'Gunakan browser modern (Chrome, Edge, Firefox, Safari).'
+      });
+      return;
+    }
+
+    try {
+      // 1. Enumerate video devices
+      let deviceCount = 0;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        deviceCount = devices.filter((d) => d.kind === 'videoinput').length;
+      } catch {}
+
+      // 2. Request userMedia with fallback
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "user" } },
+          audio: false
+        });
+      } catch (firstErr: any) {
+        if (firstErr.name === 'OverconstrainedError' || firstErr.name === 'NotFoundError') {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } else {
+          throw firstErr;
+        }
+      }
+
+      setTestCameraStream(stream);
+      setCameraPermission('Siap Digunakan');
+      setCameraResult({
+        type: 'success',
+        text: `Kamera aktif dan berhasil diakses (${deviceCount > 0 ? `${deviceCount} perangkat video terdeteksi` : 'video stream aktif'}).`,
+      });
+      toast.success("Uji Kamera Berhasil", {
+        description: "Sensor kamera terhubung dan stream video berfungsi normal."
+      });
+    } catch (err: any) {
+      const errName = err.name || "UnknownError";
+      const errMsg = err.message || "";
+      let rec = "Periksa perizinan kamera pada perangkat Anda.";
+
+      if (errName === "NotAllowedError" || errName === "PermissionDeniedError") {
+        setCameraPermission('Akses Diblokir');
+        rec = "Izin diblokir. Periksa: (1) Setelan izin situs pada browser (klik ikon gembok/setelan di sebelah URL), dan (2) Privasi Windows (Settings > Privacy & Security > Camera > nyalakan 'Let desktop apps access your camera').";
+      } else if (errName === "NotFoundError" || errName === "DevicesNotFoundError") {
+        setCameraPermission('Perangkat Tidak Ditemukan');
+        rec = "Tidak ada hardware webcam yang terdeteksi. Pastikan webcam terpasang dan driver aktif.";
+      } else if (errName === "NotReadableError" || errName === "TrackStartError") {
+        setCameraPermission('Kamera Sibuk');
+        rec = "Kamera sedang digunakan aplikasi lain (Zoom, Teams, Skype, atau Privacy Mode Lenovo Vantage), atau shutter penutup fisik kamera tertutup.";
+      } else if (errName === "SecurityError") {
+        setCameraPermission('Akses Diblokir');
+        rec = "Kebijakan keamanan (Permissions Policy) atau frame membatasi akses kamera.";
+      }
+
+      setCameraResult({
+        type: 'error',
+        text: `Uji kamera gagal: ${errName}`,
+        errorName: errName,
+        details: errMsg,
+        recommendation: rec
+      });
+      toast.error("Uji Kamera Gagal", { description: `${errName}: ${rec}` });
+    } finally {
+      setIsTestingCamera(false);
+    }
+  };
 
   const checkDevicePermissions = async () => {
     if (navigator.permissions) {
@@ -402,11 +529,75 @@ export default function SettingsPage() {
                   }`}>
                     {cameraPermission}
                   </span>
-                  <button onClick={startCamera} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors">
+                  <button
+                    onClick={handleTestCamera}
+                    disabled={isTestingCamera}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isTestingCamera ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                     Uji Kamera
                   </button>
                 </div>
               </div>
+
+              {/* Camera Result Diagnostic Box */}
+              {cameraResult && (
+                <div className={`p-3.5 rounded-xl text-xs space-y-2 border ${
+                  cameraResult.type === 'success'
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300"
+                    : "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/30 dark:border-rose-900/50 dark:text-rose-300"
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {cameraResult.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400 mt-0.5" />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <div className="font-semibold">{cameraResult.text}</div>
+                      {cameraResult.details && (
+                        <div className="text-[11px] opacity-90 font-mono">
+                          Detail: {cameraResult.details}
+                        </div>
+                      )}
+                      {cameraResult.recommendation && (
+                        <div className="text-[11px] font-sans opacity-95 pt-1 border-t border-rose-200/50 dark:border-rose-900/40">
+                          <strong>Solusi:</strong> {cameraResult.recommendation}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Live Test Camera Preview */}
+                  {testCameraStream && (
+                    <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-900/50 flex flex-col sm:flex-row items-center gap-3">
+                      <div className="w-36 h-28 bg-black rounded-lg overflow-hidden border border-emerald-300 dark:border-emerald-800 relative shadow-inner">
+                        <video
+                          ref={testVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-1 left-1 px-1.5 py-0.5 bg-emerald-600/80 text-[9px] text-white font-bold rounded">
+                          LIVE
+                        </div>
+                      </div>
+                      <div className="flex-1 text-[11px] space-y-2 text-center sm:text-left">
+                        <p className="text-emerald-700 dark:text-emerald-300">
+                          Stream video aktif. Kamera siap digunakan untuk pelaporan insiden & foto bukti.
+                        </p>
+                        <button
+                          onClick={stopTestCamera}
+                          className="px-2.5 py-1 bg-slate-900 text-white dark:bg-slate-800 dark:hover:bg-slate-700 text-[10px] font-bold rounded-md hover:bg-slate-800 transition-colors"
+                        >
+                          Hentikan Uji Kamera
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <hr className={`border-t ${isDark ? "border-slate-800" : "border-slate-100"}`} />

@@ -260,13 +260,7 @@ export function NotificationCenterSheet({
       const sentTime = new Date(log.sent_at).getTime();
       const ageMs = now - sentTime;
 
-      // Role filter for Branch user
-      if (!isHoUser && userBranch && userBranch !== "all") {
-        if (log.branch?.toLowerCase() !== userBranch.toLowerCase()) {
-          return;
-        }
-      }
-
+      // Disaster notifications are global informational alerts available to all authenticated users
       if (ageMs <= ACTIVE_WINDOW_MS) {
         recent.push(log);
       } else {
@@ -275,7 +269,7 @@ export function NotificationCenterSheet({
     });
 
     return { recentLogs: recent, historyLogs: history };
-  }, [logs, now, isHoUser, userBranch]);
+  }, [logs, now]);
 
   // Unique branches for history filtering
   const branches = useMemo(() => {

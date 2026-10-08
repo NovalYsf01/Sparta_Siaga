@@ -24,26 +24,15 @@ export function resolveNotificationReadScope(
   user: UserContext,
   requestedBranch?: string | null
 ): NotificationReadScope {
-  const canViewAllBranches = user.systemRole === "ADMIN" || user.scope === "HO";
-
-  if (canViewAllBranches) {
-    return {
-      branch: normalizeBranch(requestedBranch),
-      canViewAllBranches: true,
-    };
-  }
-
-  if (user.scope !== "BRANCH") {
-    throw new NotificationScopeError("User tidak memiliki scope notification yang valid.");
-  }
-
-  const sessionBranch = normalizeBranch(user.branch);
-  if (!sessionBranch) {
-    throw new NotificationScopeError("Branch user tidak memiliki branch aktif.");
-  }
-
+  // BUSINESS REQUIREMENT (Global Disaster Information):
+  // Disaster notifications are informational and available to all authenticated
+  // SPARTA SIAGA users (HO, System Admin, and Branch users across different branches).
+  // They must NOT be filtered solely by the user's assigned branch.
+  // An optional branch parameter can be supplied if the user/client explicitly requests
+  // to filter or drill down into a specific branch's affected stores.
   return {
-    branch: sessionBranch,
-    canViewAllBranches: false,
+    branch: normalizeBranch(requestedBranch),
+    canViewAllBranches: true,
   };
 }
+

@@ -37,34 +37,46 @@ export function CameraCapture({ isOpen, onClose, onCapture, storeName, reporterN
   }, [isOpen]);
 
   const getErrorFeedback = (err: any) => {
-    const name = err.name || err.message || "";
-    if (name.includes("NotAllowedError") || name.includes("PermissionDeniedError")) {
+    const name = err.name || "";
+    const msg = err.message || "";
+    if (
+      name.includes("NotAllowedError") ||
+      name.includes("PermissionDeniedError") ||
+      msg.includes("Permission denied") ||
+      msg.includes("disallowed by permissions policy")
+    ) {
       return {
-        title: "Akses Diblokir",
-        message: "Akses kamera belum tersedia. Periksa izin kamera untuk situs ini pada browser dan pengaturan perangkat."
+        title: "Akses Kamera Ditolak (NotAllowedError)",
+        message: "Izin kamera belum aktif. Periksa: (1) Izin kamera pada situs ini di browser (klik ikon gembok/setelan pada bar alamat URL), (2) Privasi Windows (Settings > Privacy & Security > Camera > nyalakan 'Let desktop apps access your camera'), dan (3) Pastikan tidak ada ekstensi pemblokir."
       };
     }
     if (name.includes("NotFoundError") || name.includes("DevicesNotFoundError")) {
       return {
-        title: "Perangkat Tidak Tersedia",
-        message: "Kamera tidak ditemukan pada perangkat ini."
+        title: "Kamera Tidak Ditemukan (NotFoundError)",
+        message: "Perangkat keras kamera tidak terdeteksi. Pastikan webcam terpasang, terhubung, dan driver aktif."
       };
     }
     if (name.includes("NotReadableError") || name.includes("TrackStartError")) {
       return {
-        title: "Kamera Sibuk",
-        message: "Kamera tidak dapat digunakan. Tutup aplikasi lain yang mungkin sedang menggunakannya, lalu coba lagi."
+        title: "Kamera Sedang Digunakan (NotReadableError)",
+        message: "Kamera sedang digunakan oleh aplikasi lain (Zoom, Teams, Skype, atau Privacy Mode Lenovo Vantage), atau switch penutup fisik kamera sedang tertutup."
       };
     }
     if (name.includes("OverconstrainedError")) {
       return {
-        title: "Resolusi Tidak Didukung",
-        message: "Resolusi atau tipe kamera yang diminta tidak didukung oleh perangkat ini."
+        title: "Kendala Konfigurasi (OverconstrainedError)",
+        message: "Resolusi atau mode kamera yang diminta tidak dapat dipenuhi oleh sensor webcam ini."
+      };
+    }
+    if (name.includes("SecurityError")) {
+      return {
+        title: "Pembatasan Keamanan (SecurityError)",
+        message: "Browser membatasi akses kamera karena kebijakan keamanan (Permissions Policy atau konteks halaman tidak aman)."
       };
     }
     return {
-      title: "Gagal Mengakses",
-      message: err.message || "Terjadi kesalahan sistem saat mencoba mengakses kamera."
+      title: "Gagal Mengakses Kamera",
+      message: msg || "Terjadi kesalahan sistem saat mencoba mengakses kamera."
     };
   };
 
@@ -72,10 +84,31 @@ export function CameraCapture({ isOpen, onClose, onCapture, storeName, reporterN
     setErrorDetails(null);
     setPermissionState('REQUESTING');
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-        audio: false
-      });
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        throw new Error("Aplikasi dibuka melalui protokol tidak aman (Insecure Context). Akses kamera hanya didukung via HTTPS atau localhost.");
+      }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Perangkat atau browser ini tidak mendukung API kamera (navigator.mediaDevices).");
+      }
+
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+      } catch (primaryErr: any) {
+        if (primaryErr.name === 'OverconstrainedError' || primaryErr.name === 'NotFoundError') {
+          // Fallback to any available video track on desktop/laptops with single user camera
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+        } else {
+          throw primaryErr;
+        }
+      }
+
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
