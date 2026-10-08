@@ -30,6 +30,7 @@ import {
   getRoleDisplayLabel,
   deriveScopeFromBusinessRole,
 } from "@/lib/role-catalog";
+import { normalizeBranchCode } from "@/lib/branch-service";
 
 interface User {
   id: string;
@@ -137,9 +138,9 @@ export default function UserManagementPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Debounced search for branches/stores
+  // Debounced search for canonical organizational branches
   useEffect(() => {
-    if (!branchQuery.trim() || branchQuery.length < 2) {
+    if (!branchQuery.trim() || branchQuery.length < 1) {
       setBranchResults([]);
       setIsSearchingBranch(false);
       if (abortControllerRef.current) {
@@ -148,8 +149,12 @@ export default function UserManagementPage() {
       return;
     }
 
-    // Don't search if the query is just showing the selected location label
-    if (selectedLocationObj && branchQuery.includes(selectedLocationObj.kode_toko || selectedLocationObj.cabang)) {
+    // Don't trigger search dropdown if the query matches current selected branch
+    if (
+      selectedLocationObj &&
+      (branchQuery.trim().toUpperCase() === selectedLocationObj.code?.toUpperCase() ||
+        branchQuery.trim() === `${selectedLocationObj.code} — ${selectedLocationObj.name}`)
+    ) {
       return;
     }
 
@@ -161,8 +166,8 @@ export default function UserManagementPage() {
       abortControllerRef.current = new AbortController();
 
       try {
-        const res = await fetch(`/api/stores/search?q=${encodeURIComponent(branchQuery)}&type=TOKO&limit=15`, {
-          signal: abortControllerRef.current.signal
+        const res = await fetch(`/api/branches?q=${encodeURIComponent(branchQuery)}`, {
+          signal: abortControllerRef.current.signal,
         });
         if (res.ok) {
           const data = await res.json();
@@ -171,12 +176,12 @@ export default function UserManagementPage() {
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
-          console.error("Search failed", err);
+          console.error("Branch search failed", err);
         }
       } finally {
         setIsSearchingBranch(false);
       }
-    }, 300);
+    }, 200);
 
     return () => clearTimeout(delay);
   }, [branchQuery, selectedLocationObj]);
@@ -249,22 +254,30 @@ export default function UserManagementPage() {
     setShowConfirmPassword(false);
     setIsResetPasswordOpen(false);
     
-    // Resolve location name for edit
+    // Resolve canonical organizational branch for edit
     if (derived === "BRANCH" && user.branch) {
-      setBranchQuery(user.branch);
+      const canonical = normalizeBranchCode(user.branch) || user.branch;
+      initialState.branch = canonical;
+      setEditForm(initialState as any);
+      setBranchQuery(canonical);
       setIsSearchingBranch(true);
       try {
-        const res = await fetch(`/api/stores/search?q=${encodeURIComponent(user.branch)}&type=TOKO&limit=1`);
+        const res = await fetch(`/api/branches?q=${encodeURIComponent(canonical)}`);
         if (res.ok) {
           const data = await res.json();
           if (data.data && data.data.length > 0) {
-            const loc = data.data[0];
-            setSelectedLocationObj(loc);
-            setBranchQuery(`${loc.kode_toko || loc.cabang} — ${loc.nama_toko || loc.alamat || "Cabang"}`);
+            const found = data.data.find((b: any) => b.code === canonical) || data.data[0];
+            setSelectedLocationObj(found);
+            setBranchQuery(`${found.code} — ${found.name}`);
+          } else {
+            setSelectedLocationObj({ code: canonical, name: `Cabang ${canonical}` });
+            setBranchQuery(canonical);
           }
         }
       } catch (e) {
         console.error(e);
+        setSelectedLocationObj({ code: canonical, name: `Cabang ${canonical}` });
+        setBranchQuery(canonical);
       } finally {
         setIsSearchingBranch(false);
       }
@@ -278,9 +291,10 @@ export default function UserManagementPage() {
   };
 
   const handleLocationSelect = (loc: any) => {
-    const code = loc.cabang || loc.kode_toko;
-    setSelectedLocationObj(loc);
-    setBranchQuery(`${code} — ${loc.nama_toko || loc.alamat || "Cabang"}`);
+    const code = loc.code || loc.cabang || loc.kode_toko;
+    const name = loc.name || `Cabang ${code}`;
+    setSelectedLocationObj({ ...loc, code, name });
+    setBranchQuery(`${code} — ${name}`);
     setEditForm({ ...editForm, branch: code });
     setIsBranchDropdownOpen(false);
   };
@@ -847,10 +861,18 @@ export default function UserManagementPage() {
                           
                           {editForm.scope === "BRANCH" && (
                             <div className="space-y-1.5 relative sm:col-span-2" ref={dropdownRef}>
-                              <label className="text-xs font-bold text-slate-700 dark:text-slate-400">Cabang Wilayah Operasional *</label>
-                              <div className="relative">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-400">
+                                  Cabang Penempatan *
+                                </label>
+                                <span className="text-[10px] text-slate-400">Unit Cabang Organisasi</span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                                Menentukan cabang operasional pengguna yang membawahi seluruh gerai dalam wilayahnya.
+                              </p>
+                              <div className="relative mt-1">
                                 <input 
-                                  placeholder="Ketik nama cabang (misal: CIKOKOL)..." 
+                                  placeholder="Cari cabang (misal: CIKOKOL, BANDUNG, G001)..." 
                                   value={branchQuery} 
                                   onChange={e => {
                                     setBranchQuery(e.target.value);
@@ -858,32 +880,46 @@ export default function UserManagementPage() {
                                     setIsBranchDropdownOpen(true);
                                   }} 
                                   onFocus={() => {
-                                    if (branchQuery.length >= 2) setIsBranchDropdownOpen(true);
+                                    setIsBranchDropdownOpen(true);
                                   }}
                                   className={`w-full border ${(!editForm.branch && branchQuery) ? 'border-amber-400' : 'border-slate-200 dark:border-slate-700'} rounded-xl pl-10 pr-4 py-2.5 text-sm bg-slate-50 hover:bg-white dark:bg-slate-900 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100`}
                                 />
                                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                 
                                 {/* Search Dropdown */}
-                                {isBranchDropdownOpen && (branchQuery.length >= 2 || isSearchingBranch) && (
+                                {isBranchDropdownOpen && (branchResults.length > 0 || isSearchingBranch || branchQuery.length > 0) && (
                                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-64 overflow-y-auto text-sm animate-in fade-in slide-in-from-top-2">
                                     {isSearchingBranch ? (
                                       <div className="p-4 text-center text-slate-500 flex items-center justify-center gap-2">
-                                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> Mencari data...
+                                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> Mencari data cabang...
                                       </div>
                                     ) : branchResults.length > 0 ? (
                                       <ul className="py-1">
                                         {branchResults.map((loc, idx) => {
-                                          const code = loc.cabang || loc.kode_toko;
-                                          const name = loc.nama_toko || loc.alamat || "Cabang";
+                                          const code = loc.code || loc.cabang || loc.kode_toko;
+                                          const name = loc.name || `Cabang ${code}`;
                                           return (
                                             <li 
                                               key={idx} 
                                               onClick={() => handleLocationSelect(loc)}
-                                              className="px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex flex-col border-b border-slate-50 dark:border-slate-800/50 last:border-0"
+                                              className="px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer flex flex-col border-b border-slate-50 dark:border-slate-800/50 last:border-0"
                                             >
-                                              <div className="font-bold text-slate-800 dark:text-slate-200">{code}</div>
-                                              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{name}</div>
+                                              <div className="flex items-center justify-between">
+                                                <span className="font-bold text-slate-800 dark:text-slate-200">{code}</span>
+                                                {loc.storeCount !== undefined && (
+                                                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
+                                                    {loc.storeCount.toLocaleString("id-ID")} Toko
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                                <span>{name}</span>
+                                                {loc.aliases && loc.aliases.length > 0 && (
+                                                  <span className="text-[10px] text-slate-400 font-mono">
+                                                    (Alias: {loc.aliases.join(", ")})
+                                                  </span>
+                                                )}
+                                              </div>
                                             </li>
                                           );
                                         })}

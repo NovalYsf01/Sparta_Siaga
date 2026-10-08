@@ -545,6 +545,113 @@ export interface UserPermissionOverrideRecord {
   revokedBy: string | null;
   createdAt: string;
   updatedAt: string;
+  policyCompliance?: OverridePolicyCompliance;
+}
+
+export interface OverridePolicyCompliance {
+  isValid: boolean;
+  isCompliant: boolean;
+  isEffective: boolean;
+  isEffectivelyActive: boolean;
+  statusCode: "ACTIVE_ALLOWED" | "ACTIVE_DENIED" | "EXPIRED" | "REVOKED" | "POLICY_CONFLICT";
+  statusBadgeText: string;
+  statusBadgeClass: string;
+  policyWarning?: string;
+  reason?: string;
+}
+
+export function evaluateOverridePolicyCompliance(
+  override: UserPermissionOverrideRecord,
+  _user?: { scope?: string | null; branch?: string | null }
+): OverridePolicyCompliance {
+  const isRevoked = Boolean(override.revokedAt);
+  const isExpired = !isRevoked && Boolean(override.expiresAt) && new Date(override.expiresAt!) <= new Date();
+
+  if (isRevoked) {
+    return {
+      isValid: true,
+      isCompliant: true,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "REVOKED",
+      statusBadgeText: "DICABUT",
+      statusBadgeClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+      reason: "Override telah dicabut secara manual oleh Administrator.",
+    };
+  }
+
+  if (isExpired) {
+    return {
+      isValid: true,
+      isCompliant: true,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "EXPIRED",
+      statusBadgeText: "KADALUARSA",
+      statusBadgeClass: "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+      reason: "Masa berlaku override telah berakhir.",
+    };
+  }
+
+  const isOp = isOperationalPermission(override.permissionKey);
+  const scopeRule = getPermissionScopeRule(override.permissionKey);
+
+  // Prohibit operational permissions with ALL_BRANCHES scope
+  if (isOp && override.scopeType === "ALL_BRANCHES") {
+    const warning =
+      "Hak akses operasional tidak diizinkan menggunakan cakupan seluruh cabang (ALL_BRANCHES). Override ini diblokir oleh sistem demi keamanan isolasi cabang (Zero Cross-Branch Mutation).";
+    return {
+      isValid: false,
+      isCompliant: false,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "POLICY_CONFLICT",
+      statusBadgeText: "Tidak Berlaku — Bertentangan dengan Kebijakan",
+      statusBadgeClass: "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+      policyWarning: warning,
+      reason: warning,
+    };
+  }
+
+  // Check if scopeType is in allowedScopes
+  if (!scopeRule.allowedScopes.includes(override.scopeType)) {
+    const warning = `Cakupan '${override.scopeType}' tidak sesuai dengan kebijakan '${override.permissionKey}'. Cakupan yang didukung: ${scopeRule.allowedScopes.join(", ")}.`;
+    return {
+      isValid: false,
+      isCompliant: false,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "POLICY_CONFLICT",
+      statusBadgeText: "Tidak Berlaku — Bertentangan dengan Kebijakan",
+      statusBadgeClass: "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+      policyWarning: warning,
+      reason: warning,
+    };
+  }
+
+  if (override.effect === "DENY") {
+    return {
+      isValid: true,
+      isCompliant: true,
+      isEffective: true,
+      isEffectivelyActive: true,
+      statusCode: "ACTIVE_DENIED",
+      statusBadgeText: "DITOLAK",
+      statusBadgeClass: "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+      reason: "Override aktif dengan instruksi penolakan (DENY).",
+    };
+  }
+
+  return {
+    isValid: true,
+    isCompliant: true,
+    isEffective: true,
+    isEffectivelyActive: true,
+    statusCode: "ACTIVE_ALLOWED",
+    statusBadgeText: "DIIZINKAN",
+    statusBadgeClass: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+    reason: "Override aktif dan sesuai dengan kebijakan.",
+  };
 }
 
 export interface PermissionAuditLogRecord {
@@ -562,3 +669,4 @@ export interface PermissionAuditLogRecord {
   expiresAt: string | null;
   createdAt: string;
 }
+

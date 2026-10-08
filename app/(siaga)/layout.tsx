@@ -851,6 +851,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         isOpen={isMaintenanceModalOpen}
         onClose={() => setIsMaintenanceModalOpen(false)}
         onUpdateProgress={handleUpdateMaintenanceProgress}
+        onConfirmVerification={handleConfirmVerification}
       />
 
       {/* Read-Only Incident Detail Modal (History) */}

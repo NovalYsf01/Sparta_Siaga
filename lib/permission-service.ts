@@ -16,6 +16,7 @@ import {
   isOperationalPermission,
   isMonitoringPermission,
   getPermissionScopeRule,
+  evaluateOverridePolicyCompliance,
 } from "@/types/permission";
 
 // In-memory cache for role permissions to prevent excessive DB queries
@@ -173,22 +174,26 @@ export async function getUserOverrides(userId: string): Promise<UserPermissionOv
     [userId]
   );
 
-  return res.rows.map((r) => ({
-    id: r.id,
-    userId: r.user_id,
-    permissionKey: r.permission_key,
-    effect: r.effect,
-    scopeType: r.scope_type,
-    branchCode: r.branch_code,
-    reason: r.reason,
-    startsAt: r.starts_at ? new Date(r.starts_at).toISOString() : "",
-    expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
-    grantedBy: r.granted_by,
-    revokedAt: r.revoked_at ? new Date(r.revoked_at).toISOString() : null,
-    revokedBy: r.revoked_by,
-    createdAt: r.created_at ? new Date(r.created_at).toISOString() : "",
-    updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : "",
-  }));
+  return res.rows.map((r) => {
+    const ov: UserPermissionOverrideRecord = {
+      id: r.id,
+      userId: r.user_id,
+      permissionKey: r.permission_key,
+      effect: r.effect,
+      scopeType: r.scope_type,
+      branchCode: r.branch_code,
+      reason: r.reason,
+      startsAt: r.starts_at ? new Date(r.starts_at).toISOString() : "",
+      expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : null,
+      grantedBy: r.granted_by,
+      revokedAt: r.revoked_at ? new Date(r.revoked_at).toISOString() : null,
+      revokedBy: r.revoked_by,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : "",
+      updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : "",
+    };
+    ov.policyCompliance = evaluateOverridePolicyCompliance(ov);
+    return ov;
+  });
 }
 
 export async function createUserOverride(data: {
@@ -632,6 +637,18 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
         authorized: false,
         source: "ROLE_PERMISSION",
         reason: `Aksi operasional hanya berlaku untuk cabang sendiri (${user.branch || "N/A"}), bukan ${contextBranch.toUpperCase()}.`,
+      };
+    }
+
+    // Lifecycle guard: Technical processing requires store confirmation to be completed
+    if (
+      (permission === "ESTIMATION_TRIGGER" || permission === "REPORT_UPDATE_PROGRESS" || permission === "WORK_READINESS_UPDATE") &&
+      report?.status === "pending_confirmation"
+    ) {
+      return {
+        authorized: false,
+        source: "ROLE_PERMISSION",
+        reason: "Tindakan teknis belum dapat dilakukan karena laporan masih menunggu konfirmasi kondisi toko.",
       };
     }
 

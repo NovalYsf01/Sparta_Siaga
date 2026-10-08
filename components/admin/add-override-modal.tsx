@@ -140,7 +140,7 @@ export function AddOverrideModal({
     const timer = setTimeout(async () => {
       setIsSearchingBranch(true);
       try {
-        const res = await fetch(`/api/stores/search?q=${encodeURIComponent(branchQuery)}&limit=10`);
+        const res = await fetch(`/api/branches?q=${encodeURIComponent(branchQuery)}`);
         if (res.ok) {
           const json = await res.json();
           setBranchResults(json.data || []);
@@ -151,7 +151,7 @@ export function AddOverrideModal({
       } finally {
         setIsSearchingBranch(false);
       }
-    }, 300);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [branchQuery, branchCode, branchDisplay]);
@@ -182,8 +182,8 @@ export function AddOverrideModal({
   };
 
   const handleSelectBranch = (loc: any) => {
-    const code = loc.kode_toko || loc.cabang;
-    const label = `${code} — ${loc.nama_toko || loc.cabang || "Cabang"}`;
+    const code = loc.code || loc.cabang;
+    const label = `${code} — ${loc.name || `Cabang ${code}`}`;
     setBranchCode(code);
     setBranchDisplay(label);
     setBranchQuery(label);
@@ -452,28 +452,34 @@ export function AddOverrideModal({
                       {/* Dropdown Results */}
                       {isBranchDropdownOpen && branchResults.length > 0 && (
                         <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-40 overflow-y-auto z-50 divide-y divide-slate-100 dark:divide-slate-700">
-                          {branchResults.map((b) => (
-                            <div
-                              key={b.kode_toko || b.cabang}
-                              onClick={() => handleSelectBranch(b)}
-                              className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer flex items-center justify-between text-xs"
-                            >
-                              <div className="flex items-center gap-2">
-                                <Building className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                <div>
-                                  <span className="font-bold text-slate-900 dark:text-white">
-                                    {b.kode_toko || b.cabang}
-                                  </span>
-                                  <span className="text-slate-500 dark:text-slate-400 ml-1.5">
-                                    {b.nama_toko || b.cabang}
-                                  </span>
+                          {branchResults.map((b) => {
+                            const code = b.code || b.cabang;
+                            const name = b.name || `Cabang ${code}`;
+                            return (
+                              <div
+                                key={code}
+                                onClick={() => handleSelectBranch(b)}
+                                className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer flex items-center justify-between text-xs"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Building className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                  <div>
+                                    <span className="font-bold text-slate-900 dark:text-white">
+                                      {code}
+                                    </span>
+                                    <span className="text-slate-500 dark:text-slate-400 ml-1.5">
+                                      {name}
+                                    </span>
+                                  </div>
                                 </div>
+                                {b.storeCount !== undefined && (
+                                  <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                                    {b.storeCount.toLocaleString("id-ID")} Toko
+                                  </span>
+                                )}
                               </div>
-                              <span className="text-[10px] font-semibold text-slate-400">
-                                {b.cabang || "Cabang"}
-                              </span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
 

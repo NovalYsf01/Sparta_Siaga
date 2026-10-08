@@ -7,6 +7,7 @@ import {
   Clock,
   AlertTriangle,
   ShieldCheck,
+  ShieldAlert,
   Store,
   Calendar,
   Calculator,
@@ -20,7 +21,7 @@ import {
   Wrench,
   RefreshCw,
 } from "lucide-react";
-import { IncidentRecord, RoleType } from "@/types/incident";
+import { IncidentRecord, RoleType, DamageReport } from "@/types/incident";
 import { EstimationModal } from "./estimation-modal";
 import { EstimationStatusCard } from "./estimation-status-card";
 import { EstimationRouteRecord } from "@/lib/estimation-service";
@@ -36,6 +37,7 @@ import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { WorkReadinessCard } from "./work-readiness-card";
+import { StoreVerificationModal } from "./store-verification-modal";
 
 interface MaintenanceTrackingModalProps {
   incident: IncidentRecord | null;
@@ -47,6 +49,11 @@ interface MaintenanceTrackingModalProps {
     newProgress: number,
     notes?: string,
     technician?: string
+  ) => void;
+  onConfirmVerification?: (
+    incidentId: string,
+    isDamaged: boolean,
+    report?: Partial<DamageReport>
   ) => void;
   isReadOnly?: boolean;
 }
@@ -126,8 +133,10 @@ function getDisasterLabel(type?: string): string {
 
 export function MaintenanceTrackingModal({
   incident,
+  activeRole,
   isOpen,
   onClose,
+  onConfirmVerification,
   isReadOnly = false,
 }: MaintenanceTrackingModalProps) {
   // Lock background scroll when modal is open
@@ -147,6 +156,9 @@ export function MaintenanceTrackingModal({
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
 
   // Permissions state
+  const [canConfirm, setCanConfirm] = useState(false);
+  const [confirmReason, setConfirmReason] = useState("");
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [canUpdateProgress, setCanUpdateProgress] = useState(false);
   const [updateProgressReason, setUpdateProgressReason] = useState("");
   const [canClose, setCanClose] = useState(false);
@@ -185,6 +197,8 @@ export function MaintenanceTrackingModal({
       if (meRes) setIdentity(meRes.user || meRes);
 
       if (permRes?.data) {
+        setCanConfirm(Boolean(permRes.data.canConfirm));
+        setConfirmReason(permRes.data.confirmReason || "");
         setCanUpdateProgress(permRes.data.canUpdateProgress);
         setUpdateProgressReason(permRes.data.updateProgressReason || "");
         setCanClose(permRes.data.canClose);
@@ -799,6 +813,26 @@ export function MaintenanceTrackingModal({
                       )}
 
                       {/* CONTEXTUAL ACTIONS IN ACTIVE STAGE ONLY */}
+                      {st.key === "KONFIRMASI_TOKO" && isCurrent && (
+                        <div className="mt-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-2 flex-wrap">
+                          {canConfirm ? (
+                            <button
+                              type="button"
+                              onClick={() => setIsVerificationModalOpen(true)}
+                              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
+                            >
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              Konfirmasi Kondisi Toko
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1.5 rounded-md border border-amber-200 dark:border-amber-800">
+                              <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>{confirmReason || "Konfirmasi terbatas untuk personil cabang pemilik laporan (Isolasi Cabang Aktif)."}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {st.key === "ESTIMASI" && isCurrent && (
                         <div className="mt-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-2 flex-wrap">
                           {!estimationRoute ? (
@@ -1157,6 +1191,37 @@ export function MaintenanceTrackingModal({
         incident={incident}
         latestProgress={latestProgress}
         onSuccess={() => {
+          loadData();
+        }}
+      />
+
+      {/* Sub-Modal: Konfirmasi Kondisi Toko */}
+      <StoreVerificationModal
+        incident={incident}
+        activeRole={activeRole}
+        isOpen={isVerificationModalOpen}
+        onClose={() => setIsVerificationModalOpen(false)}
+        onConfirmVerification={async (incidentId, isDamaged, report) => {
+          if (onConfirmVerification) {
+            onConfirmVerification(incidentId, isDamaged, report);
+          } else {
+            try {
+              await fetch(`/api/incidents/${incidentId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  verification: {
+                    ...report,
+                    isDamaged,
+                  },
+                  status: isDamaged ? "investigating" : "resolved",
+                }),
+              });
+            } catch (e) {
+              console.error("[MaintenanceTrackingModal] Verification error:", e);
+            }
+          }
+          setIsVerificationModalOpen(false);
           loadData();
         }}
       />
