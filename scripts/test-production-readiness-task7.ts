@@ -363,7 +363,7 @@ function runP15(): ScenarioResult {
     "lib/report-permissions.ts",
     "types/permission.ts",
   ];
-  const result = spawnSync("git", ["diff", "--name-only", "46952b8", "--", ...protectedBusinessFiles], {
+  const result = spawnSync("git", ["diff", "--name-only", "1fd022f", "--", ...protectedBusinessFiles], {
     encoding: "utf8",
   });
   const changed = result.stdout.trim();

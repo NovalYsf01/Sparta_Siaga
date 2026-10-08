@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Shield,
   Users,
@@ -40,7 +41,6 @@ export function RolePermissionTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     fetchRolesData();
@@ -63,7 +63,7 @@ export function RolePermissionTab() {
         setOriginalPermissions({ ...initialRole.permissions });
       }
     } catch (err: any) {
-      setNotification({ type: "error", message: err.message || "Gagal memuat hak akses role" });
+      toast.error(err.message || "Gagal memuat hak akses role");
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,6 @@ export function RolePermissionTab() {
   const handleConfirmSave = async () => {
     setShowConfirmModal(false);
     setSaving(true);
-    setNotification(null);
 
     // Only send permissions belonging to role catalog
     const permissionsToSave: Partial<Record<PermissionKey, PermissionEffect>> = {};
@@ -127,12 +126,13 @@ export function RolePermissionTab() {
         prev.map((r) => (r.key === selectedRoleKey ? { ...r, permissions: { ...currentPermissions } } : r))
       );
 
-      setNotification({
-        type: "success",
-        message: `Hak akses bawaan untuk role ${selectedRole?.label} berhasil disimpan!`,
+      toast.success("Hak akses role berhasil diperbarui", {
+        description: `Hak akses bawaan untuk role ${selectedRole?.label} berhasil disimpan!`,
       });
     } catch (err: any) {
-      setNotification({ type: "error", message: err.message || "Gagal menyimpan perubahan" });
+      toast.error("Gagal memperbarui hak akses role", {
+        description: err.message || "Gagal menyimpan perubahan",
+      });
     } finally {
       setSaving(false);
     }
@@ -167,31 +167,6 @@ export function RolePermissionTab() {
 
   return (
     <div className="space-y-6">
-      {/* Toast Notification */}
-      {notification && (
-        <div
-          className={`p-4 rounded-xl flex items-center justify-between border text-sm font-medium animate-in fade-in ${
-            notification.type === "success"
-              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-              : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {notification.type === "success" ? (
-              <CheckCircle2 className="w-5 h-5 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-            )}
-            <span>{notification.message}</span>
-          </div>
-          <button
-            onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Control Bar: Role Selection & Save Button */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">

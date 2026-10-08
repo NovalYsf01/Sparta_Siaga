@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import {
   Search,
   UserCheck,
@@ -58,7 +59,6 @@ export function UserOverrideTab() {
   const [loadingUser, setLoadingUser] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   
   // State to toggle expandable detail for role default permissions (Section I)
   const [showRolePermissionsDetail, setShowRolePermissionsDetail] = useState(false);
@@ -91,7 +91,6 @@ export function UserOverrideTab() {
   const handleSelectUser = async (u: UserSummary) => {
     setSelectedUser(u);
     setLoadingUser(true);
-    setNotification(null);
     try {
       const res = await fetch(`/api/admin/permissions/users/${u.id}`);
       if (!res.ok) throw new Error("Gagal mengambil data permission user");
@@ -101,7 +100,7 @@ export function UserOverrideTab() {
       setAuditLogs(json.data.auditLogs || []);
       setDefinitions(json.data.definitions || []);
     } catch (err: any) {
-      setNotification({ type: "error", message: err.message || "Gagal memuat permission user" });
+      toast.error(err.message || "Gagal memuat permission user");
     } finally {
       setLoadingUser(false);
     }
@@ -114,7 +113,6 @@ export function UserOverrideTab() {
     if (!confirmed) return;
 
     setRevokingId(override.id);
-    setNotification(null);
 
     try {
       const res = await fetch(`/api/admin/permissions/users/${selectedUser.id}/${override.id}`, {
@@ -126,14 +124,11 @@ export function UserOverrideTab() {
         throw new Error(errJson.error || "Gagal mencabut pengaturan");
       }
 
-      setNotification({
-        type: "success",
-        message: override.effect === "ALLOW" ? "Akses khusus berhasil dicabut!" : "Pembatasan berhasil dicabut!",
-      });
+      toast.success(override.effect === "ALLOW" ? "Akses khusus berhasil dicabut" : "Pembatasan berhasil dicabut");
       // Refresh user permissions
       handleSelectUser(selectedUser);
     } catch (err: any) {
-      setNotification({ type: "error", message: err.message || "Gagal mencabut pengaturan" });
+      toast.error("Gagal memperbarui akses khusus", { description: err.message || "Gagal mencabut pengaturan" });
     } finally {
       setRevokingId(null);
     }
@@ -204,32 +199,6 @@ export function UserOverrideTab() {
 
   return (
     <div className="space-y-6">
-      {/* Toast Notification */}
-      {notification && (
-        <div
-          className={`p-4 rounded-xl flex items-center justify-between border text-sm font-medium animate-in fade-in ${
-            notification.type === "success"
-              ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-              : "bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {notification.type === "success" ? (
-              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
-            )}
-            <span>{notification.message}</span>
-          </div>
-          <button
-            onClick={() => setNotification(null)}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
       {/* Bagian Atas: Cari User (Section H) */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center gap-4">
         <div className="flex-1 relative">
@@ -686,7 +655,7 @@ export function UserOverrideTab() {
           userRole={selectedUser.businessRole}
           userScope={selectedUser.scope}
           onSuccess={() => {
-            setNotification({ type: "success", message: "Akses khusus user berhasil ditambahkan!" });
+            toast.success("Akses khusus berhasil ditambahkan");
             handleSelectUser(selectedUser);
           }}
         />
