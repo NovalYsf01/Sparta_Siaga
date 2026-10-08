@@ -62,6 +62,21 @@ This permits top-level SPARTA SIAGA pages on the origin (`self`) to access camer
 
 ---
 
+### 4.4 Operational Camera Preview & Shutter Corrective (`components/incident/camera-capture.tsx`)
+1. **Root Cause of Blank Live Preview:**
+   - `<video ref={videoRef} ... />` was conditionally rendered only when `permissionState === 'GRANTED'`.
+   - When `startCamera()` initiated, `permissionState` was `'REQUESTING'`, meaning the `<video>` element was not yet in the DOM (`videoRef.current === null`).
+   - `videoRef.current.srcObject = mediaStream` silently failed. When `permissionState` changed to `'GRANTED'`, `<video>` mounted with `srcObject = null`, rendering a blank black element.
+   - **Resolution:** `<video ref={videoRef} autoPlay playsInline muted ... />` is now persistently mounted in the DOM. A `useEffect([stream])` reliably attaches `video.srcObject = stream` and triggers `video.play()` with `muted = true` (complying with browser autoplay security policies).
+2. **Root Cause of Nonfunctional Shutter:**
+   - Shutter was active before video dimensions loaded, attempting to draw `videoWidth = 0` and `videoHeight = 0` onto the canvas, producing empty/corrupted blobs.
+   - **Resolution:** Added `isVideoReady` gate tracking `onLoadedMetadata`, `onPlaying`, and `readyState >= 2`. Shutter is disabled until valid dimensions (>0) are acquired.
+3. **Photo Review & Retake Workflow:**
+   - Introduced a dedicated `REVIEW` state post-capture.
+   - Displays full-screen captured preview with official SPARTA watermark.
+   - Provides **"Foto Ulang"** (Retake) to revoke temporary blob URLs and resume live feed without remounting the camera.
+   - Provides **"Gunakan Foto"** to attach the final `File` to parent form state (`FieldPhotoUploader` or `ProgressUpdateModal`) and cleanly stop camera tracks.
+
 ## 5. Verification Matrix & Test Results
 
 ### 5.1 Persona Matrix Verification (`scripts/test-notification-and-report-personas.ts`)
@@ -84,7 +99,11 @@ Verified across all 7 representative personas:
 - **Result:** 12/12 PASSED.
 - Confirms global disaster notifications retrieval, optional branch query filtering, and 403 on notification mutation attempts.
 
-### 5.3 Regression & Build Verification
+### 5.3 Camera & Evidence Workflow Suite (`scripts/test-camera-and-evidence-workflow.ts`)
+- **Result:** 9/9 PASSED.
+- Confirms valid JPEG File output, non-empty byte buffer, watermark overlay contract, retake cancellation, and authorized evidence attachment.
+
+### 5.4 Regression & Build Verification
 - **TypeScript Check (`npx tsc --noEmit`):** PASS (0 errors).
 - **ESLint (`npm run lint`):** PASS (0 errors).
 - **Task 7 Readiness Suite (`scripts/test-production-readiness-task7.ts`):** PASS (15/15 passed).
