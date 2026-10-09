@@ -10,19 +10,18 @@ export async function POST(request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const data = await reportWorkflowService.decideInitialReport({
+    const data = await reportWorkflowService.submitInspection({
       reportId: id,
-      submissionVersion: Number(body.submissionVersion),
-      decision: body.decision,
-      reason: body.reason ?? null,
-      operationalStatus: body.operationalStatus,
+      verificationLevel: body.verificationLevel,
+      conditionNotes: String(body.conditionNotes || ""),
+      emergencyExceptionReason: body.emergencyExceptionReason ?? null,
     }, actor);
     return NextResponse.json({ data });
   } catch (error) {
     if (error instanceof ReportWorkflowError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
-    console.error("[POST /api/incidents/:id/confirm]", error);
-    return NextResponse.json({ error: "Gagal menyimpan keputusan Manager Branch." }, { status: 500 });
+    console.error("[POST /api/incidents/:id/inspection]", error);
+    return NextResponse.json({ error: "Gagal mengajukan pemeriksaan." }, { status: 500 });
   }
 }

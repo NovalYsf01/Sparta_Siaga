@@ -6,6 +6,7 @@ CREATE INDEX IF NOT EXISTS idx_users_assigned_store_id
   ON users(assigned_store_id) WHERE assigned_store_id IS NOT NULL;
 
 ALTER TABLE incidents
+  ADD COLUMN IF NOT EXISTS reporter JSONB,
   ADD COLUMN IF NOT EXISTS canonical_earthquake_event_id TEXT,
   ADD COLUMN IF NOT EXISTS canonical_store_id TEXT,
   ADD COLUMN IF NOT EXISTS earthquake_identity_version SMALLINT,

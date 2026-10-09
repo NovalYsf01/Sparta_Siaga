@@ -201,6 +201,10 @@ export interface IncidentRecord {
   // === Status & Progress ===
   status: IncidentStatus;
   progress: number;
+  latestInspectionVersion?: number;
+  canonicalEarthquakeEventId?: string;
+  canonicalStoreId?: string;
+  earthquakeIdentityVersion?: number;
 
   // === Metadata Bencana ===
   disasterMetadata?: {

@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { UserContext } from "./report-permissions";
-import { SpartaRole } from "@/types/incident";
-import { dbGetUserById, dbUpsertUser } from "./user-db";
+import { dbGetUserById } from "./user-db";
 import { verifySession } from "./jwt";
 
 /**
@@ -43,5 +42,6 @@ export async function getSessionUser(): Promise<UserContext | null> {
     systemRole: dbUser.systemRole,
     scope: isSystemAdmin ? null : dbUser.scope,
     branch: isSystemAdmin ? null : dbUser.branch,
+    storeId: isSystemAdmin ? null : dbUser.assignedStoreId ?? null,
   };
 }

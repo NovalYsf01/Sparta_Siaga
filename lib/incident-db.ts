@@ -18,6 +18,10 @@ function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     locationCity: row.location_city as string,
     status: row.status as IncidentRecord["status"],
     progress: row.progress as number,
+    latestInspectionVersion: (row.latest_inspection_version as number) ?? 0,
+    canonicalEarthquakeEventId: (row.canonical_earthquake_event_id as string) ?? undefined,
+    canonicalStoreId: (row.canonical_store_id as string) ?? undefined,
+    earthquakeIdentityVersion: (row.earthquake_identity_version as number) ?? undefined,
     disasterMetadata: (row.disaster_metadata as IncidentRecord["disasterMetadata"]) ?? undefined,
     affectedStores: (row.affected_stores as IncidentRecord["affectedStores"]) ?? undefined,
     affectedStoreCount: (row.affected_store_count as number) ?? undefined,
@@ -132,46 +136,22 @@ export async function dbFindUnlinkedManualEarthquakeCandidates(
   return rows.map(rowToIncident);
 }
 
-let isReporterColumnEnsured = false;
-async function ensureReporterColumn(pool: ReturnType<typeof getDbPool>) {
-  if (isReporterColumnEnsured) return;
-  try {
-    await pool.query(`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS reporter JSONB;`);
-    isReporterColumnEnsured = true;
-  } catch (err) {
-    console.warn("[incident-db] Failed to alter table incidents for reporter column:", err);
-  }
-}
-
 export async function dbCreateIncident(
   inc: IncidentRecord
 ): Promise<IncidentRecord> {
   const pool = getDbPool();
-  await ensureReporterColumn(pool);
   try {
     const { rows } = await pool.query(
     `INSERT INTO incidents (
       id, date, disaster_type, report_origin, reporter,
       earthquake_event_id, earthquake_source, earthquake_provenance,
       tkp_type, store_id, store_name, branch, location_city,
-      status, progress,
+      status, progress, latest_inspection_version,
+      canonical_earthquake_event_id, canonical_store_id, earthquake_identity_version,
       disaster_metadata, affected_stores, affected_store_count, danger_store_count,
       verification, maintenance_ticket, field_photos,
       timeline, created_at, updated_at, closed_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
-    ON CONFLICT (id) DO UPDATE SET
-      status                   = EXCLUDED.status,
-      progress                 = EXCLUDED.progress,
-      reporter                 = COALESCE(EXCLUDED.reporter, incidents.reporter),
-      disaster_metadata        = EXCLUDED.disaster_metadata,
-      affected_stores          = EXCLUDED.affected_stores,
-      affected_store_count     = EXCLUDED.affected_store_count,
-      danger_store_count       = EXCLUDED.danger_store_count,
-      verification             = EXCLUDED.verification,
-      maintenance_ticket       = EXCLUDED.maintenance_ticket,
-      field_photos             = EXCLUDED.field_photos,
-      timeline                 = EXCLUDED.timeline,
-      updated_at               = NOW()
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
     RETURNING *`,
     [
       inc.id,
@@ -189,6 +169,10 @@ export async function dbCreateIncident(
       inc.locationCity,
       inc.status,
       inc.progress,
+      inc.latestInspectionVersion ?? 0,
+      inc.canonicalEarthquakeEventId ?? null,
+      inc.canonicalStoreId ?? null,
+      inc.earthquakeIdentityVersion ?? null,
       inc.disasterMetadata ? JSON.stringify(inc.disasterMetadata) : null,
       inc.affectedStores ? JSON.stringify(inc.affectedStores) : null,
       inc.affectedStoreCount ?? 0,
@@ -220,7 +204,6 @@ export async function dbUpdateIncident(
   patch: Partial<IncidentRecord>
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
-  await ensureReporterColumn(pool);
   const setClauses: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -240,6 +223,10 @@ export async function dbUpdateIncident(
     earthquakeProvenance: "earthquake_provenance",
     affectedStoreCount: "affected_store_count",
     dangerStoreCount: "danger_store_count",
+    latestInspectionVersion: "latest_inspection_version",
+    canonicalEarthquakeEventId: "canonical_earthquake_event_id",
+    canonicalStoreId: "canonical_store_id",
+    earthquakeIdentityVersion: "earthquake_identity_version",
   };
 
   for (const [key, col] of Object.entries(scalarFieldMap)) {
