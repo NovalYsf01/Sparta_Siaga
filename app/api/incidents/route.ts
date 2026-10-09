@@ -5,6 +5,7 @@ import { getDbPool } from "@/lib/db";
 import { dbCreateIncident, dbGetAllIncidents } from "@/lib/incident-db";
 import { canViewReport } from "@/lib/report-permissions";
 import { checkUserPermission } from "@/lib/permission-service";
+import { earthquakeIncidentService } from "@/lib/earthquake-incident-service";
 import type { DisasterType, IncidentRecord } from "@/types/incident";
 
 export async function GET() {
@@ -59,6 +60,32 @@ export async function POST(request: Request) {
     if (!store) return NextResponse.json({ error: "Toko tidak ditemukan." }, { status: 404 });
     if (store.cabang.trim().toUpperCase() !== (actor.branch || "").trim().toUpperCase()) {
       return NextResponse.json({ error: "Toko berada di luar cabang pengguna." }, { status: 403 });
+    }
+
+    if (body.disasterType === "earthquake" && body.earthquakeEventId?.trim()) {
+      const eventResult = await pool.query(
+        `SELECT id, magnitude, depth_km, latitude, longitude, occurred_at, title, source_primary
+         FROM earthquake_events WHERE id = $1 LIMIT 1`,
+        [body.earthquakeEventId.trim()],
+      );
+      const event = eventResult.rows[0];
+      if (!event) return NextResponse.json({ error: "Kejadian gempa tidak ditemukan." }, { status: 400 });
+      const result = await earthquakeIncidentService.createOrGet({
+        event: { id: event.id, magnitude: Number(event.magnitude), depth: `${event.depth_km} km`,
+          title: event.title, time: new Date(event.occurred_at).toISOString(),
+          latitude: Number(event.latitude), longitude: Number(event.longitude), source: event.source_primary },
+        store: { id: store.kode_toko, name: store.nama_toko, branch: store.cabang,
+          city: body.locationCity?.trim() || store.alamat || store.cabang, distanceKm: 0 },
+        origin: "manual",
+        reporter: { id: actor.id, userId: actor.id, name: actor.name, nik: actor.nik,
+          role: actor.role, branch: actor.branch, storeId: actor.storeId },
+      });
+      if (result.disposition !== "CREATED") {
+        return NextResponse.json({ error: "Laporan Gempa Sudah Tersedia",
+          code: "EARTHQUAKE_REPORT_EXISTS", reportId: result.incident.id,
+          openUrl: `/reports?incident=${encodeURIComponent(result.incident.id)}` }, { status: 409 });
+      }
+      return NextResponse.json({ data: result.incident }, { status: 201 });
     }
 
     const timestamp = new Date().toISOString();

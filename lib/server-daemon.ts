@@ -11,20 +11,12 @@ import {
   updateNotificationLogForEvent,
   generateEmergencyEmailHtml 
 } from './notification-service';
-import { 
-  dbFindAutoEarthquakeReport, 
-  dbFindManualEarthquakeReportByEvent, 
-  dbFindUnlinkedManualEarthquakeCandidates,
-  dbCreateIncident, 
-  dbUpdateIncident 
-} from './incident-db';
+import { earthquakeIncidentService } from './earthquake-incident-service';
 import { AffectedStoreSummary } from '@/types/notification';
-import { ReportAffectedStore } from '@/types/incident';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
 
 export const AUTO_EARTHQUAKE_MAX_AGE_MINUTES = parseInt(process.env.AUTO_EARTHQUAKE_MAX_AGE_MINUTES || '60', 10);
-export const MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES = parseInt(process.env.MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES || '120', 10);
 
 let isCycleRunning = false;
 let initialTimer: NodeJS.Timeout | null = null;
@@ -153,44 +145,6 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
           const priorityStores = branchStores.filter(s => s.status === 'PRIORITY_MONITOR');
 
           if (priorityStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0)) {
-            // Check existing reports first
-            const existingAutoReport = await dbFindAutoEarthquakeReport(eq.id, branch);
-            const linkedManualReport = await dbFindManualEarthquakeReportByEvent(eq.id, branch);
-
-            if (linkedManualReport) {
-              // Enrich existing linked manual report metadata without touching operational state
-              await dbUpdateIncident(linkedManualReport.id, {
-                earthquakeSource: eq.source || 'BMKG/USGS',
-                earthquakeProvenance: `Diperbarui otomatis dari event ${eq.source || 'BMKG/USGS'} ${eq.id}`,
-                disasterMetadata: {
-                  magnitude: eq.magnitude,
-                  depth: eq.depth,
-                  coordinates: [eq.latitude, eq.longitude],
-                  place: eq.title,
-                  time: eq.time,
-                },
-              });
-              console.log(`[Autonomous Daemon] 🔗 ENRICHED MANUAL REPORT: ${linkedManualReport.id} for Event ${eq.id}`);
-              continue;
-            }
-
-            if (existingAutoReport) {
-              // AUTO REPORT FRESHNESS: Enrich existing auto report with latest BMKG updates
-              await dbUpdateIncident(existingAutoReport.id, {
-                earthquakeSource: eq.source || 'BMKG/USGS',
-                earthquakeProvenance: `Data dimutakhirkan otomatis dari event ${eq.source || 'BMKG/USGS'} ${eq.id}`,
-                disasterMetadata: {
-                  magnitude: eq.magnitude,
-                  depth: eq.depth,
-                  coordinates: [eq.latitude, eq.longitude],
-                  place: eq.title,
-                  time: eq.time,
-                },
-              });
-              console.log(`[Autonomous Daemon] 🔄 REFRESHED AUTO REPORT: ${existingAutoReport.id} for Event ${eq.id}`);
-              continue;
-            }
-
             // FRESHNESS PROTECTION (Requirement 5):
             // If the earthquake event is older than AUTO_EARTHQUAKE_MAX_AGE_MINUTES (default 60m),
             // DO NOT create new emergency notification or new auto-report.
@@ -199,32 +153,17 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
               continue;
             }
 
-            // UNLINKED MANUAL REPORT CANDIDATE MATCHING (Requirement 20):
-            // Check for unlinked manual earthquake reports for this branch within window
-            const unlinkedCandidates = await dbFindUnlinkedManualEarthquakeCandidates(
-              branch,
-              eq.timestamp,
-              MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES
-            );
-
-            if (unlinkedCandidates.length === 1) {
-              const candidate = unlinkedCandidates[0];
-              await dbUpdateIncident(candidate.id, {
-                earthquakeEventId: eq.id,
-                earthquakeSource: eq.source || 'BMKG/USGS',
-                earthquakeProvenance: `Ditautkan otomatis ke event ${eq.source || 'BMKG/USGS'} ${eq.id} (jendela ${MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES}m)`,
-                disasterMetadata: {
-                  magnitude: eq.magnitude,
-                  depth: eq.depth,
-                  coordinates: [eq.latitude, eq.longitude],
-                  place: eq.title,
-                  time: eq.time,
-                },
+            for (const store of branchStores) {
+              const result = await earthquakeIncidentService.createOrGet({
+                event: { id: eq.id, magnitude: eq.magnitude, depth: eq.depth,
+                  title: eq.title, time: eq.time, latitude: eq.latitude,
+                  longitude: eq.longitude, source: eq.source || 'BMKG/USGS' },
+                store: { id: store.kode_toko, name: store.nama_toko,
+                  branch: store.cabang, city: store.alamat || store.cabang,
+                  distanceKm: store.distance_km },
+                origin: 'automatic_earthquake',
               });
-              console.log(`[Autonomous Daemon] 🔗 LINKED UNLINKED MANUAL REPORT: ${candidate.id} to Event ${eq.id} (Cabang ${branch}) - skipped auto-report creation.`);
-              continue;
-            } else if (unlinkedCandidates.length > 1) {
-              console.warn(`[Autonomous Daemon] ⚠️ POTENTIAL_DUPLICATE: ${unlinkedCandidates.length} ambiguous unlinked manual reports found for Cabang ${branch}. Preserving reports without arbitrary merge.`);
+              console.log(`[Autonomous Daemon] EARTHQUAKE INCIDENT ${result.disposition}: ${result.incident.id} | Store ${store.kode_toko}`);
             }
 
             const isProcessed = await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
@@ -283,64 +222,9 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
                 ticketNumber,
               });
 
-              const reportId = `LAP-EQ-${branch.substring(0, 4).toUpperCase().replace(/\s/g, '')}-${Date.now().toString().slice(-6)}`;
-              const todayStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-
-              // Map AffectedStoreSummary → ReportAffectedStore
-              const reportAffectedStores: ReportAffectedStore[] = branchStores.map(s => ({
-                kode_toko: s.kode_toko,
-                nama_toko: s.nama_toko,
-                cabang: s.cabang,
-                alamat: s.alamat,
-                fr_type: s.fr_type,
-                distance_km: s.distance_km,
-                exposure_zone: s.status,   // 'PRIORITY_MONITOR' | 'MONITOR'
-                confirmation_status: 'pending',
-              }));
-
-              const primaryStore = branchStores[0];
-              await dbCreateIncident({
-                id: reportId,
-                date: todayStr,
-                disasterType: 'earthquake',
-                reportOrigin: 'automatic_earthquake',
-                earthquakeEventId: eq.id,
-                earthquakeSource: eq.source || 'BMKG/USGS',
-                earthquakeProvenance: `Estimasi area dampak berdasarkan data gempa ${eq.source || 'BMKG/USGS'} dan perhitungan SPARTA.`,
-                tkpType: 'toko',
-                storeId: primaryStore?.kode_toko ?? branch,
-                storeName: primaryStore?.nama_toko ?? `Toko ${branch}`,
-                branch,
-                locationCity: branch,
-                status: 'pending_confirmation',
-                progress: 10,
-                disasterMetadata: {
-                  magnitude: eq.magnitude,
-                  depth: eq.depth,
-                  coordinates: [eq.latitude, eq.longitude],
-                  place: eq.title,
-                  time: eq.time,
-                },
-                affectedStores: reportAffectedStores,
-                affectedStoreCount: branchStores.length,
-                dangerStoreCount: priorityStores.length,
-                fieldPhotos: [],
-                timeline: [
-                  {
-                    stage: 'Laporan Otomatis Dibuat',
-                    label: `Gempa M${eq.magnitude} terdeteksi oleh ${eq.source || 'BMKG/USGS'}. ${branchStores.length} toko cabang ${branch} terindikasi dalam area dampak dan memerlukan konfirmasi kondisi lapangan.`,
-                    timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
-                    actor: 'SPARTA Siaga — Autonomous Engine',
-                    notes: ticketNumber,
-                  },
-                ],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              });
-
-              console.log(`[Autonomous Daemon] 📋 AUTO REPORT CREATED: ${reportId} | Cabang ${branch} | ${branchStores.length} toko terindikasi | Konfirmasi lapangan diperlukan`);
               dispatchedEarthquakeAlerts++;
-              console.log(`[Autonomous Daemon] 🚨 DISPATCHED EARTHQUAKE ALERT: Cabang ${branch} (Ticket: ${ticketNumber}, Stores: ${branchStores.length})`);
+              console.log(`[Autonomous Daemon] DISPATCHED EARTHQUAKE ALERT: Cabang ${branch} (Ticket: ${ticketNumber}, Stores: ${branchStores.length})`);
+              continue;
             }
           }
         }

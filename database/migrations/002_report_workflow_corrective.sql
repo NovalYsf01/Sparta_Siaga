@@ -106,6 +106,10 @@ CREATE INDEX IF NOT EXISTS idx_incident_match_reviews_pending
 CREATE INDEX IF NOT EXISTS idx_incidents_canonical_event_store_lookup
   ON incidents(canonical_earthquake_event_id, canonical_store_id)
   WHERE canonical_earthquake_event_id IS NOT NULL AND canonical_store_id IS NOT NULL;
+DROP INDEX IF EXISTS idx_incidents_unique_auto_eq_branch;
+CREATE INDEX IF NOT EXISTS idx_incidents_legacy_auto_eq_branch
+  ON incidents(earthquake_event_id, branch)
+  WHERE report_origin = 'automatic_earthquake' AND earthquake_event_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_incident_event_store_v1
   ON incidents(canonical_earthquake_event_id, canonical_store_id)
   WHERE earthquake_identity_version = 1
