@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  assertTechnicalWorkflowEligible,
   canConfirmInitialReport,
   canSubmitInspection,
   isTechnicalWorkflowEligible,
@@ -91,5 +92,9 @@ assert.equal(
 assert.equal(isTechnicalWorkflowEligible(incident({ status: "confirmed_affected" })), true);
 assert.equal(isTechnicalWorkflowEligible(incident({ status: "confirmed_safe" })), false);
 assert.equal(isTechnicalWorkflowEligible(incident({ status: "preliminary_unverified" })), false);
+assert.throws(
+  () => assertTechnicalWorkflowEligible(incident({ status: "confirmed_safe" })),
+  (error: Error & { code?: string }) => error.code === "TECHNICAL_WORKFLOW_NOT_ELIGIBLE",
+);
 
 console.log("[PASS] Report workflow policy scenarios");

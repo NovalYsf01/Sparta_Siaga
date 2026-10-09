@@ -1,6 +1,7 @@
 import { getDbPool } from "./db";
 import { IncidentRecord } from "@/types/incident";
 import { dbGetIncidentById } from "./incident-db";
+import { assertTechnicalWorkflowEligible } from "./report-workflow-policy";
 import {
   evaluateWorkReadiness,
   resolveWorkReadinessCategory,
@@ -192,6 +193,7 @@ export class EstimationIntegrationService {
    * Work Status awal selalu NOT_READY ("Belum Siap Dikerjakan").
    */
   static async createRoute(params: CreateEstimationRouteParams): Promise<EstimationRouteRecord> {
+    assertTechnicalWorkflowEligible(params.report);
     await ensureEstimationRoutesTable();
     const pool = getDbPool();
 

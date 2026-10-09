@@ -23,6 +23,7 @@
 import { getDbPool } from "./db";
 import { IncidentRecord } from "@/types/incident";
 import { dbGetIncidentById, dbUpdateIncident } from "./incident-db";
+import { assertTechnicalWorkflowEligible } from "./report-workflow-policy";
 import { EstimationIntegrationService } from "./estimation-service";
 import { ProgressService } from "./progress-service";
 import { checkUserPermission } from "./permission-service";
@@ -217,6 +218,8 @@ export class CompletionApprovalService {
       throw err;
     }
 
+    assertTechnicalWorkflowEligible(report);
+
     const route = await EstimationIntegrationService.getRouteByReportId(reportId);
     const resolvedRoute = resolveApprovalRoute(report, route);
 
@@ -286,6 +289,8 @@ export class CompletionApprovalService {
       err.status = 404;
       throw err;
     }
+
+    assertTechnicalWorkflowEligible(report);
 
     if (report.status === "resolved") {
       const err: any = new Error("Laporan sudah ditutup (resolved). Tindakan approval tidak dapat diulangi.");

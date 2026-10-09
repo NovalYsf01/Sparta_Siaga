@@ -10,6 +10,7 @@ import {
   WorkReadinessRequirementKey,
 } from "@/lib/work-readiness";
 import { processReadinessUpdate } from "@/lib/work-readiness-server";
+import { assertTechnicalWorkflowEligible } from "@/lib/report-workflow-policy";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -95,6 +96,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         { status: 404 }
       );
     }
+    assertTechnicalWorkflowEligible(incident);
 
     const route = await EstimationIntegrationService.getRouteByReportId(id);
     if (!route) {

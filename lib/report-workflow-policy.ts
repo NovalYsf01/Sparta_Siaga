@@ -91,6 +91,16 @@ export function isTechnicalWorkflowEligible(report: IncidentRecord): boolean {
   return TECHNICAL_STATUSES.has(report.status);
 }
 
+export function assertTechnicalWorkflowEligible(report: IncidentRecord): void {
+  if (isTechnicalWorkflowEligible(report)) return;
+  const error = new Error(
+    "Alur teknis hanya dapat dimulai setelah Manager Branch mengonfirmasi adanya kerusakan.",
+  ) as Error & { code: string; status: number };
+  error.code = "TECHNICAL_WORKFLOW_NOT_ELIGIBLE";
+  error.status = 422;
+  throw error;
+}
+
 export function isInitialWorkflowStatus(status: IncidentStatus): status is InitialWorkflowStatus {
   return INSPECTION_STATUSES.has(status) || status === "awaiting_manager_confirmation";
 }

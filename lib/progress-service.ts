@@ -1,6 +1,7 @@
 import { getDbPool } from "./db";
 import { EstimationIntegrationService } from "./estimation-service";
 import { dbGetIncidentById, dbUpdateIncident } from "./incident-db";
+import { assertTechnicalWorkflowEligible } from "./report-workflow-policy";
 import { checkUserPermission } from "./permission-service";
 import { formatServerTimestampWib } from "./watermark";
 import { IncidentRecord } from "@/types/incident";
@@ -231,6 +232,7 @@ export class ProgressService {
       err.status = 404;
       throw err;
     }
+    assertTechnicalWorkflowEligible(report);
 
     // 2. Cek Eligibility Estimasi & Kesiapan Pekerjaan (Section D & I)
     // Update Progress HANYA boleh aktif jika Work Status = READY_FOR_WORK atau IN_PROGRESS.
@@ -479,4 +481,3 @@ export class ProgressService {
     });
   }
 }
-
