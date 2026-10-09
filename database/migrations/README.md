@@ -24,3 +24,12 @@ To validate migration syntax and file checksums offline:
 ```bash
 node scripts/migrate-production.mjs --validate-only
 ```
+
+## Report workflow corrective (`002`)
+
+Before operational execution, verify a recoverable backup, run the read-only
+duplicate audit with an explicit `SPARTA_AUDIT_DATABASE_URL`, review active
+historical branch-level earthquake incidents, validate against a database whose
+name ends in `_test` or `_isolated`, and obtain explicit approval for the exact
+SQL and rollback window. The rollback template ends in `.sql.example`, so the
+production runner cannot execute it automatically.

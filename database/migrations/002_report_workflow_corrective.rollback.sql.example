@@ -1,0 +1,18 @@
+-- MANUAL ROLLBACK TEMPLATE — never run while an application version uses this schema.
+-- Historical incident columns and field_photos are intentionally not modified.
+BEGIN;
+DROP INDEX IF EXISTS idx_incidents_initial_workflow_queue;
+DROP INDEX IF EXISTS uq_incident_event_store_v1;
+DROP INDEX IF EXISTS idx_incidents_canonical_event_store_lookup;
+DROP TABLE IF EXISTS incident_earthquake_match_reviews;
+DROP TABLE IF EXISTS incident_evidence;
+DROP TABLE IF EXISTS incident_confirmation_decisions;
+DROP TABLE IF EXISTS incident_inspection_submissions;
+ALTER TABLE incidents
+  DROP COLUMN IF EXISTS latest_inspection_version,
+  DROP COLUMN IF EXISTS earthquake_identity_version,
+  DROP COLUMN IF EXISTS canonical_store_id,
+  DROP COLUMN IF EXISTS canonical_earthquake_event_id;
+DROP INDEX IF EXISTS idx_users_assigned_store_id;
+ALTER TABLE users DROP COLUMN IF EXISTS assigned_store_id;
+COMMIT;
