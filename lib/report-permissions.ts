@@ -16,6 +16,7 @@ export interface UserContext {
   systemRole: SystemRole;
   scope: Scope | null;
   branch: string | null;
+  storeId?: string | null;
 }
 
 // ============================================================

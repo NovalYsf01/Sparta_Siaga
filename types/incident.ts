@@ -27,6 +27,11 @@ export type ReportOrigin =
  * Sesuai flowchart: laporan → estimasi → SPK → ST → Close
  */
 export type IncidentStatus =
+  | "draft"                // Laporan belum lengkap dan belum diajukan
+  | "preliminary_unverified" // Informasi awal pihak luar/belum diperiksa
+  | "field_inspection_required" // Laporan otomatis menunggu pemeriksaan toko
+  | "awaiting_manager_confirmation" // Pemeriksaan diajukan ke Manager Branch
+  | "clarification_required" // Dikembalikan Manager Branch ke Tim Toko
   | "pending_confirmation"  // Auto-report dibuat, menunggu konfirmasi lapangan cabang
   | "verifying"             // Menunggu verifikasi kondisi toko
   | "confirmed_affected"    // Cabang telah mengonfirmasi kondisi terkena dampak

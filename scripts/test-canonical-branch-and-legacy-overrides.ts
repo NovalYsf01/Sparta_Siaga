@@ -315,10 +315,11 @@ async function runAsyncTests() {
     user: timTokoCikokol,
     permission: "REPORT_CONFIRM",
     report: reportCikokol1,
+    overrides: [],
   });
   assert(
-    timTokoCanConfirmCikokol.authorized === true,
-    "Tim Toko Cikokol CAN confirm report owned by Cikokol"
+    timTokoCanConfirmCikokol.authorized === false,
+    "Tim Toko Cikokol CANNOT execute official initial confirmation"
   );
 
   const timTokoCanConfirmSidoarjo = await checkUserPermission({

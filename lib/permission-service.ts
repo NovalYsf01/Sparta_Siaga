@@ -1,6 +1,7 @@
 import { getDbPool } from "./db";
 import { UserContext } from "./report-permissions";
 import { IncidentRecord } from "@/types/incident";
+import { normalizeBranchCode } from "./branch-utils";
 
 export * from "@/types/permission";
 import {
@@ -443,7 +444,7 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
   const { user, permission, targetBranch, report } = params;
 
   // Branch normalization helper
-  const cleanBranch = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
+  const cleanBranch = (b?: string | null) => normalizeBranchCode(b).toLowerCase();
   const contextBranch = cleanBranch(targetBranch || report?.branch);
   const userBranch = cleanBranch(user.branch);
 
@@ -475,6 +476,16 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
       authorized: false,
       source: "SYSTEM_ADMIN",
       reason: "Anda tidak memiliki izin untuk melakukan tindakan ini.",
+    };
+  }
+
+  // Initial operational confirmation is a non-delegable Manager Branch duty.
+  // User overrides may narrow or disable it, but cannot elevate another role.
+  if (permission === "REPORT_CONFIRM" && user.role !== "bm") {
+    return {
+      authorized: false,
+      source: "DEFAULT_DENY",
+      reason: "Konfirmasi awal laporan hanya dapat dilakukan oleh Manager Branch yang bertanggung jawab.",
     };
   }
 

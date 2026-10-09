@@ -352,9 +352,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   ],
   tim_toko: [
     "REPORT_VIEW_OWN",
-    "REPORT_CONFIRM",
     "REPORT_FOLLOW_UP",
-    "REPORT_CLOSE",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
   ],
@@ -454,9 +452,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   },
   tim_toko: {
     REPORT_VIEW_OWN: "ALLOW",
-    REPORT_CONFIRM: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
-    REPORT_CLOSE: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
   },
@@ -669,4 +665,3 @@ export interface PermissionAuditLogRecord {
   expiresAt: string | null;
   createdAt: string;
 }
-
