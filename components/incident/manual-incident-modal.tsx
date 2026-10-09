@@ -15,7 +15,7 @@ interface ManualIncidentModalProps {
   currentUser?: UserIdentity | null;
   rawStores: any[];
   activeEarthquakes?: Earthquake[];
-  onConfirm: (data: any) => void;
+  onConfirm: (data: any) => void | Promise<void>;
 }
 
 const availableCategories = [
@@ -50,6 +50,8 @@ export function ManualIncidentModal({
   const [severity, setSeverity] = useState("Sedang");
   const [operationalStatus, setOperationalStatus] = useState("Buka Normal");
   const [notes, setNotes] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -166,17 +168,21 @@ export function ManualIncidentModal({
       }
       setStep(2);
     } else if (step === 2) {
-      const requiredPhotos = photos.depan.file && photos.dalam.file && photos.kiri.file && photos.kanan.file;
-      const isDCValid = tkpType === "DC" ? photos.detailDC.file : true;
-      if (!requiredPhotos || !isDCValid) {
-        alert("Laporan manual WAJIB melampirkan seluruh sisi foto yang diminta.");
+      const selectedPhotos = Object.values(photos).filter((photo) => photo.file);
+      const invalidThirdParty = selectedPhotos.some((photo) => photo.reporterRelation === "received" && !photo.thirdPartySourceDescription?.trim());
+      if (selectedPhotos.length < 1) {
+        alert("Lampirkan minimal satu foto kondisi aktual.");
+        return;
+      }
+      if (invalidThirdParty) {
+        alert("Lengkapi keterangan sumber untuk foto yang diterima dari pihak lain.");
         return;
       }
       setStep(3);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (identity?.systemRole === "ADMIN") {
       alert("Akun System Administrator tidak diizinkan membuat laporan operasional.");
@@ -186,22 +192,16 @@ export function ManualIncidentModal({
       (s) => s.kode_toko === storeId || s.id === storeId
     );
 
-    // Generate dummy URLs or handle files in a real app
-    const dummyPhotos = [
-      photos.depan.previewUrl || "",
-      photos.dalam.previewUrl || "",
-      photos.kiri.previewUrl || "",
-      photos.kanan.previewUrl || ""
-    ];
-    if (tkpType === "DC" && photos.detailDC.previewUrl) {
-      dummyPhotos.unshift(photos.detailDC.previewUrl);
-    }
+    const selectedPhotos = Object.values(photos).filter((photo) => photo.file);
 
     const matchedEq = disasterType === "earthquake" && selectedEarthquakeEventId
       ? activeEarthquakes.find((e) => (e.canonicalEventKey || e.id) === selectedEarthquakeEventId)
       : undefined;
 
-    onConfirm({
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await onConfirm({
       disasterType,
       reportOrigin: "manual",
       reporter: {
@@ -226,8 +226,14 @@ export function ManualIncidentModal({
       severity,
       operationalStatus,
       notes,
-      photos: dummyPhotos
-    });
+      photos: selectedPhotos
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Laporan tidak dapat dikirim.");
+      return;
+    } finally {
+      setIsSubmitting(false);
+    }
 
     // Reset state after submit handled in parent, but clean up local urls
     if (photos.depan.previewUrl) URL.revokeObjectURL(photos.depan.previewUrl);
@@ -679,6 +685,7 @@ export function ManualIncidentModal({
 
         </div>
 
+        {submitError ? <p role="alert" className="mx-4 mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 md:mx-8">{submitError}</p> : null}
         {/* Footer Actions */}
         <div className="p-4 md:px-8 md:py-5 border-t border-slate-200 bg-white shrink-0 flex items-center justify-between">
           <button
@@ -706,11 +713,11 @@ export function ManualIncidentModal({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={identity?.systemRole === "ADMIN"}
+              disabled={identity?.systemRole === "ADMIN" || isSubmitting}
               className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#D9272E] hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md shadow-red-500/20"
             >
               <AlertTriangle className="w-4 h-4" />
-              <span>Kirim Laporan Resmi</span>
+              <span>{isSubmitting ? "Mengirim…" : "Kirim Laporan Resmi"}</span>
             </button>
           )}
         </div>

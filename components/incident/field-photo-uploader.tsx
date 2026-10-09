@@ -10,6 +10,9 @@ export interface PhotoData {
   source: "camera" | "gallery" | null;
   reporterRelation: "self" | "received" | null;
   capturedAt: string | null;
+  caption?: string;
+  thirdPartySourceName?: string;
+  thirdPartySourceDescription?: string;
 }
 
 interface FieldPhotoUploaderProps {
@@ -157,6 +160,31 @@ export function FieldPhotoUploader({ label, description, value, onChange, storeN
             </div>
           </div>
           )}
+          <div className="mt-3 space-y-2">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200">
+              Keterangan foto
+              <input value={value.caption || ""} maxLength={200}
+                onChange={(event) => onChange({ ...value, caption: event.target.value })}
+                placeholder="Contoh: kondisi rak bagian belakang"
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 dark:border-slate-600 dark:bg-slate-950 dark:text-white" />
+            </label>
+            {value.reporterRelation === "received" ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Nama sumber (opsional)
+                  <input value={value.thirdPartySourceName || ""} maxLength={100}
+                    onChange={(event) => onChange({ ...value, thirdPartySourceName: event.target.value })}
+                    placeholder="Boleh dikosongkan"
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950" />
+                </label>
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">Keterangan sumber
+                  <input required value={value.thirdPartySourceDescription || ""} maxLength={160}
+                    onChange={(event) => onChange({ ...value, thirdPartySourceDescription: event.target.value })}
+                    placeholder="Warga, pelanggan, petugas keamanan"
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950" />
+                </label>
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
       <CameraCapture 

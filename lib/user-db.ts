@@ -114,8 +114,8 @@ export async function dbCreateUser(user: Partial<UserModel> & { id: string, name
   const branch = isSystemAdmin || scope === "HO" ? null : (user.branch || null);
 
   const { rows } = await pool.query(
-    `INSERT INTO users (id, external_user_id, nik, name, email, system_role, business_role, scope, branch, status, source, password_hash)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    `INSERT INTO users (id, external_user_id, nik, name, email, system_role, business_role, scope, branch, assigned_store_id, status, source, password_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING *`,
     [
       user.id,
@@ -127,6 +127,7 @@ export async function dbCreateUser(user: Partial<UserModel> & { id: string, name
       businessRole,
       scope,
       branch,
+      businessRole === "tim_toko" ? user.assignedStoreId || null : null,
       user.status || "ACTIVE",
       user.source || "LOCAL",
       user.passwordHash || null
@@ -156,6 +157,10 @@ export async function dbAdminUpdateUser(id: string, updates: Partial<UserModel>)
   if (updates.branch !== undefined) {
     setClauses.push(`branch = $${idx++}`);
     values.push(updates.branch);
+  }
+  if (updates.assignedStoreId !== undefined) {
+    setClauses.push(`assigned_store_id = $${idx++}`);
+    values.push(updates.assignedStoreId);
   }
   if (updates.status !== undefined) {
     setClauses.push(`status = $${idx++}`);

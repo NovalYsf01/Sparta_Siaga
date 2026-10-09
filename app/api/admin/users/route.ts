@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth";
 import { dbGetAllUsers, dbCreateUser, dbGetUserByNik } from "@/lib/user-db";
 import { isValidHumanBusinessRole, deriveScopeFromBusinessRole } from "@/lib/role-catalog";
 import bcrypt from "bcryptjs";
+import { getDbPool } from "@/lib/db";
 
 export async function GET() {
   try {
@@ -86,6 +87,7 @@ export async function POST(request: Request) {
     }
 
     let finalBranch: string | null = null;
+    let assignedStoreId: string | null = null;
     if (derivedScope === "HO") {
       // Role HO tidak boleh memiliki branch
       finalBranch = null;
@@ -98,6 +100,20 @@ export async function POST(request: Request) {
         );
       }
       finalBranch = body.branch.trim();
+      if (businessRole === "tim_toko") {
+        if (!body.assignedStoreId || typeof body.assignedStoreId !== "string") {
+          return NextResponse.json({ error: "Toko penugasan wajib dipilih untuk Tim Toko." }, { status: 400 });
+        }
+        const storeResult = await getDbPool().query(
+          "SELECT kode_toko, cabang FROM stores WHERE UPPER(kode_toko) = UPPER($1) OR UPPER(id) = UPPER($1) LIMIT 1",
+          [body.assignedStoreId.trim()],
+        );
+        const store = storeResult.rows[0];
+        if (!store || store.cabang.trim().toUpperCase() !== String(finalBranch).toUpperCase()) {
+          return NextResponse.json({ error: "Toko penugasan harus merupakan toko valid dalam cabang pengguna." }, { status: 400 });
+        }
+        assignedStoreId = store.kode_toko;
+      }
     }
 
     // 6. Validasi Password untuk akun LOCAL
@@ -129,6 +145,7 @@ export async function POST(request: Request) {
       businessRole,
       scope: derivedScope,
       branch: finalBranch,
+      assignedStoreId,
       status: body.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
       source,
       passwordHash,

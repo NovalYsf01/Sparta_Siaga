@@ -13,6 +13,7 @@ import type { EvidenceOrigin, EvidencePhase, IncidentEvidence } from "../types/r
 export interface EvidenceMetadataInput { caption: string; origin: EvidenceOrigin; thirdPartySourceName?: string | null; thirdPartySourceDescription?: string | null }
 export function validateEvidenceMetadata(input: EvidenceMetadataInput): { valid: boolean; code?: string } {
   if (!input.caption?.trim()) return { valid: false, code: "CAPTION_REQUIRED" };
+  if (!["CAMERA_SELF", "GALLERY_SELF", "GALLERY_THIRD_PARTY"].includes(input.origin)) return { valid: false, code: "INVALID_EVIDENCE_ORIGIN" };
   if (input.origin === "GALLERY_THIRD_PARTY" && !input.thirdPartySourceDescription?.trim()) return { valid: false, code: "THIRD_PARTY_SOURCE_REQUIRED" };
   return { valid: true };
 }
@@ -24,6 +25,7 @@ export async function saveIncidentEvidence(input: SaveEvidenceInput, actor: User
   if (!canUploadIncidentEvidence(actor, input.report)) throw Object.assign(new Error("Unggah bukti tidak diizinkan."), { code: "EVIDENCE_UPLOAD_FORBIDDEN", status: 403 });
   const metadata = validateEvidenceMetadata(input);
   if (!metadata.valid) throw Object.assign(new Error("Metadata bukti tidak lengkap."), { code: metadata.code, status: 400 });
+  if (!["INITIAL", "CLARIFICATION", "FOLLOW_UP"].includes(input.phase)) throw Object.assign(new Error("Fase bukti tidak valid."), { code: "INVALID_EVIDENCE_PHASE", status: 400 });
   if (input.buffer.length === 0 || input.buffer.length > 10 * 1024 * 1024) throw Object.assign(new Error("Ukuran foto tidak valid."), { code: "INVALID_FILE_SIZE", status: 400 });
   const magic = validateImageMagicBytes(input.buffer);
   if (!magic.valid || !magic.mimeType || !["image/jpeg", "image/png", "image/webp"].includes(magic.mimeType)) throw Object.assign(new Error("Format foto tidak valid."), { code: "INVALID_IMAGE", status: 400 });

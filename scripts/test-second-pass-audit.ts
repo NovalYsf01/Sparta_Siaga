@@ -15,7 +15,7 @@ import {
   dbFindUnlinkedManualEarthquakeCandidates,
   dbCreateIncident,
 } from "../lib/incident-db.js";
-import { AUTO_EARTHQUAKE_MAX_AGE_MINUTES, MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES } from "../lib/server-daemon.js";
+import { AUTO_EARTHQUAKE_MAX_AGE_MINUTES } from "../lib/server-daemon.js";
 import { correlateDisasters, CANONICAL_CORRELATION_THRESHOLDS } from "../lib/disaster-service.js";
 
 async function runTests() {

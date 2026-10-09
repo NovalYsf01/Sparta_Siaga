@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Info, X } from "lucide-react";
 import { Store, StoreStatus } from "@/types/store";
 import { Earthquake, DisasterFeedResponse } from "@/types/disaster";
-import { RoleType, IncidentRecord, DamageReport } from "@/types/incident";
+import { RoleType, IncidentRecord } from "@/types/incident";
 import {
   calculateIncidentStats,
 } from "@/lib/incident-store";
@@ -16,7 +16,6 @@ import { assessStoreRisk } from "@/lib/haversine";
 import { deriveStoreStatuses } from "@/lib/store-status";
 import { IncidentAppShell } from "@/components/layout/incident-app-shell";
 import { SiagaProvider } from "@/components/layout/siaga-context";
-import { StoreVerificationModal } from "@/components/incident/store-verification-modal";
 import { ManualIncidentModal } from "@/components/incident/manual-incident-modal";
 import { MaintenanceTrackingModal } from "@/components/incident/maintenance-tracking-modal";
 import { StoreDetailSheet } from "@/components/store/store-detail-sheet";
@@ -50,7 +49,6 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
   const [selectedIncidentForAction, setSelectedIncidentForAction] = useState<IncidentRecord | null>(null);
   const [selectedReadOnlyIncident, setSelectedReadOnlyIncident] = useState<IncidentRecord | null>(null);
-  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -608,91 +606,6 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     setIsMaintenanceModalOpen(true);
   };
 
-  // Confirmation of store condition
-  const handleConfirmVerification = (
-    incidentId: string,
-    isDamaged: boolean,
-    report?: Partial<DamageReport>
-  ) => {
-    const updated = incidents.map((inc) => {
-      if (inc.id !== incidentId) return inc;
-
-      const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
-
-      if (!isDamaged) {
-        // Toko Aman -> Resolved immediately, moves to History!
-        return {
-          ...inc,
-          status: "resolved" as const,
-          progress: 100,
-          verification: {
-            confirmedBy: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
-            confirmedAt: timestamp,
-            isDamaged: false,
-            notes: report?.notes || "Toko aman, operasional normal.",
-          },
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Verifikasi Selesai",
-              label: "Toko Dikonfirmasi Aman",
-              timestamp,
-              actor: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
-              notes: report?.notes,
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-          closedAt: new Date().toISOString(),
-        };
-      } else {
-        // Toko Mengalami Kerusakan -> Generate ticket & escalate to Sparta Maintenance!
-        const ticketId = `SPM-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(
-          1000 + Math.random() * 9000
-        )}`;
-
-        return {
-          ...inc,
-          status: "investigating" as const,
-          progress: 30,
-          verification: {
-            confirmedBy: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
-            confirmedAt: timestamp,
-            isDamaged: true,
-            categories: report?.categories || ["Rak Barang"],
-            severity: report?.severity || "Sedang",
-            operationalStatus: report?.operationalStatus || "Buka Normal",
-            notes: report?.notes,
-            photos: report?.photos,
-          },
-          maintenanceTicket: {
-            ticketId,
-            assignedTechnician: "Penugasan Wilayah Sparta Maintenance",
-            workDescription: `Pemeriksaan kerusakan ${report?.categories?.join(", ") || "fisik"}.`,
-          },
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Verifikasi Kerusakan",
-              label: `Kerusakan Terkonfirmasi (${report?.severity || "Sedang"})`,
-              timestamp,
-              actor: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
-              notes: report?.notes,
-            },
-            {
-              stage: "Tiket Maintenance Dibuat",
-              label: `Tiket ${ticketId} Diteruskan ke Tim Maintenance`,
-              timestamp,
-              actor: "Sistem Sparta Siaga",
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-        };
-      }
-    });
-
-    handleUpdateIncidents(updated);
-  };
-
   // Progression updater for Maintenance
   const handleUpdateMaintenanceProgress = (
     incidentId: string,
@@ -781,67 +694,37 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         currentUser={currentUser}
         rawStores={rawStores}
         activeEarthquakes={disasterData?.activeEarthquakes || []}
-        onConfirm={(data) => {
-          const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
-          const reporterInfo = data.reporter || {
-            userId: currentUser?.id,
-            name: currentUser?.name || "Pelapor Lapangan",
-            nik: currentUser?.nik || null,
-            role: currentUser?.systemRole === "ADMIN" ? "ADMIN" : (currentUser?.businessRole || currentUser?.role || activeRole),
-            branch: currentUser?.branch || data.branch,
-            storeId: data.storeId,
-          };
-          const newIncident: IncidentRecord = {
-            id: `INC-MAN-${Date.now()}`,
-            storeId: data.storeId,
-            storeName: data.storeName,
-            branch: data.branch,
-            locationCity: data.locationCity,
-            disasterType: data.disasterType,
-            reportOrigin: "manual",
-            reporter: reporterInfo,
-            earthquakeEventId: data.earthquakeEventId || undefined,
-            earthquakeSource: data.earthquakeSource || (data.earthquakeEventId ? "BMKG" : undefined),
-            earthquakeProvenance: data.earthquakeEventId ? `Ditautkan secara manual oleh pelapor ke kejadian ${data.earthquakeEventId}` : undefined,
-            tkpType: data.tkpType || "Toko",
-            date: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            status: "verifying",
-            progress: 15,
-            verification: {
-              confirmedBy: "",
-              confirmedAt: "",
-              isDamaged: true,
-              categories: data.categories,
-              severity: data.severity,
-              operationalStatus: data.operationalStatus,
-              notes: data.notes
-            },
-            fieldPhotos: data.photos ?? [],
-            timeline: [
-              {
-                stage: "Laporan Dibuat",
-                label: "Laporan insiden / kerusakan manual",
-                timestamp,
-                actor: reporterInfo.name ? `${reporterInfo.name} (${reporterInfo.role || "Pelapor"})` : "Pelapor Lapangan",
-                notes: data.notes || undefined,
-              }
-            ]
-          };
-          const updated = [newIncident, ...incidents];
-          handleUpdateIncidents(updated);
+        onConfirm={async (data) => {
+          const response = await fetch("/api/incidents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ disasterType: data.disasterType, storeId: data.storeId, locationCity: data.locationCity, description: data.notes, earthquakeEventId: data.earthquakeEventId }),
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            toast.error(payload.error || "Laporan tidak dapat dibuat");
+            throw new Error(payload.error || "Laporan tidak dapat dibuat");
+          }
+          const created = payload.data as IncidentRecord;
+          for (const photo of data.photos || []) {
+            if (!photo.file) continue;
+            const form = new FormData();
+            form.set("file", photo.file);
+            form.set("phase", "INITIAL");
+            form.set("caption", photo.caption?.trim() || "Kondisi aktual toko");
+            form.set("origin", photo.source === "camera" ? "CAMERA_SELF" : photo.reporterRelation === "received" ? "GALLERY_THIRD_PARTY" : "GALLERY_SELF");
+            if (photo.thirdPartySourceName) form.set("thirdPartySourceName", photo.thirdPartySourceName);
+            if (photo.thirdPartySourceDescription) form.set("thirdPartySourceDescription", photo.thirdPartySourceDescription);
+            const upload = await fetch(`/api/incidents/${encodeURIComponent(created.id)}/evidence`, { method: "POST", body: form });
+            if (!upload.ok) throw new Error((await upload.json()).error || "Bukti foto gagal diunggah");
+          }
+          const inspection = await fetch(`/api/incidents/${encodeURIComponent(created.id)}/inspection`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verificationLevel: "FIELD_VERIFIED", conditionNotes: data.notes }) });
+          const inspectionPayload = await inspection.json();
+          if (!inspection.ok) throw new Error(inspectionPayload.error || "Pemeriksaan tidak dapat diajukan");
+          setIncidents((current) => [inspectionPayload.data, ...current.filter((item) => item.id !== created.id)]);
           setIsManualModalOpen(false);
+          toast.success("Laporan diajukan ke Manager Branch");
         }}
-      />
-
-      {/* Verification Modal */}
-      <StoreVerificationModal
-        incident={selectedIncidentForAction}
-        activeRole={activeRole}
-        isOpen={isVerificationModalOpen}
-        onClose={() => setIsVerificationModalOpen(false)}
-        onConfirmVerification={handleConfirmVerification}
       />
 
       {/* Maintenance Tracking Modal */}
@@ -851,7 +734,6 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         isOpen={isMaintenanceModalOpen}
         onClose={() => setIsMaintenanceModalOpen(false)}
         onUpdateProgress={handleUpdateMaintenanceProgress}
-        onConfirmVerification={handleConfirmVerification}
       />
 
       {/* Read-Only Incident Detail Modal (History) */}

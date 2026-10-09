@@ -9,6 +9,7 @@ import {
 } from "@/lib/user-db";
 import { isValidHumanBusinessRole, deriveScopeFromBusinessRole } from "@/lib/role-catalog";
 import bcrypt from "bcryptjs";
+import { getDbPool } from "@/lib/db";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -72,6 +73,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       body.businessRole = null;
       body.scope = null;
       body.branch = null;
+      body.assignedStoreId = null;
     } else {
       // 4. ATURAN PENGGUNA NORMAL (USER)
       if (body.systemRole === "ADMIN") {
@@ -107,6 +109,26 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           }
           body.branch = body.branch.trim();
         }
+      }
+
+      const effectiveRole = body.businessRole ?? existingUser.businessRole;
+      const effectiveBranch = body.branch !== undefined ? body.branch : existingUser.branch;
+      if (effectiveRole === "tim_toko") {
+        const requestedStore = body.assignedStoreId !== undefined ? body.assignedStoreId : existingUser.assignedStoreId;
+        if (!requestedStore || typeof requestedStore !== "string") {
+          return NextResponse.json({ error: "Toko penugasan wajib dipilih untuk Tim Toko." }, { status: 400 });
+        }
+        const storeResult = await getDbPool().query(
+          "SELECT kode_toko, cabang FROM stores WHERE UPPER(kode_toko) = UPPER($1) OR UPPER(id) = UPPER($1) LIMIT 1",
+          [requestedStore.trim()],
+        );
+        const store = storeResult.rows[0];
+        if (!store || !effectiveBranch || store.cabang.trim().toUpperCase() !== String(effectiveBranch).trim().toUpperCase()) {
+          return NextResponse.json({ error: "Toko penugasan harus merupakan toko valid dalam cabang pengguna." }, { status: 400 });
+        }
+        body.assignedStoreId = store.kode_toko;
+      } else {
+        body.assignedStoreId = null;
       }
     }
 

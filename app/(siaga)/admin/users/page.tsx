@@ -41,6 +41,7 @@ interface User {
   businessRole: string | null;
   scope: "HO" | "BRANCH" | null;
   branch: string | null;
+  assignedStoreId: string | null;
   status: "ACTIVE" | "INACTIVE";
   source: string;
 }
@@ -70,6 +71,7 @@ export default function UserManagementPage() {
     businessRole: "tim_toko",
     scope: "BRANCH",
     branch: "",
+    assignedStoreId: "",
     status: "ACTIVE",
     password: "",
     confirmPassword: ""
@@ -215,6 +217,7 @@ export default function UserManagementPage() {
       businessRole: "tim_toko",
       scope: "BRANCH",
       branch: "",
+      assignedStoreId: "",
       status: "ACTIVE",
       password: "",
       confirmPassword: ""
@@ -243,6 +246,7 @@ export default function UserManagementPage() {
       businessRole: user.businessRole || "",
       scope: derived,
       branch: user.branch,
+      assignedStoreId: user.assignedStoreId || "",
       status: user.status,
       password: "",
       confirmPassword: ""
@@ -314,7 +318,8 @@ export default function UserManagementPage() {
       ...editForm,
       businessRole: role,
       scope: newScope,
-      branch: newBranch
+      branch: newBranch,
+      assignedStoreId: role === "tim_toko" ? editForm.assignedStoreId : null,
     });
   };
 
@@ -930,6 +935,13 @@ export default function UserManagementPage() {
                                   </div>
                                 )}
                               </div>
+                            </div>
+                          )}
+                          {editForm.businessRole === "tim_toko" && (
+                            <div className="space-y-1.5 sm:col-span-2">
+                              <label htmlFor="assigned-store-id" className="text-xs font-bold text-slate-700 dark:text-slate-400">Kode Toko Penugasan *</label>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">Wajib cocok dengan toko kanonikal di cabang yang dipilih. Tim Toko hanya dapat menginspeksi toko ini.</p>
+                              <input id="assigned-store-id" required value={editForm.assignedStoreId || ""} onChange={(event) => setEditForm({ ...editForm, assignedStoreId: event.target.value.trimStart().toUpperCase() })} placeholder="Contoh: T001" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" />
                             </div>
                           )}
                         </div>
