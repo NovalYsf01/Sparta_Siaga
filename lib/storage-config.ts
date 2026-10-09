@@ -5,6 +5,7 @@ export interface StoragePaths {
   root: string;
   readiness: string;
   progress: string;
+  incidents: string;
 }
 
 export class StorageConfigError extends Error {
@@ -28,6 +29,7 @@ export function getPrivateStoragePaths(overrideRoot?: string): StoragePaths {
     root,
     readiness: path.join(root, "readiness"),
     progress: path.join(root, "progress"),
+    incidents: path.join(root, "incidents"),
   };
 }
 
@@ -52,6 +54,7 @@ export async function validatePrivateStorage(rootToCheck?: string): Promise<Stor
   await fs.mkdir(paths.root, { recursive: true });
   await fs.mkdir(paths.readiness, { recursive: true });
   await fs.mkdir(paths.progress, { recursive: true });
+  await fs.mkdir(paths.incidents, { recursive: true });
 
   // Perform a randomized create/write/read/delete probe
   const probeFilename = `.probe_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
