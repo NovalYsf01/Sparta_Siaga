@@ -85,6 +85,10 @@ export function checkClientPermission(params: ClientPermissionCheckParams): Clie
     const matchingOverrides = activeOverrides.filter((ov) => ov.permissionKey === permission);
 
     const doesScopeMatch = (ov: UserPermissionOverrideRecord) => {
+      // Operational actions cannot match ALL_BRANCHES (must be specific branch or own branch)
+      if (isOperationalPermission(permission) && ov.scopeType === "ALL_BRANCHES") {
+        return false;
+      }
       if (ov.scopeType === "ALL_BRANCHES") return true;
       if (ov.scopeType === "SPECIFIC_BRANCH") {
         if (!contextBranch) return true;

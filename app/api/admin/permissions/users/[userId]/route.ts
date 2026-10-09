@@ -10,6 +10,8 @@ import {
   getRolePermissions,
   getUserOverrides,
   createUserOverride,
+  getPermissionScopeRule,
+  isOperationalPermission,
 } from "@/lib/permission-service";
 
 type RouteContext = { params: Promise<{ userId: string }> };
@@ -139,6 +141,26 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
+    // Canonical scope rule validation (Reject contradictory scope payloads)
+    const scopeRule = getPermissionScopeRule(permissionKey);
+    if (!scopeRule.allowedScopes.includes(scopeType)) {
+      return NextResponse.json(
+        {
+          error: `Cakupan '${scopeType}' bertentangan dengan kebijakan hak akses '${permissionKey}'. Cakupan yang valid: ${scopeRule.allowedScopes.join(", ")}.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (isOperationalPermission(permissionKey) && scopeType === "ALL_BRANCHES") {
+      return NextResponse.json(
+        {
+          error: "Cakupan 'Semua Branch' tidak diizinkan untuk hak akses operasional (Zero Cross-Branch Mutation).",
+        },
+        { status: 400 }
+      );
+    }
+
     if (scopeType === "SPECIFIC_BRANCH" && (!branchCode || !branchCode.trim())) {
       return NextResponse.json(
         { error: "Kode cabang wajib diisi jika scope adalah SPECIFIC_BRANCH." },
@@ -151,6 +173,20 @@ export async function POST(request: Request, { params }: RouteContext) {
         { error: "Alasan (reason) wajib diisi untuk setiap user override." },
         { status: 400 }
       );
+    }
+
+    // Date validation
+    if (expiresAt) {
+      const expDate = new Date(expiresAt);
+      if (isNaN(expDate.getTime())) {
+        return NextResponse.json({ error: "Format tanggal berakhir tidak valid." }, { status: 400 });
+      }
+      if (expDate <= new Date()) {
+        return NextResponse.json(
+          { error: "Tanggal berakhir masa berlaku harus lebih besar dari waktu sekarang." },
+          { status: 400 }
+        );
+      }
     }
 
     // Check user exists

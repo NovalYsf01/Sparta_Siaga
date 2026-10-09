@@ -166,31 +166,7 @@ export interface IncidentReporter {
   storeId?: string | null;
 }
 
-export function getRoleDisplayLabel(role?: string | null): string {
-  if (!role) return "User";
-  const r = role.toLowerCase();
-  const map: Record<string, string> = {
-    ho_admin: "HO Admin",
-    gm_ho: "GM HO",
-    sm_ho: "SM HO",
-    bm: "Manager Branch",
-    bnm: "BnM",
-    bbc: "BBC",
-    bmc: "BMC",
-    bec: "BEC",
-    bes: "BES",
-    bms: "BMS",
-    bbs: "BBS",
-    tim_toko: "Tim Toko",
-    tim_maintenance: "Tim Maintenance",
-    sparta_maintenance: "Sparta Maintenance",
-    tim_office: "Tim Office",
-    tim_warehouse: "Tim Warehouse",
-    admin: "System Admin",
-    user: "User",
-  };
-  return map[r] || role.replace(/_/g, " ").toUpperCase();
-}
+export { getRoleDisplayLabel } from "@/lib/role-catalog";
 
 /**
  * Record laporan utama — anchor lifecycle sistem.

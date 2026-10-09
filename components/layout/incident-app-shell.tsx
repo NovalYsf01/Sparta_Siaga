@@ -336,20 +336,22 @@ export function IncidentAppShell({
           {/* Right: Date Range, Notifications, Role */}
           <div className="flex items-center gap-3 sm:gap-4">
             
-            <button
-              onClick={() => {
-                if (onOpenReportModal) {
-                  onOpenReportModal();
-                } else {
-                  const event = new CustomEvent('open-manual-report');
-                  window.dispatchEvent(event);
-                }
-              }}
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
-            >
-              <ClipboardList className="w-4 h-4" />
-              Buat Laporan
-            </button>
+            {identity?.systemRole !== "ADMIN" && (
+              <button
+                onClick={() => {
+                  if (onOpenReportModal) {
+                    onOpenReportModal();
+                  } else {
+                    const event = new CustomEvent('open-manual-report');
+                    window.dispatchEvent(event);
+                  }
+                }}
+                className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Buat Laporan
+              </button>
+            )}
             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden md:block mx-1"></div>
 
 

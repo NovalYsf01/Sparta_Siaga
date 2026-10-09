@@ -49,15 +49,18 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     const patch = await request.json();
-    const isClose = patch.status === "resolved";
-    const action = isClose ? "close" : "act";
+    const isConfirmation = Boolean(
+      patch.verification && (!incident.verification || incident.status === "pending_confirmation" || incident.status === "verifying")
+    );
+    const isWorkClose = patch.status === "resolved" && (!isConfirmation || patch.verification?.isDamaged === true);
+    const action = isConfirmation ? "confirm" : isWorkClose ? "close" : "act";
 
     const authResult = await checkMutationAuthorization(action, sessionUser, incident);
     if (!authResult.authorized) {
       return NextResponse.json({ error: authResult.reason }, { status: 403 });
     }
 
-    if (isClose) {
+    if (isWorkClose) {
       const { ProgressService } = await import("@/lib/progress-service");
       const latest = await ProgressService.getLatestProgress(id);
       if (latest.latestPercentage < 100) {

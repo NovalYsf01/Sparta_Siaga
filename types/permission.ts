@@ -179,6 +179,146 @@ export function isMonitoringPermission(key: PermissionKey): boolean {
 }
 
 // ============================================================
+// CANONICAL SCOPE POLICIES PER PERMISSION
+// ============================================================
+
+export type ScopePolicyType = "FIXED_NATIONAL" | "FIXED_OWN" | "BRANCH_SCOPED";
+
+export interface PermissionScopeRule {
+  key: PermissionKey;
+  policy: ScopePolicyType;
+  allowedScopes: readonly ScopeType[];
+  defaultScope: ScopeType;
+  scopeSummary: (userContext?: { branch?: string | null; scope?: string | null }) => string;
+  description: string;
+}
+
+export const PERMISSION_SCOPE_RULES: Record<PermissionKey, PermissionScopeRule> = {
+  REPORT_VIEW_ALL: {
+    key: "REPORT_VIEW_ALL",
+    policy: "FIXED_NATIONAL",
+    allowedScopes: ["ALL_BRANCHES"],
+    defaultScope: "ALL_BRANCHES",
+    scopeSummary: () => "Seluruh Cabang (Nasional)",
+    description: "Izin monitoring baca seluruh laporan cabang secara nasional.",
+  },
+  REPORT_VIEW_OWN: {
+    key: "REPORT_VIEW_OWN",
+    policy: "FIXED_OWN",
+    allowedScopes: ["OWN_SCOPE"],
+    defaultScope: "OWN_SCOPE",
+    scopeSummary: (u) => `Cabang Pengguna (${u?.branch || "Scope User"})`,
+    description: "Izin melihat laporan cabang/toko penugasan sendiri.",
+  },
+  NOTIFICATION_VIEW: {
+    key: "NOTIFICATION_VIEW",
+    policy: "FIXED_OWN",
+    allowedScopes: ["OWN_SCOPE"],
+    defaultScope: "OWN_SCOPE",
+    scopeSummary: () => "Global / Seluruh Notifikasi Bencana",
+    description: "Izin memantau feed notifikasi peringatan bencana.",
+  },
+  MANAGEMENT_INSTRUCTION_CREATE: {
+    key: "MANAGEMENT_INSTRUCTION_CREATE",
+    policy: "FIXED_NATIONAL",
+    allowedScopes: ["ALL_BRANCHES"],
+    defaultScope: "ALL_BRANCHES",
+    scopeSummary: () => "Seluruh Cabang (Nasional)",
+    description: "Izin menerbitkan instruksi tanggap darurat manajemen HO.",
+  },
+  ESTIMATION_VIEW: {
+    key: "ESTIMATION_VIEW",
+    policy: "FIXED_OWN",
+    allowedScopes: ["OWN_SCOPE"],
+    defaultScope: "OWN_SCOPE",
+    scopeSummary: (u) => `Cabang Pengguna (${u?.branch || "Scope User"})`,
+    description: "Izin melihat status tiket estimasi perbaikan.",
+  },
+  REPORT_CONFIRM: {
+    key: "REPORT_CONFIRM",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin konfirmasi kondisi kerusakan di lapangan.",
+  },
+  REPORT_FOLLOW_UP: {
+    key: "REPORT_FOLLOW_UP",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin investigasi dan tindak lanjut penanganan insiden.",
+  },
+  REPORT_UPDATE_PROGRESS: {
+    key: "REPORT_UPDATE_PROGRESS",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin pembaruan persentase progress perbaikan teknis.",
+  },
+  REPORT_CLOSE: {
+    key: "REPORT_CLOSE",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin penyelesaian dan penutupan laporan insiden.",
+  },
+  ESTIMATION_TRIGGER: {
+    key: "ESTIMATION_TRIGGER",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin pembuatan tiket estimasi perbaikan fisik.",
+  },
+  WORK_READINESS_UPDATE: {
+    key: "WORK_READINESS_UPDATE",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin verifikasi kesiapan kerja fisik di toko.",
+  },
+  COMPLETION_SUBMIT: {
+    key: "COMPLETION_SUBMIT",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin pengajuan penyelesaian pekerjaan fisik (PIC).",
+  },
+  COMPLETION_APPROVE_COORDINATOR: {
+    key: "COMPLETION_APPROVE_COORDINATOR",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
+    description: "Izin approval penyelesaian pekerjaan (Koordinator).",
+  },
+};
+
+export function getPermissionScopeRule(key: PermissionKey): PermissionScopeRule {
+  return (
+    PERMISSION_SCOPE_RULES[key] || {
+      key,
+      policy: "BRANCH_SCOPED",
+      allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+      defaultScope: "SPECIFIC_BRANCH",
+      scopeSummary: (u) => `Cabang (${u?.branch || "N/A"})`,
+      description: "Pengaturan izin operasional cabang.",
+    }
+  );
+}
+
+export function isFixedScopePermission(key: PermissionKey): boolean {
+  const rule = getPermissionScopeRule(key);
+  return rule.policy === "FIXED_NATIONAL" || rule.policy === "FIXED_OWN";
+}
+
+// ============================================================
 // ROLE PERMISSION CATALOG (INHERENT PERMISSIONS PER BUSINESS ROLE)
 // ============================================================
 // Menentukan permission apa saja yang memang secara business rule
@@ -244,6 +384,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   bes: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
+    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
     "COMPLETION_SUBMIT",
@@ -258,6 +399,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   bbs: [
     "REPORT_VIEW_OWN",
     "REPORT_FOLLOW_UP",
+    "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
     "ESTIMATION_VIEW",
     "COMPLETION_SUBMIT",
@@ -344,6 +486,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   bes: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
+    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
     COMPLETION_SUBMIT: "ALLOW",
@@ -358,6 +501,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   bbs: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
+    REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
     COMPLETION_SUBMIT: "ALLOW",
@@ -401,6 +545,113 @@ export interface UserPermissionOverrideRecord {
   revokedBy: string | null;
   createdAt: string;
   updatedAt: string;
+  policyCompliance?: OverridePolicyCompliance;
+}
+
+export interface OverridePolicyCompliance {
+  isValid: boolean;
+  isCompliant: boolean;
+  isEffective: boolean;
+  isEffectivelyActive: boolean;
+  statusCode: "ACTIVE_ALLOWED" | "ACTIVE_DENIED" | "EXPIRED" | "REVOKED" | "POLICY_CONFLICT";
+  statusBadgeText: string;
+  statusBadgeClass: string;
+  policyWarning?: string;
+  reason?: string;
+}
+
+export function evaluateOverridePolicyCompliance(
+  override: UserPermissionOverrideRecord,
+  _user?: { scope?: string | null; branch?: string | null }
+): OverridePolicyCompliance {
+  const isRevoked = Boolean(override.revokedAt);
+  const isExpired = !isRevoked && Boolean(override.expiresAt) && new Date(override.expiresAt!) <= new Date();
+
+  if (isRevoked) {
+    return {
+      isValid: true,
+      isCompliant: true,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "REVOKED",
+      statusBadgeText: "DICABUT",
+      statusBadgeClass: "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700",
+      reason: "Override telah dicabut secara manual oleh Administrator.",
+    };
+  }
+
+  if (isExpired) {
+    return {
+      isValid: true,
+      isCompliant: true,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "EXPIRED",
+      statusBadgeText: "KADALUARSA",
+      statusBadgeClass: "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+      reason: "Masa berlaku override telah berakhir.",
+    };
+  }
+
+  const isOp = isOperationalPermission(override.permissionKey);
+  const scopeRule = getPermissionScopeRule(override.permissionKey);
+
+  // Prohibit operational permissions with ALL_BRANCHES scope
+  if (isOp && override.scopeType === "ALL_BRANCHES") {
+    const warning =
+      "Hak akses operasional tidak diizinkan menggunakan cakupan seluruh cabang (ALL_BRANCHES). Override ini diblokir oleh sistem demi keamanan isolasi cabang (Zero Cross-Branch Mutation).";
+    return {
+      isValid: false,
+      isCompliant: false,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "POLICY_CONFLICT",
+      statusBadgeText: "Tidak Berlaku — Bertentangan dengan Kebijakan",
+      statusBadgeClass: "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+      policyWarning: warning,
+      reason: warning,
+    };
+  }
+
+  // Check if scopeType is in allowedScopes
+  if (!scopeRule.allowedScopes.includes(override.scopeType)) {
+    const warning = `Cakupan '${override.scopeType}' tidak sesuai dengan kebijakan '${override.permissionKey}'. Cakupan yang didukung: ${scopeRule.allowedScopes.join(", ")}.`;
+    return {
+      isValid: false,
+      isCompliant: false,
+      isEffective: false,
+      isEffectivelyActive: false,
+      statusCode: "POLICY_CONFLICT",
+      statusBadgeText: "Tidak Berlaku — Bertentangan dengan Kebijakan",
+      statusBadgeClass: "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700",
+      policyWarning: warning,
+      reason: warning,
+    };
+  }
+
+  if (override.effect === "DENY") {
+    return {
+      isValid: true,
+      isCompliant: true,
+      isEffective: true,
+      isEffectivelyActive: true,
+      statusCode: "ACTIVE_DENIED",
+      statusBadgeText: "DITOLAK",
+      statusBadgeClass: "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+      reason: "Override aktif dengan instruksi penolakan (DENY).",
+    };
+  }
+
+  return {
+    isValid: true,
+    isCompliant: true,
+    isEffective: true,
+    isEffectivelyActive: true,
+    statusCode: "ACTIVE_ALLOWED",
+    statusBadgeText: "DIIZINKAN",
+    statusBadgeClass: "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+    reason: "Override aktif dan sesuai dengan kebijakan.",
+  };
 }
 
 export interface PermissionAuditLogRecord {
@@ -418,3 +669,4 @@ export interface PermissionAuditLogRecord {
   expiresAt: string | null;
   createdAt: string;
 }
+

@@ -266,10 +266,14 @@ export function OperationalReportCenter({
                         <td className="px-4 py-3 whitespace-nowrap">
                           <button
                             onClick={() => onSelectIncident(inc)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors ${
+                              inc.status === "pending_confirmation"
+                                ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                                : "bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                            }`}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            Detail
+                            {inc.status === "pending_confirmation" ? "Review & Konfirmasi" : "Detail"}
                           </button>
                         </td>
                       </tr>
@@ -323,9 +327,13 @@ export function OperationalReportCenter({
                     </div>
                     <button
                       onClick={() => onSelectIncident(inc)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-semibold text-xs transition-colors"
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors ${
+                        inc.status === "pending_confirmation"
+                          ? "bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                          : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400"
+                      }`}
                     >
-                      Lihat Detail
+                      {inc.status === "pending_confirmation" ? "Review & Konfirmasi" : "Lihat Detail"}
                     </button>
                   </div>
                 </div>

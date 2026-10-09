@@ -433,17 +433,12 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             } catch (e) {}
           }
 
-          // Requirements 5 & 6: Bell count counts strictly UNREAD + ACTIVE (<=72h) notifications
-          // Do NOT count archived/historical notifications (>72h) or legacy acknowledged/resolved fields
-          const isHo = monitoredBranch === "all" || !activeRole || activeRole.startsWith("ho_");
+          // Requirements: Bell count counts strictly UNREAD + ACTIVE (<=72h) notifications
+          // Disaster notifications are global informational alerts available to all authenticated users
           const activeUnreadLogs = (logsJson.logs || []).filter((l: any) => {
             const sentTime = new Date(l.sent_at).getTime();
             const isActive = (nowMs - sentTime) <= MAX_ACTIVE_WINDOW_MS;
             const isRead = readIds.has(l.id) || sentTime <= lastReadTime;
-
-            if (!isHo && monitoredBranch && l.branch?.toLowerCase() !== monitoredBranch.toLowerCase()) {
-              return false;
-            }
 
             return isActive && !isRead;
           });
@@ -467,6 +462,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
               ticketNumber: l.ticket_number,
               branch: l.branch,
               source: sourceLabel,
+              forceBypassBranchFilter: true, // Disaster notifications are global informational alerts
               timestamp: new Date(l.sent_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
               isSimulation: l.disaster_id?.includes("sim"),
               onClickDetail: () => {
@@ -855,6 +851,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         isOpen={isMaintenanceModalOpen}
         onClose={() => setIsMaintenanceModalOpen(false)}
         onUpdateProgress={handleUpdateMaintenanceProgress}
+        onConfirmVerification={handleConfirmVerification}
       />
 
       {/* Read-Only Incident Detail Modal (History) */}

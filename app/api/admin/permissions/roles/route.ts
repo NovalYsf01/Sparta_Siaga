@@ -7,19 +7,7 @@ import {
   ROLE_PERMISSION_CATALOG,
   getRolePermissions,
 } from "@/lib/permission-service";
-
-export const BUSINESS_ROLES = [
-  { key: "ho_admin", label: "HO Admin", scope: "HO" },
-  { key: "gm_ho", label: "GM HO", scope: "HO" },
-  { key: "sm_ho", label: "SM HO", scope: "HO" },
-  { key: "bm", label: "Branch Manager", scope: "BRANCH" },
-  { key: "tim_toko", label: "Tim Toko", scope: "BRANCH" },
-  { key: "sparta_maintenance", label: "Sparta Maintenance", scope: "BRANCH" },
-  { key: "bms", label: "Branch Maintenance Support (BMS)", scope: "BRANCH" },
-  { key: "bmc", label: "Branch Maintenance Coordinator (BMC)", scope: "BRANCH" },
-  { key: "bbc", label: "Branch Building Coordinator (BBC)", scope: "BRANCH" },
-  { key: "bnm", label: "Branch & Maintenance (BnM)", scope: "BRANCH" },
-];
+import { CANONICAL_HUMAN_ROLES } from "@/lib/role-catalog";
 
 export async function GET() {
   try {
@@ -46,12 +34,13 @@ export async function GET() {
     }
 
     const rolesData = await Promise.all(
-      BUSINESS_ROLES.map(async (role) => {
+      CANONICAL_HUMAN_ROLES.map(async (role) => {
         const permissions = await getRolePermissions(role.key);
         const catalog = ROLE_PERMISSION_CATALOG[role.key] || [];
         return {
           key: role.key,
           label: role.label,
+          fullLabel: role.fullLabel,
           scope: role.scope,
           userCount: counts[role.key] || 0,
           catalog,

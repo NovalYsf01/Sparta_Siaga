@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetAllUsers, dbCreateUser, dbGetUserByNik } from "@/lib/user-db";
+import { isValidHumanBusinessRole, deriveScopeFromBusinessRole } from "@/lib/role-catalog";
 import bcrypt from "bcryptjs";
 
 export async function GET() {
@@ -8,7 +9,10 @@ export async function GET() {
     const sessionUser = await getSessionUser();
     
     if (!sessionUser || sessionUser.systemRole !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Hanya ADMIN yang dapat mengakses manajemen user." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Hanya System Administrator yang dapat mengakses manajemen user." },
+        { status: 403 }
+      );
     }
 
     const users = await dbGetAllUsers();
@@ -26,44 +30,82 @@ export async function POST(request: Request) {
     const sessionUser = await getSessionUser();
     
     if (!sessionUser || sessionUser.systemRole !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden: Hanya ADMIN yang dapat menambah user." }, { status: 403 });
+      return NextResponse.json(
+        { error: "Forbidden: Hanya System Administrator yang dapat menambah user." },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
-    if (!body.name || !body.businessRole) {
-      return NextResponse.json({ error: "Data user tidak lengkap" }, { status: 400 });
+
+    // 1. Validasi Nama
+    if (!body.name || typeof body.name !== "string" || !body.name.trim()) {
+      return NextResponse.json({ error: "Nama user wajib diisi." }, { status: 400 });
     }
 
-    if (body.nik && typeof body.nik === "string" && body.nik.trim()) {
-      const existingUserWithNik = await dbGetUserByNik(body.nik.trim());
-      if (existingUserWithNik) {
-        return NextResponse.json({ error: "NIK sudah terdaftar." }, { status: 400 });
-      }
-    }
-
+    // 2. Proteksi System Role: User creation melalui UI / normal API HANYA boleh bertipe USER
     if (body.systemRole === "ADMIN") {
-      return NextResponse.json({ error: "System ADMIN hanya dapat dibuat melalui ENV / seed script." }, { status: 400 });
+      return NextResponse.json(
+        { error: "System ADMIN hanya dapat dikonfigurasi melalui ENV / script seed terproteksi." },
+        { status: 400 }
+      );
+    }
+    const systemRole = "USER";
+
+    // 3. Validasi NIK: Wajib untuk akun lokal, harus unik & ditrim
+    if (!body.nik || typeof body.nik !== "string" || !body.nik.trim()) {
+      return NextResponse.json({ error: "NIK wajib diisi." }, { status: 400 });
+    }
+    const trimmedNik = body.nik.trim();
+    const existingUserWithNik = await dbGetUserByNik(trimmedNik);
+    if (existingUserWithNik) {
+      return NextResponse.json({ error: "NIK sudah terdaftar pada pengguna lain." }, { status: 400 });
     }
 
-    body.systemRole = "USER";
+    // 4. Validasi Business Role dari Katalog Kanonikal
+    const businessRole = typeof body.businessRole === "string" ? body.businessRole.trim().toLowerCase() : "";
+    if (!isValidHumanBusinessRole(businessRole)) {
+      return NextResponse.json(
+        { error: `Business Role '${body.businessRole}' tidak valid atau bukan peran persona pengguna yang dapat dipilih.` },
+        { status: 400 }
+      );
+    }
 
-    if (["ho_admin", "gm_ho", "sm_ho"].includes(body.businessRole)) {
-      body.scope = "HO";
-      body.branch = null;
-    } else if (["bm", "tim_toko", "sparta_maintenance"].includes(body.businessRole)) {
-      body.scope = "BRANCH";
-      if (!body.branch) {
-        return NextResponse.json({ error: "Cabang/Toko wajib diisi untuk role berscope BRANCH" }, { status: 400 });
-      }
+    // 5. Otoritatif Server-Derived Scope & Branch
+    const derivedScope = deriveScopeFromBusinessRole(businessRole);
+    if (!derivedScope) {
+      return NextResponse.json({ error: "Gagal menurunkan cakupan (scope) untuk role tersebut." }, { status: 400 });
+    }
+
+    // Jika client mengirim scope yang bertentangan dengan katalog kanonikal, tolak
+    if (body.scope && body.scope !== derivedScope) {
+      return NextResponse.json(
+        { error: `Scope '${body.scope}' tidak sesuai dengan Business Role '${businessRole}'. Scope yang benar adalah '${derivedScope}'.` },
+        { status: 400 }
+      );
+    }
+
+    let finalBranch: string | null = null;
+    if (derivedScope === "HO") {
+      // Role HO tidak boleh memiliki branch
+      finalBranch = null;
     } else {
-      return NextResponse.json({ error: "Business Role tidak valid" }, { status: 400 });
+      // Role BRANCH wajib memiliki branch yang valid
+      if (!body.branch || typeof body.branch !== "string" || !body.branch.trim()) {
+        return NextResponse.json(
+          { error: "Cabang wajib dipilih untuk role dengan cakupan BRANCH." },
+          { status: 400 }
+        );
+      }
+      finalBranch = body.branch.trim();
     }
 
-    // Password validation for LOCAL users
+    // 6. Validasi Password untuk akun LOCAL
+    const source = body.source === "SSO" ? "SSO" : "LOCAL";
     let passwordHash: string | null = null;
-    if (body.source !== "SSO") {
+    if (source === "LOCAL") {
       if (!body.password || typeof body.password !== "string" || !body.password.trim()) {
-        return NextResponse.json({ error: "Password wajib diisi." }, { status: 400 });
+        return NextResponse.json({ error: "Password wajib diisi untuk pengguna lokal." }, { status: 400 });
       }
 
       if (body.password.length < 8) {
@@ -80,15 +122,15 @@ export async function POST(request: Request) {
     const id = `usr_local_${Date.now()}`;
     const newUser = await dbCreateUser({
       id,
-      name: body.name,
-      nik: body.nik || null,
-      email: body.email || null,
-      systemRole: "USER",
-      businessRole: body.businessRole,
-      scope: body.scope,
-      branch: body.branch,
-      status: body.status || "ACTIVE",
-      source: body.source || "LOCAL",
+      name: body.name.trim(),
+      nik: trimmedNik,
+      email: body.email && typeof body.email === "string" ? body.email.trim() : null,
+      systemRole,
+      businessRole,
+      scope: derivedScope,
+      branch: finalBranch,
+      status: body.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
+      source,
       passwordHash,
     });
 

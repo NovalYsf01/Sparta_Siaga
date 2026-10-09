@@ -70,7 +70,17 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
-    // 4. Validate report status eligibility (Must not be resolved/archived)
+    // 4. Validate report status eligibility (Must not be resolved/archived, and must not be pending_confirmation)
+    if (incident.status === "pending_confirmation") {
+      return NextResponse.json(
+        {
+          error: "Laporan masih menunggu konfirmasi kondisi toko. Estimasi hanya dapat dibuat setelah konfirmasi dampak selesai.",
+          code: "REPORT_PENDING_CONFIRMATION",
+        },
+        { status: 422 }
+      );
+    }
+
     if (incident.status === "resolved" || incident.status === "archived") {
       return NextResponse.json(
         {

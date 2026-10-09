@@ -1,10 +1,12 @@
 import { Pool, PoolConfig } from "pg";
 import { getRuntimeConfig } from "./runtime-config";
 
-let pool: Pool | null = null;
+const globalForDb = globalThis as unknown as {
+  pool: Pool | undefined;
+};
 
 export function getDbPool(): Pool {
-  if (!pool) {
+  if (!globalForDb.pool) {
     const config = getRuntimeConfig();
     const rawConnectionString = config.databaseUrl;
 
@@ -31,19 +33,19 @@ export function getDbPool(): Pool {
       };
     }
 
-    pool = new Pool(poolConfig);
+    globalForDb.pool = new Pool(poolConfig);
 
-    pool.on("error", (err) => {
+    globalForDb.pool.on("error", (err) => {
       console.error("[Database Pool] Unexpected error on idle client:", err);
     });
   }
 
-  return pool;
+  return globalForDb.pool;
 }
 
 export async function closeDbPool(): Promise<void> {
-  const active = pool;
-  pool = null;
+  const active = globalForDb.pool;
+  globalForDb.pool = undefined;
   if (active) {
     await active.end();
   }
