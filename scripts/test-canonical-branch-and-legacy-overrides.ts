@@ -10,11 +10,11 @@
 
 import {
   CANONICAL_BRANCHES,
-  getCanonicalBranches,
   findCanonicalBranch,
   normalizeBranchCode,
   isBranchCodeValid,
-} from "../lib/branch-service";
+} from "../lib/branch-utils";
+import { getCanonicalBranches } from "../lib/branch-service";
 import {
   evaluateOverridePolicyCompliance,
   getPermissionScopeRule,

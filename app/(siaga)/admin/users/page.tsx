@@ -30,7 +30,7 @@ import {
   getRoleDisplayLabel,
   deriveScopeFromBusinessRole,
 } from "@/lib/role-catalog";
-import { normalizeBranchCode } from "@/lib/branch-service";
+import { normalizeBranchCode } from "@/lib/branch-utils";
 
 interface User {
   id: string;
