@@ -62,55 +62,76 @@ export async function dbGetIncidentById(
   return rowToIncident(rows[0]);
 }
 
-/**
- * Find an existing automatic earthquake report for a given event + branch.
- * Used for deduplication: ONE earthquake event + ONE affected branch = ONE report.
- */
+// Lookup existing auto-report by event and store, falling back to branch for legacy data.
 export async function dbFindAutoEarthquakeReport(
   earthquakeEventId: string,
-  branch: string
+  targetId: string,
+  branch?: string
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
-  const { rows } = await pool.query(
+  // 1. Primary lookup by exact store
+  const storeRes = await pool.query(
     `SELECT * FROM incidents
-     WHERE earthquake_event_id = $1 AND branch = $2 AND report_origin = 'automatic_earthquake'
+     WHERE earthquake_event_id = $1 AND store_id = $2 AND report_origin = 'automatic_earthquake'
      LIMIT 1`,
-    [earthquakeEventId, branch]
+    [earthquakeEventId, targetId]
   );
-  if (rows.length === 0) return null;
-  return rowToIncident(rows[0]);
+  if (storeRes.rows.length > 0) return rowToIncident(storeRes.rows[0]);
+
+  // 2. Legacy fallback lookup by branch (only match legacy branch records where store_id equals the branch or is null)
+  const branchLookup = branch || targetId;
+  const branchRes = await pool.query(
+    `SELECT * FROM incidents
+     WHERE earthquake_event_id = $1 
+       AND branch = $2 
+       AND (store_id = $2 OR store_id IS NULL)
+       AND report_origin = 'automatic_earthquake'
+     LIMIT 1`,
+    [earthquakeEventId, branchLookup]
+  );
+  if (branchRes.rows.length > 0) return rowToIncident(branchRes.rows[0]);
+
+  return null;
 }
 
-/**
- * Check if there is a manual earthquake report explicitly linked to this event for the branch.
- * Used to prevent auto-daemon from creating duplicates when a branch
- * has already manually reported AND linked this specific earthquake.
- */
+// Find manual report linked to this event, checking store first then branch.
 export async function dbFindManualEarthquakeReportByEvent(
   earthquakeEventId: string,
-  branch: string
+  storeIdOrBranch: string,
+  branch?: string
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
-  const { rows } = await pool.query(
+  const storeRes = await pool.query(
     `SELECT * FROM incidents
      WHERE earthquake_event_id = $1
-       AND branch = $2 
+       AND store_id = $2 
        AND report_origin = 'manual'
      ORDER BY created_at DESC
      LIMIT 1`,
-    [earthquakeEventId, branch]
+    [earthquakeEventId, storeIdOrBranch]
   );
-  if (rows.length === 0) return null;
-  return rowToIncident(rows[0]);
+  if (storeRes.rows.length > 0) return rowToIncident(storeRes.rows[0]);
+
+  if (branch) {
+    const branchRes = await pool.query(
+      `SELECT * FROM incidents
+       WHERE earthquake_event_id = $1
+         AND branch = $2 
+         AND (store_id = $2 OR store_id IS NULL)
+         AND report_origin = 'manual'
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [earthquakeEventId, branch]
+    );
+    if (branchRes.rows.length > 0) return rowToIncident(branchRes.rows[0]);
+  }
+
+  return null;
 }
 
-/**
- * Find candidate unlinked manual reports for a branch within a time window (Requirement 20).
- * Matches: same branch, disaster_type = 'earthquake', earthquake_event_id IS NULL,
- * created_at within event timestamp +/- windowMinutes.
- */
+// Find unlinked manual earthquake reports for the specific store within time window.
 export async function dbFindUnlinkedManualEarthquakeCandidates(
-  branch: string,
+  storeId: string,
   eventTimestamp: number,
   windowMinutes: number = 120
 ): Promise<IncidentRecord[]> {
@@ -121,13 +142,13 @@ export async function dbFindUnlinkedManualEarthquakeCandidates(
 
   const { rows } = await pool.query(
     `SELECT * FROM incidents
-     WHERE branch = $1
+     WHERE store_id = $1
        AND disaster_type = 'earthquake'
        AND report_origin = 'manual'
        AND earthquake_event_id IS NULL
        AND created_at >= $2 AND created_at <= $3
      ORDER BY created_at ASC`,
-    [branch, minTime.toISOString(), maxTime.toISOString()]
+    [storeId, minTime.toISOString(), maxTime.toISOString()]
   );
   return rows.map(rowToIncident);
 }
@@ -203,16 +224,20 @@ export async function dbCreateIncident(
     ]
   );
   return rowToIncident(rows[0]);
-} catch (error: unknown) {
-  const pgError = error as { code?: string; constraint?: string };
-  if (pgError.code === '23505' && pgError.constraint === 'idx_incidents_unique_auto_eq_branch') {
-    console.warn(`[SPARTA SIAGA] Race condition avoided: Duplicate automatic report for event ${inc.earthquakeEventId} at branch ${inc.branch}. Returning existing record.`);
-    // Fetch and return the existing record instead of failing
-    const existing = await dbFindAutoEarthquakeReport(inc.earthquakeEventId!, inc.branch);
-    if (existing) return existing;
+  } catch (error: unknown) {
+    const pgError = error as { code?: string; constraint?: string };
+    const autoConstraints = [
+      'idx_incidents_unique_auto_eq_store',
+      'idx_incidents_unique_auto_eq_branch',
+      'uq_incident_event_store_v1',
+    ];
+    if (pgError.code === '23505' && autoConstraints.includes(pgError.constraint || '')) {
+      console.warn(`[SPARTA SIAGA] Race condition caught: event ${inc.earthquakeEventId} at store ${inc.storeId}. Returning existing record.`);
+      const existing = await dbFindAutoEarthquakeReport(inc.earthquakeEventId!, inc.storeId, inc.branch);
+      if (existing) return existing;
+    }
+    throw error;
   }
-  throw error;
-}
 }
 
 export async function dbUpdateIncident(

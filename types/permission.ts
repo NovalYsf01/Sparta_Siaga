@@ -366,6 +366,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   ],
   bms: [
     "REPORT_VIEW_OWN",
+    "REPORT_CONFIRM",
     "REPORT_FOLLOW_UP",
     "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
@@ -383,6 +384,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   ],
   bes: [
     "REPORT_VIEW_OWN",
+    "REPORT_CONFIRM",
     "REPORT_FOLLOW_UP",
     "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
@@ -468,6 +470,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   },
   bms: {
     REPORT_VIEW_OWN: "ALLOW",
+    REPORT_CONFIRM: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
     REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
@@ -485,6 +488,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   },
   bes: {
     REPORT_VIEW_OWN: "ALLOW",
+    REPORT_CONFIRM: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
     REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",

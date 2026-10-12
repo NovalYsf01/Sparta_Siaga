@@ -363,7 +363,7 @@ export async function updateNotificationLogForEvent(
           message = COALESCE($2, message),
           affected_stores_count = COALESCE($3, affected_stores_count),
           affected_stores_sample = COALESCE($4, affected_stores_sample),
-          updated_at = NOW()
+          sent_at = NOW()
       WHERE disaster_id = $5 AND branch = $6;
     `;
     const res = await pool.query(query, [
