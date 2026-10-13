@@ -6,9 +6,9 @@ import { ReportDistributionService } from "@/lib/distribution-service";
 import { canViewReport } from "@/lib/report-permissions";
 import { checkUserPermission } from "@/lib/permission-service";
 
-export async function GET() {
+export async function GET(request?: Request) {
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

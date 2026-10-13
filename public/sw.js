@@ -1,7 +1,7 @@
 // SPARTA SIAGA Service Worker — Online-First Enterprise PWA
 // Cache Versioning: Static assets only. Sensitive API & Operational data are STRICTLY EXCLUDED.
 
-const CACHE_NAME = "sparta-siaga-static-v1";
+const CACHE_NAME = "sparta-siaga-static-v2";
 const STATIC_ASSETS = [
   "/offline.html",
   "/manifest.json",
@@ -24,7 +24,7 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Activate Event: Clean up outdated caches
+// Activate Event: Clean up outdated caches immediately
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -44,11 +44,13 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // 1. SECURITY FILTER: Never cache any API requests or authentication endpoints
+  // 1. SECURITY & FRESHNESS FILTER:
+  // Never cache API, auth, private documents, or Next.js internal build chunks (_next/)
   if (
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
     url.pathname.startsWith("/storage/") ||
+    url.pathname.startsWith("/_next/") ||
     url.pathname.includes("/evidence/") ||
     url.pathname.includes("/document/") ||
     url.pathname.includes("/export/") ||
@@ -73,14 +75,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 3. Static Assets (_next/static, public images/icons): Stale-While-Revalidate
-  const isStaticAsset =
-    url.pathname.startsWith("/_next/static/") ||
+  // 3. Static Brand Assets & PWA Icons: Stale-While-Revalidate
+  const isStaticBrandAsset =
     url.pathname.startsWith("/icons/") ||
     url.pathname.startsWith("/brand/") ||
     STATIC_ASSETS.includes(url.pathname);
 
-  if (isStaticAsset) {
+  if (isStaticBrandAsset) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request).then((networkResponse) => {

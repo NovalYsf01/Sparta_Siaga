@@ -1,7 +1,7 @@
 import { getDbPool } from "./db";
 import { IncidentRecord, ManagementInstruction } from "@/types/incident";
 
-function rowToIncident(row: Record<string, unknown>): IncidentRecord {
+export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
   return {
     id: row.id as string,
     date: row.date as string,
@@ -26,6 +26,14 @@ function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     maintenanceTicket: (row.maintenance_ticket as IncidentRecord["maintenanceTicket"]) ?? undefined,
     fieldPhotos: (row.field_photos as string[]) ?? [],
     timeline: (row.timeline as IncidentRecord["timeline"]) ?? [],
+    externalWorkId: (row.external_work_id as string) ?? undefined,
+    externalSystem: (row.external_system as string) ?? undefined,
+    externalWorkStatus: (row.external_work_status as string) ?? undefined,
+    externalSyncedAt: row.external_synced_at
+      ? row.external_synced_at instanceof Date
+        ? (row.external_synced_at as Date).toISOString()
+        : (row.external_synced_at as string)
+      : undefined,
     createdAt:
       row.created_at instanceof Date
         ? (row.created_at as Date).toISOString()
@@ -265,6 +273,10 @@ export async function dbUpdateIncident(
     earthquakeProvenance: "earthquake_provenance",
     affectedStoreCount: "affected_store_count",
     dangerStoreCount: "danger_store_count",
+    externalWorkId: "external_work_id",
+    externalSystem: "external_system",
+    externalWorkStatus: "external_work_status",
+    externalSyncedAt: "external_synced_at",
   };
 
   for (const [key, col] of Object.entries(scalarFieldMap)) {

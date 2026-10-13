@@ -10,9 +10,25 @@ import { verifySession } from "./jwt";
  * Extracts authenticated user context from the active session.
  * Database is the single source of truth for authorization.
  */
-export async function getSessionUser(): Promise<UserContext | null> {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get("siaga_session")?.value;
+export async function getSessionUser(req?: Request): Promise<UserContext | null> {
+  let sessionToken: string | undefined;
+
+  if (req) {
+    const cookieHeader = req.headers.get("cookie") || "";
+    const match = cookieHeader.match(/siaga_session=([^;]+)/);
+    if (match) {
+      sessionToken = match[1];
+    }
+  }
+
+  if (!sessionToken) {
+    try {
+      const cookieStore = await cookies();
+      sessionToken = cookieStore.get("siaga_session")?.value;
+    } catch {
+      // Handled when called outside Next.js requestAsyncStorage
+    }
+  }
 
   if (!sessionToken) {
     return null;

@@ -131,7 +131,7 @@ export default function DashboardPage() {
             incidents={activeIncidents}
             onSelectIncident={handleSelectIncidentForDetail}
             onCreateReportClick={handleOpenReportModal}
-            hideAction={true}
+            hideAction={false}
           />
         </div>
       </div>

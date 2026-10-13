@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 const nextConfig = {
   reactStrictMode: false, // Prevents double rendering on Leaflet map instances
   poweredByHeader: false,
+  devIndicators: false,
   output: 'standalone',
   turbopack: {
     root: fileURLToPath(new URL('.', import.meta.url)),

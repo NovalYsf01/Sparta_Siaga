@@ -35,6 +35,7 @@ import {
 import { checkClientPermission } from "@/lib/client-permissions";
 import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { CameraCapture } from "./camera-capture";
 
 interface StoreVerificationModalProps {
   incident: IncidentRecord | null;
@@ -84,6 +85,7 @@ export function StoreVerificationModal({
   // Real file uploads
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<{ name: string; size: number; url: string }[]>([]);
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
 
   // Branch Manager approval states
   const [bmDecision, setBmDecision] = useState<BmDecision>("approved");
@@ -889,13 +891,13 @@ export function StoreVerificationModal({
 
                 <button
                   type="button"
-                  onClick={() => cameraInputRef.current?.click()}
+                  onClick={() => setIsCameraModalOpen(true)}
                   className="p-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-blue-50/40 text-left flex items-center gap-2 transition-colors"
                 >
                   <Camera className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
                   <div>
                     <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Ambil dari Kamera</div>
-                    <div className="text-[10px] text-slate-400">Kamera HP / Perangkat</div>
+                    <div className="text-[10px] text-slate-400">Live Webcam / HP</div>
                   </div>
                 </button>
               </div>
@@ -1000,6 +1002,22 @@ export function StoreVerificationModal({
           </form>
         )}
       </div>
+
+      <CameraCapture
+        isOpen={isCameraModalOpen}
+        onClose={() => setIsCameraModalOpen(false)}
+        onCapture={(file, previewUrl) => {
+          setSelectedFiles((prev) => [...prev, file]);
+          setFilePreviews((prev) => [
+            ...prev,
+            { name: file.name, size: file.size, url: previewUrl },
+          ]);
+          setSubmitError(null);
+          setIsCameraModalOpen(false);
+        }}
+        storeName={incident.storeName || incident.storeId || "Lokasi Toko"}
+        reporterName={identity?.name || "Petugas SPARTA"}
+      />
     </div>
   );
 }

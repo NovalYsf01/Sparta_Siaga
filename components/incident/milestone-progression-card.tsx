@@ -61,7 +61,12 @@ export function MilestoneProgressionCard({
       const res = await fetch(`/api/incidents/${incident.id}/milestones`);
       if (res.ok) {
         const json = await res.json();
-        setMilestones(json.data || []);
+        const list = Array.isArray(json.data)
+          ? json.data
+          : Array.isArray(json.data?.milestones)
+          ? json.data.milestones
+          : [];
+        setMilestones(list);
       }
     } catch (err) {
       console.error("[MilestoneProgressionCard] Gagal memuat milestones:", err);
@@ -74,9 +79,12 @@ export function MilestoneProgressionCard({
     loadMilestones();
   }, [incident.id]);
 
+  // Ensure safe array operations
+  const safeMilestones = Array.isArray(milestones) ? milestones : [];
+
   // Find active milestone
-  const activeMilestone = milestones.find((m) => m.status === "NOT_STARTED" || m.status === "REVISION_REQUESTED");
-  const allCompleted = milestones.length === 5 && milestones.every((m) => m.status === "SUBMITTED");
+  const activeMilestone = safeMilestones.find((m) => m.status === "NOT_STARTED" || m.status === "REVISION_REQUESTED");
+  const allCompleted = safeMilestones.length === 5 && safeMilestones.every((m) => m.status === "SUBMITTED");
   const currentProgress = incident.progress ?? 0;
 
   const isBmUser = identity?.businessRole === "bm" || identity?.role === "bm";
@@ -247,7 +255,7 @@ export function MilestoneProgressionCard({
         <div className="grid grid-cols-5 gap-2 pt-1 text-center">
           {MILESTONE_ORDER.map((key, idx) => {
             const cfg = MILESTONE_CONFIG[key];
-            const ms = milestones.find((m) => m.stageKey === key);
+            const ms = safeMilestones.find((m) => m.stageKey === key);
             const isCompleted = ms?.status === "SUBMITTED";
             const isCurrent = activeMilestone?.stageKey === key;
             const isRevision = ms?.status === "REVISION_REQUESTED";
@@ -489,7 +497,7 @@ export function MilestoneProgressionCard({
         </div>
 
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-          {milestones.map((ms) => {
+          {safeMilestones.map((ms) => {
             const isCompleted = ms.status === "SUBMITTED";
             const isExpanded = Boolean(expandedRevisions[ms.id]);
             const revisionsCount = ms.revisions?.length || 0;

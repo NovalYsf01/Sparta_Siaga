@@ -280,6 +280,12 @@ export interface IncidentRecord {
   // Manual: wajib (4 foto tampak). Auto-report: field ini null/empty pending konfirmasi.
   fieldPhotos?: string[];
 
+  // === Sinkronisasi Ekosistem Eksternal (SPARTA Maintenance / Engineering Support) ===
+  externalWorkId?: string;
+  externalSystem?: string;
+  externalWorkStatus?: string;
+  externalSyncedAt?: string;
+
   // === Timeline / History ===
   timeline: TimelineEvent[];
   createdAt: string;

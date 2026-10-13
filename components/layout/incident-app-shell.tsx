@@ -23,6 +23,7 @@ import {
   Sun,
   Moon,
   UserCog,
+  MoreHorizontal,
 } from "lucide-react";
 import { RoleType } from "@/types/incident";
 import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt";
@@ -53,7 +54,7 @@ export function IncidentAppShell({
   children,
 }: IncidentAppShellProps) {
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [identity, setIdentity] = useState<{
     id: string;
@@ -112,9 +113,9 @@ export function IncidentAppShell({
     return "Sistem Mitigasi";
   };
 
-  // Lock body scroll when mobile drawer is open
+  // Lock body scroll when mobile Lainnya bottom sheet is open
   React.useEffect(() => {
-    if (isMobileMenuOpen) {
+    if (isMoreSheetOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -122,18 +123,18 @@ export function IncidentAppShell({
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isMobileMenuOpen]);
+  }, [isMoreSheetOpen]);
 
-  // Close drawer on Escape key
+  // Close sheet on Escape key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isMobileMenuOpen) {
-        setIsMobileMenuOpen(false);
+      if (e.key === "Escape" && isMoreSheetOpen) {
+        setIsMoreSheetOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isMobileMenuOpen]);
+  }, [isMoreSheetOpen]);
 
   React.useEffect(() => {
     fetch("/api/auth/me")
@@ -335,19 +336,20 @@ export function IncidentAppShell({
             isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
           }`}
         >
-          {/* Left: Mobile hamburger, Breadcrumbs, or Search */}
+          {/* Left: Mobile Title (no duplicate hamburger) & Desktop Breadcrumbs */}
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={`lg:hidden p-2.5 rounded-xl transition-colors border border-transparent min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 ${
-                isDark 
-                  ? "text-slate-300 hover:bg-slate-800 hover:border-slate-700" 
-                  : "text-slate-600 hover:bg-slate-100 hover:border-slate-300"
-              }`}
-              aria-label="Toggle Menu"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            {/* Mobile Header Title */}
+            <div className="lg:hidden flex items-center gap-2.5 min-w-0">
+              <Image src="/brand/building_logo.png" alt="SPARTA" width={28} height={28} className="shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
+                  {getPageTitle(pathname)}
+                </h1>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block leading-tight">
+                  SPARTA SIAGA
+                </span>
+              </div>
+            </div>
 
             {/* Desktop Breadcrumbs (SPARTA Enterprise Style) */}
             <div className="hidden lg:flex items-center gap-2 text-xs shrink-0">
@@ -615,99 +617,161 @@ export function IncidentAppShell({
             <span>Event</span>
           </Link>
 
-          <Link
-            href="/settings"
+          <button
+            type="button"
+            onClick={() => setIsMoreSheetOpen(true)}
             className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
-              pathname.startsWith("/settings")
+              isMoreSheetOpen || pathname.startsWith("/reports/tracking") || pathname.startsWith("/reports/history") || pathname.startsWith("/settings") || pathname.startsWith("/admin")
                 ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
             }`}
+            aria-expanded={isMoreSheetOpen}
+            aria-label="Buka Menu Lainnya"
           >
-            <Settings className="w-5 h-5" />
-            <span>Pengaturan</span>
-          </Link>
+            <MoreHorizontal className="w-5 h-5" />
+            <span>Lainnya</span>
+          </button>
         </nav>
       </div>
 
-      {/* MOBILE FULL SCREEN SLIDE-OVER DRAWER MENU (SPARTA Enterprise Style) */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-[3000] flex" role="dialog" aria-modal="true" aria-label="Menu Navigasi Mobile">
+      {/* MOBILE "LAINNYA" ACCESSIBLE BOTTOM SHEET (antislop-layoutmobile & antislop-human) */}
+      {isMoreSheetOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-[3000] flex flex-col justify-end"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Menu Navigasi Lainnya"
+        >
+          {/* Backdrop */}
           <div
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsMobileMenuOpen(false)}
+            onClick={() => setIsMoreSheetOpen(false)}
           />
-          <div className="relative w-72 max-w-[85vw] flex flex-col h-full shadow-2xl p-5 border-r border-white/10 bg-[#123B6D] text-white">
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+
+          {/* Bottom Sheet Card */}
+          <div className="relative w-full rounded-t-2xl shadow-2xl p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+            {/* Sheet Handle */}
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full mx-auto mb-3" />
+
+            {/* Sheet Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <Image src="/brand/building_logo.png" alt="SPARTA Logo" width={34} height={34} className="shrink-0" />
-                <div className="flex flex-col">
-                  <span className="font-extrabold text-sm tracking-wider text-white leading-tight">SPARTA SIAGA</span>
-                  <span className="text-[9px] text-blue-200 font-medium leading-tight">Mitigasi Bencana Alfamart</span>
+                <Image src="/brand/building_logo.png" alt="SPARTA Logo" width={28} height={28} className="shrink-0" />
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white leading-tight">
+                    Menu & Akses Sistem
+                  </h3>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight block">
+                    SPARTA SIAGA • Ekosistem Terpadu
+                  </span>
                 </div>
               </div>
               <button
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="p-2 rounded-xl text-blue-200 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                aria-label="Tutup Menu Navigasi"
+                type="button"
+                onClick={() => setIsMoreSheetOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Tutup Menu"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Drawer Navigation List */}
-            <nav className="flex-1 py-4 space-y-4 overflow-y-auto">
-              {navGroups.map((group, gIdx) => (
-                <div key={gIdx} className="space-y-1">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-blue-200/60 px-2 mb-1.5">
-                    {group.title}
-                  </div>
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = isNavActive(item.href, pathname);
-                    return (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all min-h-[44px] ${
-                          isActive 
-                            ? "bg-[#1D5AA6] text-white shadow-sm border border-white/10" 
-                            : "text-blue-100 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-[#F6C800]" : "text-blue-200"}`} />
-                          <span>{item.label}</span>
-                        </div>
-                        {item.badge && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#D9272E] text-white">
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+            {/* Current User Info Card */}
+            {identity && (
+              <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/60 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  {identity.name ? identity.name.charAt(0).toUpperCase() : "U"}
                 </div>
-              ))}
-            </nav>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                    {identity.name}
+                  </div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                    {getRoleSubtitle(identity)}
+                  </div>
+                </div>
+              </div>
+            )}
 
-            {/* Contextual PWA Install & User Info in Drawer Footer */}
-            <div className="pt-3 border-t border-white/10 space-y-3">
-              <PwaInstallPrompt variant="compact" className="w-full justify-center bg-white/10 text-white hover:bg-white/20" />
-              {identity && (
-                <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-white/5 text-xs text-blue-200">
-                  <div className="w-7 h-7 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-xs shrink-0">
-                    {identity.name ? identity.name.charAt(0).toUpperCase() : "U"}
-                  </div>
-                  <div className="truncate">
-                    <div className="font-bold text-white truncate text-xs">{identity.name}</div>
-                    <div className="text-[10px] text-blue-300 truncate">{getRoleSubtitle(identity)}</div>
-                  </div>
+            {/* Navigation Grid / List */}
+            <div className="mt-4 space-y-4">
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2 block">
+                  Alur Laporan & Penanganan
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/reports/tracking"
+                    onClick={() => setIsMoreSheetOpen(false)}
+                    className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all text-xs font-semibold"
+                  >
+                    <Activity className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span>Tracking Alur</span>
+                  </Link>
+
+                  <Link
+                    href="/reports/history"
+                    onClick={() => setIsMoreSheetOpen(false)}
+                    className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all text-xs font-semibold"
+                  >
+                    <History className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                    <span>Riwayat Laporan</span>
+                  </Link>
                 </div>
-              )}
+              </div>
+
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 px-1 mb-2 block">
+                  Pengaturan & Akun
+                </span>
+                <div className="space-y-1.5">
+                  <Link
+                    href="/settings"
+                    onClick={() => setIsMoreSheetOpen(false)}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Settings className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>Pengaturan Sistem</span>
+                    </div>
+                  </Link>
+
+                  {identity?.systemRole === "ADMIN" && (
+                    <Link
+                      href="/admin/users"
+                      onClick={() => setIsMoreSheetOpen(false)}
+                      className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
+                        <span>Manajemen User & Hak Akses</span>
+                      </div>
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {/* Install PWA Prompt */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <PwaInstallPrompt variant="compact" className="w-full justify-center" />
+              </div>
+
+              {/* Logout Action */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/login';
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-bold transition-colors min-h-[44px]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  Keluar dari Sesi (Logout)
+                </button>
+              </div>
             </div>
           </div>
         </div>
