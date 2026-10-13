@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   X,
   ShieldAlert,
@@ -11,8 +11,27 @@ import {
   Store,
   Lock,
   ArrowRight,
+  HelpCircle,
+  Clock,
+  User,
+  Phone,
+  MessageSquare,
+  Building2,
+  FileText,
+  AlertCircle,
+  CheckCircle2,
+  RotateCcw,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
-import { IncidentRecord, RoleType, DamageReport } from "@/types/incident";
+import {
+  IncidentRecord,
+  RoleType,
+  DamageReport,
+  InspectionCondition,
+  InspectionMethod,
+  BmDecision,
+} from "@/types/incident";
 import { checkClientPermission } from "@/lib/client-permissions";
 import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
@@ -35,20 +54,52 @@ export function StoreVerificationModal({
   onClose,
   onConfirmVerification,
 }: StoreVerificationModalProps) {
-  // Lock background scroll when modal is open
   useBodyScrollLock(isOpen);
 
-  const [selectedCondition, setSelectedCondition] = useState<"safe" | "damaged">("safe");
-  const [categories, setCategories] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+  const [permissionData, setPermissionData] = useState<{
+    canConfirm: boolean;
+    confirmReason: string;
+    canBmApprove?: boolean;
+    bmApproveReason?: string;
+    scopeReason: string;
+  } | null>(null);
+
+  // Inspection form states
+  const [inspectionMethod, setInspectionMethod] = useState<InspectionMethod>("kunjungan_langsung");
+  const [officerName, setOfficerName] = useState("");
+  const [officerRole, setOfficerRole] = useState("Kepala Toko");
+  const [officerChannel, setOfficerChannel] = useState("WhatsApp");
+  const [officerContact, setOfficerContact] = useState("");
+
+  const [selectedCondition, setSelectedCondition] = useState<InspectionCondition>("damaged");
+  const [categories, setCategories] = useState<string[]>(["Rak Barang"]);
   const [severity, setSeverity] = useState<"Ringan" | "Sedang" | "Berat">("Sedang");
   const [operationalStatus, setOperationalStatus] = useState<"Buka Normal" | "Tutup Sementara">("Buka Normal");
   const [notes, setNotes] = useState("");
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [identity, setIdentity] = useState<UserIdentity | null>(null);
-  const [permissionData, setPermissionData] = useState<{ canConfirm: boolean; confirmReason: string; scopeReason: string } | null>(null);
 
-  React.useEffect(() => {
+  // Real file uploads
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<{ name: string; size: number; url: string }[]>([]);
+
+  // Branch Manager approval states
+  const [bmDecision, setBmDecision] = useState<BmDecision>("approved");
+  const [bmNotes, setBmNotes] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
     if (isOpen && incident) {
+      setSubmitError(null);
+      setSelectedFiles([]);
+      setFilePreviews([]);
+      setNotes("");
+      setBmNotes("");
+
       Promise.all([
         fetch("/api/auth/me").then((res) => (res.ok ? res.json() : null)),
         fetch(`/api/incidents/${incident.id}/permissions`).then((res) => (res.ok ? res.json() : null)),
@@ -57,15 +108,24 @@ export function StoreVerificationModal({
           if (meData) setIdentity(meData);
           if (permData?.data) {
             setPermissionData({
-              canConfirm: permData.data.canConfirm,
-              confirmReason: permData.data.confirmReason,
-              scopeReason: permData.data.canConfirm ? "" : (permData.data.confirmReason || "Di luar cakupan akses akun Anda"),
+              canConfirm: Boolean(permData.data.canConfirm),
+              confirmReason: permData.data.confirmReason || "",
+              canBmApprove: Boolean(permData.data.canBmApprove),
+              bmApproveReason: permData.data.bmApproveReason || "",
+              scopeReason: permData.data.confirmReason || "Di luar cakupan akun Anda",
             });
           }
         })
         .catch(() => {});
     }
   }, [isOpen, incident]);
+
+  // Clean up object URLs when unmounting or files change
+  useEffect(() => {
+    return () => {
+      filePreviews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [filePreviews]);
 
   if (!isOpen || !incident) return null;
 
@@ -75,8 +135,20 @@ export function StoreVerificationModal({
     report: incident,
   });
 
-  const canVerify = permissionData !== null ? permissionData.canConfirm : clientCheck.authorized;
-  const blockedScopeReason = permissionData?.scopeReason || clientCheck.scopeReason || "Di luar cakupan akun Anda";
+  const canConfirm = permissionData !== null ? permissionData.canConfirm : clientCheck.authorized;
+  const canBmApprove = permissionData?.canBmApprove ?? (identity?.role === "bm" && identity?.branch?.toLowerCase() === incident.branch?.toLowerCase());
+
+  // Determine if this modal displays BM Approval mode or BMS/BES Inspection mode
+  const isBmView = Boolean(
+    canBmApprove &&
+    (incident.status === "pending_bm_approval" || incident.verification?.confirmedBy)
+  );
+
+  const blockedScopeReason =
+    permissionData?.scopeReason ||
+    permissionData?.confirmReason ||
+    clientCheck.scopeReason ||
+    "Di luar cakupan akun Anda";
 
   const availableCategories = [
     "Dinding/Struktur",
@@ -94,59 +166,178 @@ export function StoreVerificationModal({
     }
   };
 
-  const handleSimulatePhoto = () => {
-    setPhotoPreview(
-      "https://images.unsplash.com/photo-1590247813693-5541d1c609fd?auto=format&fit=crop&q=80&w=400"
-    );
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length === 0) return;
+
+    const merged = [...selectedFiles, ...newFiles];
+    setSelectedFiles(merged);
+
+    const newPreviews = newFiles.map((file) => ({
+      name: file.name,
+      size: file.size,
+      url: URL.createObjectURL(file),
+    }));
+    setFilePreviews((prev) => [...prev, ...newPreviews]);
+    setSubmitError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleRemoveFile = (index: number) => {
+    URL.revokeObjectURL(filePreviews[index].url);
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // BMS / BES inspection submission
+  const handleSubmitInspection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canVerify) return;
+    if (!canConfirm || isSubmitting) return;
 
-    const confirmedBy = identity?.name
-      ? `${identity.name} (${identity.position || "Staff SPARTA"})`
-      : `PIC ${incident.storeName}`;
-    const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
-
-    if (selectedCondition === "safe") {
-      onConfirmVerification(incident.id, false, {
-        confirmedBy,
-        confirmedAt: timestamp,
-        isDamaged: false,
-        operationalStatus: "Buka Normal",
-        notes: notes || "Toko aman, tidak ada kerusakan fisik setelah guncangan/kejadian.",
-      });
-    } else {
-      onConfirmVerification(incident.id, true, {
-        confirmedBy,
-        confirmedAt: timestamp,
-        isDamaged: true,
-        categories: categories.length > 0 ? categories : ["Rak Barang"],
-        severity,
-        operationalStatus,
-        photos: photoPreview ? [photoPreview] : undefined,
-        notes: notes || "Terjadi kerusakan fisik di area gerai, perlu tindakan Sparta Maintenance.",
-      });
+    if (selectedFiles.length === 0) {
+      setSubmitError("Minimal satu foto bukti pemeriksaan wajib dilampirkan.");
+      return;
     }
 
-    onClose();
+    if (inspectionMethod === "informasi_petugas" && !officerName.trim()) {
+      setSubmitError("Nama petugas pemberi informasi wajib diisi.");
+      return;
+    }
+
+    if (!notes.trim()) {
+      setSubmitError("Keterangan kondisi aktual wajib diisi.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("inspection_method", inspectionMethod);
+      formData.append("condition", selectedCondition);
+      formData.append("notes", notes.trim());
+      formData.append("operational_status", operationalStatus);
+      formData.append("severity", severity);
+      formData.append("categories", JSON.stringify(categories));
+
+      if (inspectionMethod === "informasi_petugas") {
+        formData.append("officer_name", officerName.trim());
+        formData.append("officer_role", officerRole.trim());
+        formData.append("officer_channel", officerChannel.trim());
+        if (officerContact.trim()) {
+          formData.append("officer_contact", officerContact.trim());
+        }
+      }
+
+      selectedFiles.forEach((file) => {
+        formData.append("photos", file);
+      });
+
+      const res = await fetch(`/api/incidents/${incident.id}/confirm`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Gagal mengajukan pemeriksaan.");
+      }
+
+      onConfirmVerification(incident.id, selectedCondition === "damaged", {
+        confirmedBy: identity?.name ? `${identity.name} (${identity.role?.toUpperCase() || "BMS"})` : "Petugas Pemeriksa",
+        confirmedAt: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB",
+        isDamaged: selectedCondition === "damaged",
+        notes,
+        categories,
+        severity,
+        operationalStatus,
+      });
+
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Terjadi kesalahan sistem.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  // Branch Manager approval decision submission
+  const handleSubmitBmDecision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canBmApprove || isSubmitting) return;
+
+    if (
+      (bmDecision === "rejected" || bmDecision === "clarification_requested") &&
+      !bmNotes.trim()
+    ) {
+      setSubmitError(
+        bmDecision === "rejected"
+          ? "Alasan penolakan laporan tidak valid wajib diisi."
+          : "Catatan permintaan klarifikasi kepada BMS/BES wajib diisi."
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const res = await fetch(`/api/incidents/${incident.id}/approval`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          decision: bmDecision,
+          reason: bmNotes.trim(),
+          notes: bmNotes.trim(),
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        throw new Error(resData.error || "Gagal menyimpan keputusan Branch Manager.");
+      }
+
+      onConfirmVerification(incident.id, bmDecision === "approved", {
+        confirmedBy: `${identity?.name || "Manager Branch"} (Branch Manager)`,
+        confirmedAt: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB",
+        isDamaged: bmDecision === "approved",
+        notes: bmNotes,
+      });
+
+      onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Gagal menyimpan keputusan.";
+      setSubmitError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const hasAccess = canConfirm || canBmApprove;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] touch-auto select-text">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400">
-              <ShieldAlert className="w-5 h-5" />
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl ${isBmView ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400"}`}>
+              {isBmView ? <ShieldAlert className="w-5 h-5" /> : <Store className="w-5 h-5" />}
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                Konfirmasi Kondisi Toko Pasca Bencana
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{incident.storeName} • {incident.branch}</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                  {isBmView ? "Review & Persetujuan Manager Branch" : "Pemeriksaan Lapangan Kondisi Lokasi"}
+                </h3>
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                  {incident.tkpType === "dc" ? "Warehouse / DC" : "Toko"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {incident.storeName} • Cabang {incident.branch}
+              </p>
             </div>
           </div>
           <button
@@ -158,28 +349,30 @@ export function StoreVerificationModal({
         </div>
 
         {/* Content */}
-        {!canVerify ? (
+        {!hasAccess ? (
           <div className="p-6 text-center space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
             <div className="w-12 h-12 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-200 dark:border-amber-800">
               <Lock className="w-6 h-6" />
             </div>
             <div className="space-y-1">
-              <h4 className="font-bold text-slate-900 dark:text-white text-sm">Akses Konfirmasi Tidak Tersedia</h4>
+              <h4 className="font-bold text-slate-900 dark:text-white text-sm">Akses Tidak Tersedia</h4>
               <p className="text-xs text-slate-600 dark:text-slate-300 max-w-sm mx-auto leading-relaxed">
-                Anda tidak memiliki izin untuk melakukan konfirmasi pada laporan ini.
+                Anda tidak memiliki wewenang untuk memeriksa atau menyetujui laporan ini.
               </p>
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Akses ditentukan berdasarkan permission dan cakupan laporan yang dimiliki akun Anda.
+                Pemeriksaan gerai toko hanya untuk BMS cabang terkait. Laporan DC untuk BES cabang terkait. Persetujuan untuk Branch Manager.
               </p>
             </div>
 
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-left text-xs space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Permission:</span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">Konfirmasi Laporan (REPORT_CONFIRM)</span>
+                <span className="text-slate-500 dark:text-slate-400">Status Akun:</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {identity ? `${identity.name} (${identity.role?.toUpperCase()} - ${identity.branch || "HO"})` : "Tamu"}
+                </span>
               </div>
               <div className="flex items-start justify-between gap-2 border-t border-slate-100 dark:border-slate-700/60 pt-2">
-                <span className="text-slate-500 dark:text-slate-400 shrink-0">Cakupan (Scope):</span>
+                <span className="text-slate-500 dark:text-slate-400 shrink-0">Alasan Blokir:</span>
                 <span className="font-medium text-slate-700 dark:text-slate-300 text-right text-[11px]">
                   {blockedScopeReason}
                 </span>
@@ -193,53 +386,426 @@ export function StoreVerificationModal({
               Tutup
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
-            {/* Condition Choice (Radio Toggle) */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Pilih Kondisi Fisik Gerai:
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <div
-                  onClick={() => setSelectedCondition("safe")}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-2.5 ${
-                    selectedCondition === "safe"
-                      ? "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <CheckCircle className={`w-5 h-5 shrink-0 ${selectedCondition === "safe" ? "text-emerald-600" : "text-slate-400"}`} />
-                  <div>
-                    <div className="text-xs font-bold text-slate-800">Toko Aman</div>
-                    <div className="text-[10px] text-slate-500">Tidak ada kerusakan fisik</div>
-                  </div>
-                </div>
+        ) : isBmView ? (
+          /* =========================================================================
+             BRANCH MANAGER REVIEW & DECISION MODE
+             ========================================================================= */
+          <form onSubmit={handleSubmitBmDecision} className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
+            {submitError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{submitError}</span>
+              </div>
+            )}
 
-                <div
-                  onClick={() => setSelectedCondition("damaged")}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center gap-2.5 ${
-                    selectedCondition === "damaged"
-                      ? "border-red-500 bg-red-50/60 ring-2 ring-red-500/20"
-                      : "border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <AlertTriangle className={`w-5 h-5 shrink-0 ${selectedCondition === "damaged" ? "text-red-600" : "text-slate-400"}`} />
+            {/* Inspection Submission Summary Card */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 pb-2.5">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Hasil Pengajuan Pemeriksaan Lapangan
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                  incident.verification?.condition === "safe" || incident.verification?.isDamaged === false
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                    : incident.verification?.condition === "uncertain"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                    : "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
+                }`}>
+                  {incident.verification?.condition === "safe" || incident.verification?.isDamaged === false
+                    ? "Kondisi Aman"
+                    : incident.verification?.condition === "uncertain"
+                    ? "Belum Dapat Dipastikan"
+                    : "Ada Kerusakan Fisik"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Pemeriksa:</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {incident.verification?.confirmedBy || "BMS/BES Cabang"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Waktu Pemeriksaan:</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {incident.verification?.confirmedAt || "Baru saja"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">Metode:</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {incident.verification?.inspectionMethod === "informasi_petugas"
+                      ? "Informasi Petugas Lokasi"
+                      : "Kunjungan Langsung"}
+                  </span>
+                </div>
+                {incident.verification?.officerSource && (
                   <div>
-                    <div className="text-xs font-bold text-slate-800">Ada Kerusakan</div>
-                    <div className="text-[10px] text-slate-500">Kirim tiket Maintenance</div>
+                    <span className="text-slate-400 block text-[11px]">Sumber Informasi:</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      {incident.verification.officerSource.name} ({incident.verification.officerSource.channel || "WhatsApp"})
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {incident.verification?.notes && (
+                <div className="border-t border-slate-200 dark:border-slate-700/60 pt-2 text-xs">
+                  <span className="text-slate-400 block text-[11px]">Keterangan Pemeriksa:</span>
+                  <p className="text-slate-800 dark:text-slate-200 mt-0.5 leading-relaxed bg-white dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                    {incident.verification.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Evidence Photos Gallery */}
+              {incident.verification?.photos && incident.verification.photos.length > 0 && (
+                <div className="border-t border-slate-200 dark:border-slate-700/60 pt-2">
+                  <span className="text-slate-400 block text-[11px] mb-1.5">
+                    Bukti Foto Pemeriksaan ({incident.verification.photos.length}):
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {incident.verification.photos.map((url, idx) => (
+                      <a
+                        key={idx}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:opacity-90 transition-opacity"
+                      >
+                        <img src={url} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1 right-1 p-1 rounded-md bg-slate-900/70 text-white opacity-0 group-hover:opacity-100 transition-opacity text-[10px]">
+                          <ExternalLink className="w-3 h-3" />
+                        </span>
+                      </a>
+                    ))}
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* BM Decision Selection */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                Keputusan Manager Branch:
+              </label>
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setBmDecision("approved")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                    bmDecision === "approved"
+                      ? "border-red-500 bg-red-50/70 dark:bg-red-950/40 ring-2 ring-red-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${bmDecision === "approved" ? "text-red-600 dark:text-red-400" : "text-slate-400"}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Setujui Penanganan</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Mulai alur pekerjaan & estimasi</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBmDecision("safe")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                    bmDecision === "safe"
+                      ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <CheckCircle className={`w-4 h-4 shrink-0 mt-0.5 ${bmDecision === "safe" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Nyatakan Aman</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Operasional normal tanpa tiket</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBmDecision("clarification_requested")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                    bmDecision === "clarification_requested"
+                      ? "border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 ring-2 ring-amber-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <HelpCircle className={`w-4 h-4 shrink-0 mt-0.5 ${bmDecision === "clarification_requested" ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Minta Klarifikasi</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">BMS/BES wajib revisi foto/detail</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setBmDecision("rejected")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                    bmDecision === "rejected"
+                      ? "border-slate-700 bg-slate-100 dark:bg-slate-800 ring-2 ring-slate-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <X className={`w-4 h-4 shrink-0 mt-0.5 ${bmDecision === "rejected" ? "text-slate-800 dark:text-slate-200" : "text-slate-400"}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Tolak Laporan</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Laporan tidak valid atau hoax</div>
+                  </div>
+                </button>
               </div>
             </div>
 
-            {/* FORM STANDAR CEPAT (When damaged is selected) */}
+            {/* Reason / Notes */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  {bmDecision === "rejected" || bmDecision === "clarification_requested" ? (
+                    <span className="text-red-600 dark:text-red-400">* Alasan {bmDecision === "rejected" ? "Penolakan" : "Permintaan Klarifikasi"} (Wajib):</span>
+                  ) : (
+                    "Catatan Manager Branch (Opsional):"
+                  )}
+                </label>
+              </div>
+              <textarea
+                value={bmNotes}
+                onChange={(e) => setBmNotes(e.target.value)}
+                rows={3}
+                required={bmDecision === "rejected" || bmDecision === "clarification_requested"}
+                placeholder={
+                  bmDecision === "rejected"
+                    ? "Jelaskan mengapa laporan ini tidak valid..."
+                    : bmDecision === "clarification_requested"
+                    ? "Tulis poin apa yang perlu diperjelas atau difoto ulang oleh tim pemeriksa..."
+                    : "Tambahkan catatan arahan penanganan jika diperlukan..."
+                }
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+            </div>
+
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm flex items-center gap-1.5 transition-all ${
+                  bmDecision === "approved"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : bmDecision === "safe"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : bmDecision === "clarification_requested"
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-slate-800 hover:bg-slate-900"
+                }`}
+              >
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>
+                  {bmDecision === "approved"
+                    ? "Setujui Penanganan Kerusakan"
+                    : bmDecision === "safe"
+                    ? "Konfirmasi Kondisi Aman"
+                    : bmDecision === "clarification_requested"
+                    ? "Kirim Permintaan Klarifikasi"
+                    : "Tolak Laporan Tidak Valid"}
+                </span>
+                {!isSubmitting && <ArrowRight className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* =========================================================================
+             BMS / BES INSPECTION SUBMISSION MODE
+             ========================================================================= */
+          <form onSubmit={handleSubmitInspection} className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
+            {submitError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
+            {/* Clarification Notice if previous attempt needed clarification */}
+            {incident.status === "clarification_requested" && (
+              <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-xs space-y-1">
+                <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200">
+                  <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span>Permintaan Klarifikasi dari Manager Branch</span>
+                </div>
+                <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
+                  Catatan BM: &quot;{incident.verification?.bmApproval?.clarificationReason || incident.verification?.notes || "Mohon lengkapi foto dan keterangan aktual."}&quot;
+                </p>
+                <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium pt-1">
+                  Pengajuan ini akan dicatat sebagai revisi resmi dan dievaluasi kembali oleh Manager Branch.
+                </p>
+              </div>
+            )}
+
+            {/* 1. Metode Pemeriksaan */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                Pilih Metode Pemeriksaan:
+              </label>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setInspectionMethod("kunjungan_langsung")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                    inspectionMethod === "kunjungan_langsung"
+                      ? "border-blue-600 bg-blue-50/70 dark:bg-blue-950/40 ring-2 ring-blue-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <Building2 className={`w-4 h-4 shrink-0 mt-0.5 ${inspectionMethod === "kunjungan_langsung" ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Kunjungan Langsung</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">Pemeriksaan fisik di lokasi</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setInspectionMethod("informasi_petugas")}
+                  className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                    inspectionMethod === "informasi_petugas"
+                      ? "border-blue-600 bg-blue-50/70 dark:bg-blue-950/40 ring-2 ring-blue-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <MessageSquare className={`w-4 h-4 shrink-0 mt-0.5 ${inspectionMethod === "informasi_petugas" ? "text-blue-600 dark:text-blue-400" : "text-slate-400"}`} />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Informasi Petugas Lokasi</div>
+                    <div className="text-[10px] text-slate-500 dark:text-slate-400">WhatsApp / Media Perusahaan</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Identitas Petugas jika menggunakan informasi petugas lokasi */}
+            {inspectionMethod === "informasi_petugas" && (
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                  Identitas Sumber Informasi & Foto:
+                </span>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                      Nama Petugas Lokasi (Wajib):
+                    </label>
+                    <input
+                      type="text"
+                      value={officerName}
+                      onChange={(e) => setOfficerName(e.target.value)}
+                      placeholder="Contoh: Budi Santoso"
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                      Jabatan di Lokasi:
+                    </label>
+                    <input
+                      type="text"
+                      value={officerRole}
+                      onChange={(e) => setOfficerRole(e.target.value)}
+                      placeholder="Contoh: Kepala Toko / Crew"
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                      Saluran Komunikasi:
+                    </label>
+                    <select
+                      value={officerChannel}
+                      onChange={(e) => setOfficerChannel(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="WhatsApp">WhatsApp</option>
+                      <option value="Telepon Langsung">Telepon Langsung</option>
+                      <option value="Email Perusahaan">Email Perusahaan</option>
+                      <option value="Portal Internal SPARTA">Portal Internal SPARTA</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-500 mb-1">
+                      Nomor Kontak / WA (Opsional):
+                    </label>
+                    <input
+                      type="text"
+                      value={officerContact}
+                      onChange={(e) => setOfficerContact(e.target.value)}
+                      placeholder="0812xxxxxxx"
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Hasil Kondisi Pemeriksaan */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                Hasil Kondisi Fisik Lokasi:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCondition("damaged")}
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    selectedCondition === "damaged"
+                      ? "border-red-500 bg-red-50/70 dark:bg-red-950/40 ring-2 ring-red-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <AlertTriangle className={`w-4 h-4 mb-1 ${selectedCondition === "damaged" ? "text-red-600 dark:text-red-400" : "text-slate-400"}`} />
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Ada Kerusakan</div>
+                  <div className="text-[10px] text-slate-500">Perlu perbaikan</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCondition("safe")}
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    selectedCondition === "safe"
+                      ? "border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <CheckCircle className={`w-4 h-4 mb-1 ${selectedCondition === "safe" ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`} />
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Kondisi Aman</div>
+                  <div className="text-[10px] text-slate-500">Tanpa kerusakan</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCondition("uncertain")}
+                  className={`p-2.5 rounded-xl border text-left transition-all ${
+                    selectedCondition === "uncertain"
+                      ? "border-amber-500 bg-amber-50/70 dark:bg-amber-950/40 ring-2 ring-amber-500/20"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <HelpCircle className={`w-4 h-4 mb-1 ${selectedCondition === "uncertain" ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`} />
+                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Belum Pasti</div>
+                  <div className="text-[10px] text-slate-500">Perlu observasi</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Kategori Kerusakan (Jika Damaged) */}
             {selectedCondition === "damaged" && (
-              <div className="space-y-4 pt-2 border-t border-slate-100 animate-in fade-in">
-                {/* 1. Kategori Kerusakan */}
+              <div className="space-y-3 pt-1 border-t border-slate-100 dark:border-slate-800">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Kategori Kerusakan (Bisa pilih lebih dari satu):
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Kategori Kerusakan:
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {availableCategories.map((cat) => {
@@ -252,7 +818,7 @@ export function StoreVerificationModal({
                           className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
                             isChecked
                               ? "bg-red-600 text-white border-red-600 font-semibold"
-                              : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                              : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
                           }`}
                         >
                           {isChecked ? "✓ " : "+ "}
@@ -263,115 +829,172 @@ export function StoreVerificationModal({
                   </div>
                 </div>
 
-                {/* 2. Tingkat Keparahan & Status Operasional */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Tingkat Keparahan:
                     </label>
                     <select
                       value={severity}
                       onChange={(e) => setSeverity(e.target.value as "Ringan" | "Sedang" | "Berat")}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200"
                     >
                       <option value="Ringan">Ringan (Struktur Aman)</option>
                       <option value="Sedang">Sedang (Perlu Perbaikan Segera)</option>
-                      <option value="Berat">Berat (Berbahaya untuk dimasuki)</option>
+                      <option value="Berat">Berat (Berbahaya)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                       Status Operasional:
                     </label>
                     <select
                       value={operationalStatus}
                       onChange={(e) => setOperationalStatus(e.target.value as "Buka Normal" | "Tutup Sementara")}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800"
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200"
                     >
                       <option value="Buka Normal">Buka Normal</option>
                       <option value="Tutup Sementara">Tutup Sementara</option>
                     </select>
                   </div>
                 </div>
-
-                {/* 3. Upload Foto Bukti Kerusakan */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Foto Bukti Kerusakan:
-                  </label>
-                  {photoPreview ? (
-                    <div className="relative rounded-xl overflow-hidden border border-slate-200 h-28 bg-slate-100">
-                      <img
-                        src={photoPreview}
-                        alt="Bukti Kerusakan"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setPhotoPreview(null)}
-                        className="absolute top-2 right-2 p-1 rounded-full bg-slate-900/80 text-white hover:bg-red-600 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      onClick={handleSimulatePhoto}
-                      className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-3 text-center cursor-pointer bg-slate-50/60 hover:bg-blue-50/40 transition-colors flex flex-col items-center justify-center gap-1.5"
-                    >
-                      <Camera className="w-5 h-5 text-slate-400" />
-                      <span className="text-xs font-medium text-blue-600">
-                        Klik untuk upload foto / Ambil dari Kamera Toko
-                      </span>
-                      <span className="text-[10px] text-slate-400">JPG, PNG maksimal 5 MB</span>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
-            {/* Catatan / Keterangan Tambahan */}
+            {/* 3. Upload Foto Bukti Pemeriksaan (Minimal 1 Foto Wajib) */}
+            <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <span className="text-red-600 dark:text-red-400">*</span> Bukti Foto Pemeriksaan (Minimal 1 Foto):
+                </label>
+                <span className="text-[10px] text-slate-400">
+                  {selectedFiles.length} foto dipilih
+                </span>
+              </div>
+
+              {/* Action buttons for File vs Camera */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-blue-50/40 text-left flex items-center gap-2 transition-colors"
+                >
+                  <Upload className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Pilih dari Galeri</div>
+                    <div className="text-[10px] text-slate-400">JPG, PNG, WEBP</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="p-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-blue-50/40 text-left flex items-center gap-2 transition-colors"
+                >
+                  <Camera className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Ambil dari Kamera</div>
+                    <div className="text-[10px] text-slate-400">Kamera HP / Perangkat</div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Hidden file inputs */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {/* Previews */}
+              {filePreviews.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {filePreviews.map((preview, idx) => (
+                    <div
+                      key={idx}
+                      className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video bg-slate-100 dark:bg-slate-800 group"
+                    >
+                      <img src={preview.url} alt={preview.name} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFile(idx)}
+                          className="p-1 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors shadow-xs"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <div className="absolute bottom-0 inset-x-0 bg-slate-950/70 px-1 py-0.5 text-[9px] text-white truncate font-mono">
+                        {(preview.size / 1024).toFixed(0)} KB
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 4. Keterangan Kondisi Aktual */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                Catatan Kondisi Toko:
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                <span className="text-red-600 dark:text-red-400">*</span> Keterangan Kondisi Aktual Lapangan:
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
+                required
                 placeholder={
                   selectedCondition === "safe"
-                    ? "Contoh: Seluruh staf aman, barang pajangan stabil, toko buka normal."
-                    : "Jelaskan ringkas apa saja yang rusak untuk tim teknisi Sparta Maintenance..."
+                    ? "Contoh: Seluruh struktur bangunan aman, kaca dan rak barang utuh, staf dapat beroperasi normal."
+                    : selectedCondition === "uncertain"
+                    ? "Contoh: Ada retakan rambut di pilar utama, belum dapat dipastikan keamanan strukturalnya tanpa teknisi sipil."
+                    : "Contoh: Kaca etalase pecah dan plafon koridor tengah runtuh, butuh penanganan Sparta Maintenance..."
                 }
-                className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>
 
-            {/* Submit Action */}
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+            {/* Inspector Identity Footer */}
+            <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-slate-400" />
+                Pemeriksa: <strong className="text-slate-700 dark:text-slate-200">{identity?.name || "BMS"} ({identity?.role?.toUpperCase() || "BMS"})</strong>
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Cabang: {incident.branch}
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm flex items-center gap-1.5 transition-all ${
-                  selectedCondition === "safe"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-red-600 hover:bg-red-700"
-                }`}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition-all"
               >
-                <span>
-                  {selectedCondition === "safe"
-                    ? "Konfirmasi Toko Aman"
-                    : "Kirim Laporan & Tiket Maintenance"}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Ajukan Hasil Pemeriksaan ke Manager Branch</span>
+                {!isSubmitting && <ArrowRight className="w-3.5 h-3.5" />}
               </button>
             </div>
           </form>

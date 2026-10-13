@@ -210,8 +210,8 @@ export function ActiveIncidentsTable({
         </div>
       </div>
 
-      {/* Responsive Table */}
-      <div className="overflow-x-auto">
+      {/* DESKTOP TABLE VIEW */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead className="bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 font-medium tracking-wide text-xs border-b border-slate-100 dark:border-slate-700">
             <tr>
@@ -311,6 +311,93 @@ export function ActiveIncidentsTable({
           </tbody>
         </table>
       </div>
+
+      {/* MOBILE CARD LIST VIEW (antislop-layoutmobile: adaptive, zero horizontal scroll) */}
+      <div className="md:hidden space-y-2.5 p-3">
+        {filteredIncidents.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-400">
+            Tidak ada kejadian aktif yang sesuai dengan filter Anda.
+          </div>
+        ) : (
+          filteredIncidents.map((inc) => {
+            const disaster = getDisasterBadge(inc.disasterType);
+            const status = getStatusBadge(inc.status);
+            const Icon = disaster.icon;
+
+            return (
+              <div
+                key={inc.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl p-3.5 shadow-xs space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                      {inc.storeName}
+                    </div>
+                    <div className="text-[11px] text-slate-500 truncate">
+                      {inc.locationCity} • {inc.branch}
+                    </div>
+                  </div>
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${status.color}`}>
+                    {status.label}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium ${disaster.color}`}>
+                    <Icon className="w-3 h-3 shrink-0" />
+                    <span>{disaster.label}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {inc.date}
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-400">Progress Penanganan</span>
+                    <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {inc.progress}%
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${getProgressBarColor(inc.progress)}`}
+                      style={{ width: `${inc.progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Mobile Action Button */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => onSelectIncident(inc)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors min-h-[44px] flex-1"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Lihat Detail Laporan</span>
+                  </button>
+                  {onDeleteIncident && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Hapus laporan ${inc.id} (${inc.storeName})? Tindakan ini tidak dapat dibatalkan.`)) {
+                          onDeleteIncident(inc.id);
+                        }
+                      }}
+                      className="p-2.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      title="Hapus Laporan"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
+

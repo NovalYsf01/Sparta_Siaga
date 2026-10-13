@@ -613,6 +613,7 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
   // Operational permissions: REPORT_CONFIRM, REPORT_FOLLOW_UP, REPORT_UPDATE_PROGRESS, REPORT_CLOSE, COMPLETION_SUBMIT, COMPLETION_APPROVE_COORDINATOR
   const isOperationalAction =
     permission === "REPORT_CONFIRM" ||
+    permission === "REPORT_BM_APPROVAL" ||
     permission === "REPORT_FOLLOW_UP" ||
     permission === "REPORT_UPDATE_PROGRESS" ||
     permission === "REPORT_CLOSE" ||
@@ -713,6 +714,108 @@ export async function canConfirmReportAsync(
     report,
   });
   return result.authorized;
+}
+
+export async function canSubmitInspectionAsync(
+  user: UserContext,
+  report: IncidentRecord
+): Promise<{ authorized: boolean; reason?: string }> {
+  if (user.systemRole === "ADMIN") {
+    return {
+      authorized: false,
+      reason: "System Administrator tidak dapat melakukan tindakan operasional pemeriksaan.",
+    };
+  }
+
+  if (user.scope === "HO") {
+    return {
+      authorized: false,
+      reason: "User dengan scope Head Office tidak memiliki izin operasional pemeriksaan cabang.",
+    };
+  }
+
+  const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
+  if (!user.branch || clean(user.branch) !== clean(report.branch)) {
+    return {
+      authorized: false,
+      reason: `Aksi operasional hanya berlaku untuk cabang sendiri (${user.branch || "N/A"}), bukan ${report.branch}.`,
+    };
+  }
+
+  // TKP Type vs Role segregation: Toko -> BMS, DC/Warehouse -> BES
+  const tkp = report.tkpType || "toko";
+  if (tkp === "dc") {
+    if (user.role !== "bes") {
+      return {
+        authorized: false,
+        reason: "Laporan DC/Warehouse ditangani oleh BES cabang terkait.",
+      };
+    }
+  } else {
+    // tkp === "toko"
+    if (user.role === "bes") {
+      return {
+        authorized: false,
+        reason: "BES tidak berwenang mengambil alih pemeriksaan laporan toko. Laporan toko ditangani oleh BMS cabang terkait.",
+      };
+    }
+    if (user.role !== "bms" && user.role !== "tim_toko") {
+      return {
+        authorized: false,
+        reason: "Laporan gerai toko hanya dapat diperiksa oleh BMS cabang terkait.",
+      };
+    }
+  }
+
+  const permResult = await checkUserPermission({
+    user,
+    permission: "REPORT_CONFIRM",
+    report,
+  });
+
+  return { authorized: permResult.authorized, reason: permResult.reason };
+}
+
+export async function canApproveAsBmAsync(
+  user: UserContext,
+  report: IncidentRecord
+): Promise<{ authorized: boolean; reason?: string }> {
+  if (user.systemRole === "ADMIN") {
+    return {
+      authorized: false,
+      reason: "System Administrator tidak dapat melakukan persetujuan Branch Manager.",
+    };
+  }
+
+  if (user.scope === "HO") {
+    return {
+      authorized: false,
+      reason: "Scope Head Office tidak berwenang memberikan keputusan persetujuan Branch Manager.",
+    };
+  }
+
+  if (user.role !== "bm") {
+    return {
+      authorized: false,
+      reason: "Hanya Branch Manager cabang terkait yang berwenang memberikan keputusan persetujuan.",
+    };
+  }
+
+  const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
+  if (!user.branch || clean(user.branch) !== clean(report.branch)) {
+    return {
+      authorized: false,
+      reason: `Branch Manager hanya berwenang untuk cabangnya sendiri (${user.branch || "N/A"}), bukan ${report.branch}.`,
+    };
+  }
+
+  const permResult = await checkUserPermission({
+    user,
+    permission: "REPORT_BM_APPROVAL",
+    report,
+  });
+
+  return { authorized: permResult.authorized, reason: permResult.reason };
 }
 
 export async function canFollowUpReportAsync(

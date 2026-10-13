@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
-import { checkUserPermission } from "@/lib/permission-service";
+import {
+  checkUserPermission,
+  canSubmitInspectionAsync,
+  canApproveAsBmAsync,
+} from "@/lib/permission-service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -19,7 +23,8 @@ export async function GET(_: Request, { params }: RouteContext) {
     }
 
     const [
-      confirmResult,
+      inspectionResult,
+      bmApprovalResult,
       followUpResult,
       updateProgressResult,
       closeResult,
@@ -30,7 +35,8 @@ export async function GET(_: Request, { params }: RouteContext) {
       submitCompletionResult,
       approveCoordinatorResult,
     ] = await Promise.all([
-      checkUserPermission({ user: sessionUser, permission: "REPORT_CONFIRM", report: incident }),
+      canSubmitInspectionAsync(sessionUser, incident),
+      canApproveAsBmAsync(sessionUser, incident),
       checkUserPermission({ user: sessionUser, permission: "REPORT_FOLLOW_UP", report: incident }),
       checkUserPermission({ user: sessionUser, permission: "REPORT_UPDATE_PROGRESS", report: incident }),
       checkUserPermission({ user: sessionUser, permission: "REPORT_CLOSE", report: incident }),
@@ -46,8 +52,10 @@ export async function GET(_: Request, { params }: RouteContext) {
       data: {
         incidentId: incident.id,
         branch: incident.branch,
-        canConfirm: confirmResult.authorized,
-        confirmReason: confirmResult.reason || "",
+        canConfirm: inspectionResult.authorized,
+        confirmReason: inspectionResult.reason || "",
+        canBmApprove: bmApprovalResult.authorized,
+        bmApproveReason: bmApprovalResult.reason || "",
         canFollowUp: followUpResult.authorized,
         followUpReason: followUpResult.reason || "",
         canUpdateProgress: updateProgressResult.authorized,

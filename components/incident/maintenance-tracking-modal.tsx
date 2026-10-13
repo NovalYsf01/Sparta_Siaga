@@ -38,6 +38,7 @@ import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { WorkReadinessCard } from "./work-readiness-card";
 import { StoreVerificationModal } from "./store-verification-modal";
+import { MilestoneProgressionCard } from "./milestone-progression-card";
 
 interface MaintenanceTrackingModalProps {
   incident: IncidentRecord | null;
@@ -158,6 +159,8 @@ export function MaintenanceTrackingModal({
   // Permissions state
   const [canConfirm, setCanConfirm] = useState(false);
   const [confirmReason, setConfirmReason] = useState("");
+  const [canBmApprove, setCanBmApprove] = useState(false);
+  const [bmApproveReason, setBmApproveReason] = useState("");
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [canUpdateProgress, setCanUpdateProgress] = useState(false);
   const [updateProgressReason, setUpdateProgressReason] = useState("");
@@ -177,7 +180,7 @@ export function MaintenanceTrackingModal({
   const [approveCoordinatorReason, setApproveCoordinatorReason] = useState("");
 
   // Supporting details active tab
-  const [activeTab, setActiveTab] = useState<"none" | "estimation" | "progress" | "approval" | "info">("none");
+  const [activeTab, setActiveTab] = useState<"none" | "milestones" | "estimation" | "progress" | "approval" | "info">("milestones");
 
   const [loading, setLoading] = useState(false);
 
@@ -199,6 +202,8 @@ export function MaintenanceTrackingModal({
       if (permRes?.data) {
         setCanConfirm(Boolean(permRes.data.canConfirm));
         setConfirmReason(permRes.data.confirmReason || "");
+        setCanBmApprove(Boolean(permRes.data.canBmApprove));
+        setBmApproveReason(permRes.data.bmApproveReason || "");
         setCanUpdateProgress(permRes.data.canUpdateProgress);
         setUpdateProgressReason(permRes.data.updateProgressReason || "");
         setCanClose(permRes.data.canClose);
@@ -388,29 +393,52 @@ export function MaintenanceTrackingModal({
       actorDetail: isAutoReport ? "Sistem Otomasi SPARTA" : (incident.reporter?.name || "Pelapor"),
     };
 
-    // 2. Konfirmasi Toko
-    const isStep2Pending = incident.status === "pending_confirmation";
-    const isStep2Completed = !isStep2Pending;
-    const confirmationResult = incident.verification
-      ? incident.verification.isDamaged
-        ? "Toko Dikonfirmasi Terdampak Kerusakan"
-        : incident.verification.isDamaged === false
-        ? "Toko Dikonfirmasi Aman (Tidak Ada Kerusakan)"
-        : "Konfirmasi diterima"
-      : isStep2Completed
-      ? "Kondisi toko telah dikonfirmasi"
-      : null;
+    // 2. Pemeriksaan BMS/BES & Persetujuan BM
+    const isStep2PendingInspection =
+      incident.status === "pending_confirmation" ||
+      incident.status === "clarification_requested";
+    const isStep2PendingBm = incident.status === "pending_bm_approval";
+    const isStep2Completed =
+      incident.status !== "pending_confirmation" &&
+      incident.status !== "clarification_requested" &&
+      incident.status !== "pending_bm_approval";
+
+    let step2PrimaryDetail = "Menunggu pemeriksaan kondisi fisik oleh tim BMS/BES cabang";
+    let step2StateLabel = "Sedang Berlangsung";
+
+    if (isStep2PendingBm) {
+      step2PrimaryDetail =
+        "Hasil pemeriksaan diajukan oleh BMS/BES. Menunggu peninjauan & keputusan Manager Branch.";
+      step2StateLabel = "Menunggu Approval BM";
+    } else if (incident.status === "clarification_requested") {
+      step2PrimaryDetail =
+        `Manager Branch meminta klarifikasi/revisi: "${incident.verification?.bmApproval?.clarificationReason || "Mohon lengkapi data"}"`;
+      step2StateLabel = "Klarifikasi Diminta";
+    } else if (incident.status === "confirmed_safe") {
+      step2PrimaryDetail = "Kondisi dinyatakan AMAN oleh Manager Branch. Operasional normal.";
+      step2StateLabel = "Selesai (Aman)";
+    } else if (incident.status === "rejected_invalid") {
+      step2PrimaryDetail = "Laporan DITOLAK oleh Manager Branch (Data Tidak Valid).";
+      step2StateLabel = "Ditolak BM";
+    } else if (isStep2Completed) {
+      step2PrimaryDetail =
+        incident.verification?.isDamaged
+          ? "Pemeriksaan kerusakan disetujui Manager Branch. Lanjut penanganan teknis."
+          : "Pemeriksaan selesai dan disetujui Manager Branch.";
+      step2StateLabel = "Disetujui BM";
+    }
 
     const step2: LifecycleStepView = {
       key: "KONFIRMASI_TOKO",
       number: 2,
-      title: "Konfirmasi Toko",
+      title: "Pemeriksaan & Persetujuan BM",
       state: isStep2Completed ? "completed" : "current",
-      stateLabel: isStep2Completed ? "Selesai" : "Sedang Berlangsung",
-      primaryDetail: isStep2Completed
-        ? (confirmationResult || "Toko telah memberikan konfirmasi")
-        : "Menunggu konfirmasi kondisi fisik dari cabang atau gerai toko",
-      actorDetail: incident.verification?.confirmedBy || (isStep2Completed ? "Tim Cabang / Toko" : null),
+      stateLabel: step2StateLabel,
+      primaryDetail: step2PrimaryDetail,
+      actorDetail:
+        incident.verification?.bmApproval?.decidedBy ||
+        incident.verification?.confirmedBy ||
+        (isStep2Completed ? "Tim Cabang" : null),
       timestampDetail: incident.verification?.confirmedAt ? safeFormatDate(incident.verification.confirmedAt) : null,
     };
 
@@ -815,19 +843,37 @@ export function MaintenanceTrackingModal({
                       {/* CONTEXTUAL ACTIONS IN ACTIVE STAGE ONLY */}
                       {st.key === "KONFIRMASI_TOKO" && isCurrent && (
                         <div className="mt-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-2 flex-wrap">
-                          {canConfirm ? (
+                          {/* Case 1: Branch Manager Review Action */}
+                          {incident.status === "pending_bm_approval" && canBmApprove ? (
                             <button
                               type="button"
                               onClick={() => setIsVerificationModalOpen(true)}
-                              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
+                              className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
                             >
                               <ShieldAlert className="w-3.5 h-3.5" />
-                              Konfirmasi Kondisi Toko
+                              Review & Berikan Keputusan BM
+                            </button>
+                          ) : incident.status === "pending_bm_approval" && !canBmApprove ? (
+                            <div className="flex items-center gap-1.5 text-[11px] text-indigo-800 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1.5 rounded-md border border-indigo-200 dark:border-indigo-800">
+                              <Lock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                              <span>Menunggu keputusan Branch Manager ({incident.branch}).</span>
+                            </div>
+                          ) : canConfirm ? (
+                            /* Case 2: BMS / BES Inspection Action */
+                            <button
+                              type="button"
+                              onClick={() => setIsVerificationModalOpen(true)}
+                              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
+                            >
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              {incident.status === "clarification_requested"
+                                ? "Kirim Ulang / Revisi Pemeriksaan"
+                                : "Pemeriksaan Lapangan BMS/BES"}
                             </button>
                           ) : (
                             <div className="flex items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1.5 rounded-md border border-amber-200 dark:border-amber-800">
                               <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                              <span>{confirmReason || "Konfirmasi terbatas untuk personil cabang pemilik laporan (Isolasi Cabang Aktif)."}</span>
+                              <span>{confirmReason || "Pemeriksaan terbatas untuk petugas BMS/BES cabang terkait."}</span>
                             </div>
                           )}
                         </div>
@@ -958,6 +1004,18 @@ export function MaintenanceTrackingModal({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
+                  onClick={() => setActiveTab(activeTab === "milestones" ? "none" : "milestones")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                    activeTab === "milestones"
+                      ? "bg-[#1D5AA6] text-white shadow-xs"
+                      : "bg-blue-50 dark:bg-blue-950/40 text-[#1D5AA6] dark:text-blue-300 hover:bg-blue-100"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>5 Milestone ({latestProgress}%)</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setActiveTab(activeTab === "info" ? "none" : "info")}
                   className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                     activeTab === "info"
@@ -1002,6 +1060,17 @@ export function MaintenanceTrackingModal({
                 </button>
               </div>
             </div>
+
+            {/* TAB CONTENT 0: 5 MILESTONE PROGRESSION */}
+            {activeTab === "milestones" && (
+              <div className="animate-in fade-in">
+                <MilestoneProgressionCard
+                  incident={incident}
+                  identity={identity}
+                  onMilestoneUpdated={loadData}
+                />
+              </div>
+            )}
 
             {/* TAB CONTENT 1: INFORMASI TKP & TOKO */}
             {activeTab === "info" && (

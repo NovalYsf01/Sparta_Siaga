@@ -7,6 +7,7 @@ export const PERMISSION_KEYS = [
   "REPORT_VIEW_ALL",
   "REPORT_VIEW_OWN",
   "REPORT_CONFIRM",
+  "REPORT_BM_APPROVAL",
   "REPORT_FOLLOW_UP",
   "REPORT_UPDATE_PROGRESS",
   "REPORT_CLOSE",
@@ -53,9 +54,16 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
   {
     key: "REPORT_CONFIRM",
-    label: "Konfirmasi Laporan",
+    label: "Konfirmasi / Pemeriksaan Laporan",
     category: "LAPORAN",
-    description: "Izin melakukan verifikasi dan konfirmasi kondisi toko terdampak di lapangan.",
+    description: "Izin melakukan pemeriksaan dan pengajuan hasil kondisi lapangan oleh BMS/BES.",
+    isOperational: true,
+  },
+  {
+    key: "REPORT_BM_APPROVAL",
+    label: "Persetujuan Branch Manager",
+    category: "LAPORAN",
+    description: "Izin memberikan keputusan dan persetujuan awal Branch Manager terhadap hasil pemeriksaan cabang.",
     isOperational: true,
   },
   {
@@ -154,6 +162,7 @@ export type AdminCapability = (typeof ADMIN_CAPABILITIES)[number];
 
 export const OPERATIONAL_PERMISSIONS: readonly PermissionKey[] = [
   "REPORT_CONFIRM",
+  "REPORT_BM_APPROVAL",
   "REPORT_FOLLOW_UP",
   "REPORT_UPDATE_PROGRESS",
   "REPORT_CLOSE",
@@ -241,6 +250,14 @@ export const PERMISSION_SCOPE_RULES: Record<PermissionKey, PermissionScopeRule> 
     defaultScope: "SPECIFIC_BRANCH",
     scopeSummary: (u) => `Operasional Cabang (${u?.branch || "Branch"})`,
     description: "Izin konfirmasi kondisi kerusakan di lapangan.",
+  },
+  REPORT_BM_APPROVAL: {
+    key: "REPORT_BM_APPROVAL",
+    policy: "BRANCH_SCOPED",
+    allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
+    defaultScope: "SPECIFIC_BRANCH",
+    scopeSummary: (u) => `Keputusan Branch Manager (${u?.branch || "Branch"})`,
+    description: "Izin persetujuan awal Branch Manager terhadap hasil pemeriksaan cabang.",
   },
   REPORT_FOLLOW_UP: {
     key: "REPORT_FOLLOW_UP",
@@ -345,6 +362,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
   bm: [
     "REPORT_VIEW_OWN",
     "REPORT_CONFIRM",
+    "REPORT_BM_APPROVAL",
     "REPORT_FOLLOW_UP",
     "REPORT_CLOSE",
     "NOTIFICATION_VIEW",
@@ -388,6 +406,7 @@ export const ROLE_PERMISSION_CATALOG: Record<string, readonly PermissionKey[]> =
     "REPORT_FOLLOW_UP",
     "REPORT_UPDATE_PROGRESS",
     "NOTIFICATION_VIEW",
+    "ESTIMATION_TRIGGER",
     "ESTIMATION_VIEW",
     "COMPLETION_SUBMIT",
   ],
@@ -449,6 +468,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
   bm: {
     REPORT_VIEW_OWN: "ALLOW",
     REPORT_CONFIRM: "ALLOW",
+    REPORT_BM_APPROVAL: "ALLOW",
     REPORT_FOLLOW_UP: "ALLOW",
     REPORT_CLOSE: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
@@ -492,6 +512,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<string, Partial<Record<PermissionK
     REPORT_FOLLOW_UP: "ALLOW",
     REPORT_UPDATE_PROGRESS: "ALLOW",
     NOTIFICATION_VIEW: "ALLOW",
+    ESTIMATION_TRIGGER: "ALLOW",
     ESTIMATION_VIEW: "ALLOW",
     COMPLETION_SUBMIT: "ALLOW",
   },

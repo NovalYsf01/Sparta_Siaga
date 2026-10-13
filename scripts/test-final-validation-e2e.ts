@@ -10,6 +10,7 @@ import {
   dbDeleteIncident
 } from "../lib/incident-db";
 import { processEarthquakeAlertsAndReports } from "../lib/server-daemon";
+import { updateNotificationLogForEvent } from "../lib/notification-service";
 import { canViewReport, canActOnReport, UserContext } from "../lib/report-permissions";
 import { canViewReportAsync, canConfirmReportAsync, checkMutationAuthorization } from "../lib/permission-service";
 import { Earthquake } from "../types/disaster";
@@ -273,8 +274,8 @@ async function runFinalValidation() {
       `Store1=${pass2Store1?.status} (${pass2Store1?.progress}%), Store2=${pass2Store2?.status} (${pass2Store2?.progress}%)`
     );
 
-    // 5. SEPARATION OF NOTIFICATIONS AND OPERATIONAL REPORTS
-    console.log("\n--- NOTIFICATION SEPARATION VERIFICATION ---");
+    // 5. SEPARATION OF NOTIFICATIONS AND OPERATIONAL REPORTS & SENT_AT IMMUTABILITY
+    console.log("\n--- NOTIFICATION SEPARATION & SENT_AT IMMUTABILITY VERIFICATION ---");
     const notifRes = await client.query(
       `SELECT id, disaster_id, disaster_type, branch, title, channel, sent_at 
        FROM notification_logs 
@@ -294,6 +295,26 @@ async function runFinalValidation() {
       "Notification log is branch-level broadcast, distinct from store operational tickets",
       notifRes.rows[0]?.branch === "BANDUNG" && notifRes.rows[0]?.disaster_type === "earthquake",
       `Notif ID: ${notifRes.rows[0]?.id}, Branch: ${notifRes.rows[0]?.branch}, Channel: ${notifRes.rows[0]?.channel}`
+    );
+
+    // Verify sent_at immutability on notification update
+    const initialSentAt = new Date(notifRes.rows[0].sent_at).getTime();
+    await updateNotificationLogForEvent(simEventId, "BANDUNG", {
+      title: "⚠️ PERINGATAN DARURAT GEMPA M 5.6 (UPDATED) - CABANG BANDUNG",
+      message: "Pembaruan parameter gempa: data mutakhir BMKG.",
+    });
+
+    const notifAfterUpdateRes = await client.query(
+      `SELECT title, sent_at FROM notification_logs WHERE disaster_id = $1;`,
+      [simEventId]
+    );
+    const updatedSentAt = new Date(notifAfterUpdateRes.rows[0].sent_at).getTime();
+
+    check(
+      "NOTIFICATION_SENT_AT_PRESERVATION",
+      "Updating notification info does not alter original sent_at timestamp",
+      initialSentAt === updatedSentAt && notifAfterUpdateRes.rows[0].title.includes("(UPDATED)"),
+      `Initial sent_at=${new Date(initialSentAt).toISOString()}, After update sent_at=${new Date(updatedSentAt).toISOString()}`
     );
 
     // 6. ACCESS CONTROL & ROLE PERMISSION AUDIT
@@ -448,8 +469,8 @@ async function runFinalValidation() {
       `Timeline entries count: ${updatedIncident?.timeline.length}`
     );
 
-    // 8. HISTORICAL RECORD COMPATIBILITY TEST
-    console.log("\n--- HISTORICAL REPORT COMPATIBILITY TEST ---");
+    // 8. HISTORICAL RECORD COMPATIBILITY & DEDUPLICATION TEST (store_id = branch)
+    console.log("\n--- HISTORICAL REPORT COMPATIBILITY & DEDUPLICATION TEST ---");
     const legacyEventId = "EQ-HIST-LEGACY-001";
     const legacyReportId = `LAP-HIST-${Date.now().toString().slice(-6)}`;
     await client.query("DELETE FROM incidents WHERE earthquake_event_id = $1;", [legacyEventId]);
@@ -476,12 +497,64 @@ async function runFinalValidation() {
       updatedAt: new Date().toISOString(),
     });
 
+    // 8a. Historical report with store_id = branch is successfully read
     const foundLegacy = await dbFindAutoEarthquakeReport(legacyEventId, "CIKOKOL", "CIKOKOL");
     check(
       "HISTORICAL_COMPATIBILITY",
-      "dbFindAutoEarthquakeReport resolves legacy branch-level records",
-      foundLegacy?.id === legacyReportId,
-      foundLegacy ? `Found legacy report ${foundLegacy.id}` : "Not found"
+      "dbFindAutoEarthquakeReport resolves legacy record where store_id = branch",
+      foundLegacy?.id === legacyReportId && foundLegacy?.storeId === "CIKOKOL",
+      foundLegacy ? `Found legacy report ${foundLegacy.id} (storeId=${foundLegacy.storeId})` : "Not found"
+    );
+
+    // 8b. Evaluating stores in that branch for this legacy event does NOT create duplicate reports
+    const legacyEarthquake: Earthquake = {
+      id: legacyEventId,
+      source: "BMKG",
+      sourcePrimary: "BMKG",
+      canonicalEventKey: legacyEventId,
+      title: "Gempa Historis Wilayah Banten",
+      place: "Banten",
+      magnitude: 5.4,
+      depth: "10 km",
+      depthKm: 10,
+      latitude: -6.2000,
+      longitude: 106.6500,
+      time: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      timestamp: Date.now() - 10 * 60 * 1000,
+      potensiTsunami: false,
+      priorityRadiusKm: 30.0,
+      monitoringRadiusKm: 50.0,
+    };
+
+    const cklStore1: Store = {
+      id: "ST-CKL-001",
+      kode_toko: "TKO-CKL-001",
+      nama_toko: "Alfamart Cikokol 1",
+      cabang: "CIKOKOL",
+      alamat: "Jl. M.H. Thamrin No. 1, Cikokol",
+      latitude: -6.2010,
+      longitude: 106.6510,
+      fr_type: "Reguler",
+      branch_emergency_contact: "dc.cikokol@alfamart.co.id",
+    };
+
+    const legacyCycleResult = await processEarthquakeAlertsAndReports([legacyEarthquake], [cklStore1], true);
+    check(
+      "HISTORICAL_DEDUPLICATION",
+      "Autonomous processing on legacy event does not create duplicate report",
+      legacyCycleResult.createdReports === 0,
+      `Created reports = ${legacyCycleResult.createdReports} (matched existing legacy record)`
+    );
+
+    const totalLegacyIncidents = await client.query(
+      `SELECT id FROM incidents WHERE earthquake_event_id = $1;`,
+      [legacyEventId]
+    );
+    check(
+      "HISTORICAL_DEDUPLICATION",
+      "Total incident count for legacy event remains exactly 1",
+      totalLegacyIncidents.rows.length === 1,
+      `Found ${totalLegacyIncidents.rows.length} incident record(s) for ${legacyEventId}`
     );
 
     // Clean up test data

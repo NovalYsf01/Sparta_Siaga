@@ -106,28 +106,26 @@ export default function MonitoringPage() {
           />
           
           {/* Compact Map Controls inside Map */}
-          <div className="absolute bottom-4 left-4 sm:bottom-auto sm:top-4 sm:left-4 z-[400] scale-90 sm:scale-100 origin-bottom-left sm:origin-top-left">
-            <MapControls
-              latestEarthquake={selectedEarthquake || disasterData?.latestBmkgEarthquake}
-              incidentOnly={incidentOnly}
-              onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
-              basemap={basemap}
-              onChangeBasemap={(b) => setBasemap(b)}
-              onResetView={handleResetView}
-              totalStoresCount={computedStores.length}
-              affectedStoresCount={dangerCount + warningCount}
-              showRadar={showRadar}
-              onToggleRadar={() => setShowRadar((prev) => !prev)}
-              radarTimeString={radarData?.timeFormatted}
-              theme={theme}
-              activeLayer={activeLayer}
-              onLayerChange={setActiveLayer}
-              mapTimeFilter={mapTimeFilter}
-              onChangeMapTimeFilter={setMapTimeFilter}
-              selectedEarthquake={selectedEarthquake}
-              onClearEventFocus={clearEventFocus}
-            />
-          </div>
+          <MapControls
+            latestEarthquake={selectedEarthquake || disasterData?.latestBmkgEarthquake}
+            incidentOnly={incidentOnly}
+            onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
+            basemap={basemap}
+            onChangeBasemap={(b) => setBasemap(b)}
+            onResetView={handleResetView}
+            totalStoresCount={computedStores.length}
+            affectedStoresCount={dangerCount + warningCount}
+            showRadar={showRadar}
+            onToggleRadar={() => setShowRadar((prev) => !prev)}
+            radarTimeString={radarData?.timeFormatted}
+            theme={theme}
+            activeLayer={activeLayer}
+            onLayerChange={setActiveLayer}
+            mapTimeFilter={mapTimeFilter}
+            onChangeMapTimeFilter={setMapTimeFilter}
+            selectedEarthquake={selectedEarthquake}
+            onClearEventFocus={clearEventFocus}
+          />
         </div>
 
       </div>

@@ -323,6 +323,13 @@ export function ManualIncidentModal({
                     <span>Akun System Administrator hanya memiliki hak audit & pemantauan, tidak diizinkan membuat laporan operasional.</span>
                   </div>
                 )}
+
+                {(identity?.businessRole === "tim_toko" || identity?.role === "tim_toko" || activeRole === "tim_toko") && (
+                  <div className="mt-4 p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-xs text-amber-800 font-semibold">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                    <span>Pelaporan mandiri oleh Tim Toko saat ini dinonaktifkan sementara. Laporan ditangani langsung melalui tim operasional cabang (BMS/BES).</span>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -507,8 +514,7 @@ export function ManualIncidentModal({
                     <option value="theft">KEMALINGAN</option>
                     <option value="fire">KEBAKARAN</option>
                     <option value="flood">KEBANJIRAN</option>
-                    <option value="heavy_rain">HUJAN/BADAI</option>
-                    <option value="strong_wind">ANGIN KENCANG</option>
+                    <option value="heavy_rain">HUJAN/BADAI (Termasuk Angin Kencang)</option>
                     <option value="earthquake">GEMPA BUMI</option>
                     <option value="severe_building_damage">BANGUNAN RUSAK PARAH</option>
                   </select>
@@ -696,7 +702,12 @@ export function ManualIncidentModal({
             <button
               type="button"
               onClick={handleNext}
-              disabled={identity?.systemRole === "ADMIN"}
+              disabled={
+                identity?.systemRole === "ADMIN" ||
+                identity?.businessRole === "tim_toko" ||
+                identity?.role === "tim_toko" ||
+                activeRole === "tim_toko"
+              }
               className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md shadow-blue-500/20"
             >
               <span>Lanjut</span>
@@ -706,7 +717,12 @@ export function ManualIncidentModal({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={identity?.systemRole === "ADMIN"}
+              disabled={
+                identity?.systemRole === "ADMIN" ||
+                identity?.businessRole === "tim_toko" ||
+                identity?.role === "tim_toko" ||
+                activeRole === "tim_toko"
+              }
               className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-[#D9272E] hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-md shadow-red-500/20"
             >
               <AlertTriangle className="w-4 h-4" />

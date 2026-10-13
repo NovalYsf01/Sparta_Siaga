@@ -294,9 +294,21 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 1. Cek Route work_status
+    // 1. Cek Foto bukti akhir / SERAH TERIMA wajib
+    const hasFinalEvidence = await ProgressService.hasFinalOrHandoverEvidence(reportId);
+    let hasMilestoneSt = false;
+    try {
+      const { getMilestones } = await import("./milestone-service");
+      const milestones = await getMilestones(reportId);
+      const st = milestones.find((m) => m.stageKey === "SERAH_TERIMA");
+      hasMilestoneSt = Boolean(st && st.status === "SUBMITTED" && st.documentStorageKey);
+    } catch {
+      // ignore
+    }
+
+    // 2. Cek Route work_status (jika tidak menggunakan milestone serah terima)
     const route = await EstimationIntegrationService.getRouteByReportId(reportId);
-    if (route && route.workStatus !== "COMPLETED") {
+    if (route && route.workStatus !== "COMPLETED" && !hasMilestoneSt) {
       const err: any = new Error(
         `Alur persetujuan belum dapat dimulai karena pekerjaan fisik belum berstatus 'COMPLETED' (status saat ini: '${route.workStatus}').`
       );
@@ -305,22 +317,21 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 2. Cek Progress fisik 100%
+    // 3. Cek Progress fisik 100%
     const latestProgress = await ProgressService.getLatestProgress(reportId);
-    if (latestProgress.latestPercentage < 100) {
+    const effectiveProgress = Math.max(report.progress || 0, latestProgress.latestPercentage || 0);
+    if (effectiveProgress < 100) {
       const err: any = new Error(
-        `Pekerjaan fisik belum mencapai 100% (progress saat ini: ${latestProgress.latestPercentage}%). Persetujuan tidak dapat diproses.`
+        `Pekerjaan fisik belum mencapai 100% (progress saat ini: ${effectiveProgress}%). Persetujuan tidak dapat diproses.`
       );
       err.status = 400;
       err.code = "PROGRESS_NOT_100";
       throw err;
     }
 
-    // 3. Cek Foto bukti akhir / HANDOVER wajib
-    const hasFinalEvidence = await ProgressService.hasFinalOrHandoverEvidence(reportId);
-    if (!hasFinalEvidence) {
+    if (!hasFinalEvidence && !hasMilestoneSt) {
       const err: any = new Error(
-        "Bukti serah terima pekerjaan (FINAL / HANDOVER) wajib dilampirkan sebelum mengajukan penyelesaian."
+        "Bukti serah terima pekerjaan (Milestone Serah Terima atau FINAL / HANDOVER) wajib dilampirkan sebelum mengajukan penyelesaian."
       );
       err.status = 400;
       err.code = "FINAL_EVIDENCE_MISSING";
@@ -405,13 +416,13 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 6. Update Approval State -> WAITING_COORDINATOR_APPROVAL
+    // 6. Update Approval State -> WAITING_MANAGER_APPROVAL (Direct to BM in new workflow)
     const pool = getDbPool();
-    const submissionNotes = (params.notes || "").trim() || "Pekerjaan fisik telah 100% selesai dan siap diperiksa.";
+    const submissionNotes = (params.notes || "").trim() || "Pekerjaan fisik telah 100% selesai dan siap diverifikasi.";
 
     const updateRes = await pool.query(
       `UPDATE report_completion_approvals SET
-        status = 'WAITING_COORDINATOR_APPROVAL',
+        status = 'WAITING_MANAGER_APPROVAL',
         pic_user_id = $1,
         pic_user_name = $2,
         submitted_at = NOW(),
@@ -446,17 +457,18 @@ export class CompletionApprovalService {
       ]
     );
 
-    // 8. Append to Incident Timeline
+    // 8. Append to Incident Timeline & update status
     const nowWib = formatServerTimestampWib();
     const timelineEntry = {
       stage: "Pengajuan Penyelesaian",
-      label: "Pengajuan Selesai oleh PIC Lapangan",
+      label: "Penyelesaian Pekerjaan Diajukan ke Manager Branch",
       timestamp: nowWib,
       actor: `${params.actor.name} (${actorRole.toUpperCase()})`,
       notes: submissionNotes,
     };
 
     await dbUpdateIncident(params.reportId, {
+      status: "pending_final_approval",
       timeline: [...(report.timeline || []), timelineEntry],
     });
 
@@ -795,14 +807,13 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 6. Status Check: WAITING_MANAGER_APPROVAL is MANDATORY!
-    // Direct close without coordinator approval is strictly rejected.
-    if (approval.status !== "WAITING_MANAGER_APPROVAL") {
+    // 6. Status Check: WAITING_MANAGER_APPROVAL or WAITING_COORDINATOR_APPROVAL (legacy fallback)
+    if (approval.status !== "WAITING_MANAGER_APPROVAL" && approval.status !== "WAITING_COORDINATOR_APPROVAL") {
       const err: any = new Error(
-        `Penutupan laporan langsung ditolak: Persetujuan Koordinator (BMC/BEC/BBC) wajib diselesaikan terlebih dahulu (status approval saat ini: '${approval.status}').`
+        `Persetujuan final Branch Manager ditolak: Status approval saat ini adalah '${approval.status}'.`
       );
       err.status = 400;
-      err.code = "COORDINATOR_APPROVAL_REQUIRED";
+      err.code = "INVALID_APPROVAL_STATE";
       throw err;
     }
 
@@ -841,19 +852,20 @@ export class CompletionApprovalService {
       ]
     );
 
-    // 9. Update Incident: status = resolved, progress = 100
+    // 9. Update Incident: status = closed, progress = 100, closedAt
     const nowWib = formatServerTimestampWib();
     const closeTimelineEntry = {
       stage: "Laporan Ditutup",
-      label: "Case Closed oleh Branch Manager",
+      label: "Pekerjaan Disetujui Final & Laporan Resmi Ditutup (CLOSED)",
       timestamp: nowWib,
       actor: `${params.actor.name} (BM ${report.branch || ""})`,
       notes: managerNotes,
     };
 
     const updatedIncident = await dbUpdateIncident(params.reportId, {
-      status: "resolved",
+      status: "closed",
       progress: 100,
+      closedAt: new Date().toISOString(),
       timeline: [...(report.timeline || []), closeTimelineEntry],
     });
 
@@ -942,9 +954,9 @@ export class CompletionApprovalService {
     }
 
     // 4. State Check
-    if (approval.status !== "WAITING_MANAGER_APPROVAL") {
+    if (approval.status !== "WAITING_MANAGER_APPROVAL" && approval.status !== "WAITING_COORDINATOR_APPROVAL") {
       const err: any = new Error(
-        `Penolakan Branch Manager ditolak: Status laporan saat ini adalah '${approval.status}'.`
+        `Penolakan / permintaan revisi Branch Manager ditolak: Status laporan saat ini adalah '${approval.status}'.`
       );
       err.status = 400;
       throw err;
@@ -994,7 +1006,7 @@ export class CompletionApprovalService {
       ]
     );
 
-    // 8. Append to Incident Timeline
+    // 8. Append to Incident Timeline & update status to revision_requested
     const nowWib = formatServerTimestampWib();
     const timelineEntry = {
       stage: "Revisi Pekerjaan Diminta",
@@ -1005,8 +1017,16 @@ export class CompletionApprovalService {
     };
 
     await dbUpdateIncident(params.reportId, {
+      status: "revision_requested",
       timeline: [...(report.timeline || []), timelineEntry],
     });
+
+    try {
+      const { requestMilestoneRevision } = await import("./milestone-service");
+      await requestMilestoneRevision(params.reportId, "SERAH_TERIMA", reason, params.actor as any);
+    } catch {
+      // ignore if milestone not yet initialized
+    }
 
     return this.mapRowToRecord(updateRes.rows[0]);
   }

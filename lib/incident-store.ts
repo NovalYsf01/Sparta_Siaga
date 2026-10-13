@@ -157,6 +157,11 @@ export function calculateIncidentStats(incidents: IncidentRecord[]): IncidentSta
     severe_building_damage: 0,
     wind: 0, // legacy
     other: 0,
+    autoEarthquake: 0,
+    waitingInspection: 0,
+    waitingBmApproval: 0,
+    inHandling: 0,
+    closed: 0,
     statusBreakdown: {
       resolved: 0,
       inMaintenance: 0,
@@ -176,14 +181,50 @@ export function calculateIncidentStats(incidents: IncidentRecord[]): IncidentSta
     else if (inc.disasterType === "severe_building_damage") stats.severe_building_damage++;
     else stats.other++;
 
-    // Count per status
-    if (inc.status === "resolved" || inc.status === "archived") {
+    // Operational KPI counts
+    if (inc.reportOrigin === "automatic_earthquake" || inc.disasterType === "earthquake") {
+      stats.autoEarthquake = (stats.autoEarthquake || 0) + 1;
+    }
+
+    if (
+      inc.status === "pending_confirmation" ||
+      inc.status === "verifying" ||
+      inc.status === "clarification_requested"
+    ) {
+      stats.waitingInspection = (stats.waitingInspection || 0) + 1;
+    } else if (
+      inc.status === "pending_bm_approval" ||
+      inc.status === "pending_final_approval" ||
+      inc.status === "awaiting_st" ||
+      (inc.progress === 100 && inc.status !== "closed" && inc.status !== "resolved")
+    ) {
+      stats.waitingBmApproval = (stats.waitingBmApproval || 0) + 1;
+    } else if (
+      inc.status === "confirmed_affected" ||
+      inc.status === "in_maintenance" ||
+      inc.status === "investigating" ||
+      inc.status === "in_estimation" ||
+      inc.status === "awaiting_spk" ||
+      inc.status === "spk_issued" ||
+      ((inc.progress ?? 0) > 0 && (inc.progress ?? 0) < 100)
+    ) {
+      stats.inHandling = (stats.inHandling || 0) + 1;
+    } else if (
+      inc.status === "closed" ||
+      inc.status === "resolved" ||
+      inc.status === "confirmed_safe"
+    ) {
+      stats.closed = (stats.closed || 0) + 1;
+    }
+
+    // Legacy statusBreakdown
+    if (inc.status === "resolved" || inc.status === "archived" || inc.status === "closed") {
       stats.statusBreakdown.resolved++;
     } else if (inc.status === "in_maintenance") {
       stats.statusBreakdown.inMaintenance++;
     } else if (inc.status === "investigating") {
       stats.statusBreakdown.investigating++;
-    } else if (inc.status === "verifying") {
+    } else if (inc.status === "verifying" || inc.status === "pending_confirmation") {
       stats.statusBreakdown.verifying++;
     } else {
       stats.statusBreakdown.unhandled++;

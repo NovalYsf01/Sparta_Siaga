@@ -53,10 +53,30 @@ export async function POST(request: Request) {
       );
     }
 
+    if (sessionUser.role === "tim_toko" || (sessionUser as any).businessRole === "tim_toko") {
+      return NextResponse.json(
+        {
+          error: "Pelaporan mandiri oleh Tim Toko saat ini dinonaktifkan sementara. Laporan ditangani langsung melalui tim operasional cabang (BMS/BES).",
+          code: "STORE_SELF_REPORT_DISABLED",
+        },
+        { status: 403 }
+      );
+    }
+
     const body: IncidentRecord = await request.json();
     if (!body.id || !body.disasterType || !body.storeId) {
       return NextResponse.json(
         { error: "Data laporan tidak lengkap (id, disasterType, storeId wajib diisi)" },
+        { status: 400 }
+      );
+    }
+
+    if (body.disasterType === "strong_wind") {
+      return NextResponse.json(
+        {
+          error: "Kategori Angin Kencang dialihkan ke Hujan Lebat/Badai untuk pembuatan laporan baru.",
+          code: "STRONG_WIND_MERGED",
+        },
         { status: 400 }
       );
     }

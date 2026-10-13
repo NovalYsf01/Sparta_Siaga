@@ -1,10 +1,33 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
+import { PwaRegister } from "@/components/pwa/pwa-register";
 import "./globals.css";
 
+export const viewport: Viewport = {
+  themeColor: "#123B6D",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export const metadata: Metadata = {
-  title: "SPARTA Siaga - Disaster & Branch Monitoring System",
-  description: "Real-time interactive monitoring of physical branches & early disaster alerts for Alfamart networks",
+  title: "SPARTA Siaga — Monitoring & Mitigasi Bencana Alfamart",
+  description: "Pusat Intelijen Mitigasi Bencana & Pemantauan Operasional Cabang PT Sumber Alfaria Trijaya Tbk",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SPARTA SIAGA",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -13,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className="dark">
+    <html lang="id">
       <head>
         <link
           rel="stylesheet"
@@ -23,6 +46,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-red-500/20 selection:text-red-500">
+        <PwaRegister />
         {children}
         <Toaster 
           position="top-right"
@@ -46,3 +70,4 @@ export default function RootLayout({
     </html>
   );
 }
+

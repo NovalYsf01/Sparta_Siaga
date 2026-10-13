@@ -14,6 +14,7 @@ import {
   Info,
   Calendar,
   Layers,
+  ExternalLink,
 } from "lucide-react";
 import { IncidentRecord } from "@/types/incident";
 import { UserIdentity } from "@/lib/identity";
@@ -21,6 +22,7 @@ import { checkClientPermission } from "@/lib/client-permissions";
 import { EstimationRouteRecord, HandlerType } from "@/lib/estimation-service";
 import { EstimationStatusCard } from "./estimation-status-card";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { getExternalSystemConfig } from "@/lib/external-systems-config";
 
 interface EstimationModalProps {
   isOpen: boolean;
@@ -114,7 +116,8 @@ export function EstimationModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canTrigger) return;
-    if (!isTkpToko) return;
+
+    const resolvedHandler: HandlerType = isTkpToko ? "BMS" : "BES";
 
     setLoading(true);
     setErrorMessage(null);
@@ -124,7 +127,7 @@ export function EstimationModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          handler: handlerType,
+          handler: resolvedHandler,
         }),
       });
 
@@ -191,27 +194,6 @@ export function EstimationModal({
                   Tutup
                 </button>
               </div>
-            </div>
-          ) : !isTkpToko ? (
-            /* JIKA BUKAN TKP TOKO (MISAL DC) */
-            <div className="text-center py-6 space-y-4">
-              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 flex items-center justify-center mx-auto border border-slate-200 dark:border-slate-700">
-                <Building className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                  Alur Estimasi Khusus TKP Toko
-                </h4>
-                <p className="text-xs text-slate-600 dark:text-slate-300 max-w-sm mx-auto leading-relaxed">
-                  Alur estimasi untuk lokasi DC belum tersedia.
-                </p>
-              </div>
-              <button
-                onClick={onClose}
-                className="px-6 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors"
-              >
-                Tutup
-              </button>
             </div>
           ) : !canTrigger ? (
             /* JIKA TIDAK MEMILIKI ESTIMATION_TRIGGER (BM, Sparta Mtc, HO, Admin) */
@@ -396,120 +378,84 @@ export function EstimationModal({
                 </div>
               </div>
 
-              {/* 2. PILIH HANDLER (Section G: BMS vs Rekanan) */}
-              <div className="space-y-3">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                  Pilih Handler:
-                </label>
+              {/* 2. HANDLER OTOMATIS & TAUTAN SISTEM KERJA */}
+              {(() => {
+                const extSystem = getExternalSystemConfig(isTkpToko ? "toko" : "dc");
+                const autoHandler = isTkpToko ? "BMS" : "BES";
+                const autoHandlerTitle = isTkpToko
+                  ? "BMS — SPARTA Maintenance (Gerai Toko)"
+                  : "BES — Engineering Warehouse (DC/Warehouse)";
+                const autoDesc = isTkpToko
+                  ? "Estimasi pekerjaan gerai toko ditangani langsung oleh tim BMS cabang terkait."
+                  : "Estimasi pekerjaan fasilitas DC/Warehouse ditangani langsung oleh tim BES cabang terkait.";
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Card Handler BMS */}
-                  <div
-                    onClick={() => setHandlerType("BMS")}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                      handlerType === "BMS"
-                        ? "border-[#1D5AA6] bg-blue-50/50 dark:bg-blue-950/30 ring-2 ring-[#1D5AA6]/20"
-                        : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <div className="space-y-1.5">
+                return (
+                  <div className="space-y-4">
+                    {/* Handler Assigned Card */}
+                    <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-slate-900 dark:text-white">
-                          Handler BMS
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-blue-700 dark:text-blue-300">
+                          Handler Operasional (Otomatis)
                         </span>
-                        <input
-                          type="radio"
-                          name="handler"
-                          checked={handlerType === "BMS"}
-                          onChange={() => setHandlerType("BMS")}
-                          className="text-[#1D5AA6] focus:ring-[#1D5AA6]"
-                        />
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#1D5AA6] text-white">
+                          {autoHandler}
+                        </span>
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        &ldquo;Estimasi ditangani melalui alur BMS.&rdquo;
+                      <div className="font-bold text-sm text-slate-900 dark:text-white">
+                        {autoHandlerTitle}
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                        {autoDesc}
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <span className="text-[10px] font-semibold text-[#1D5AA6] dark:text-blue-400">
-                        Target: SPARTA Maintenance
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setHandlerType("BMS");
-                        }}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                          handlerType === "BMS"
-                            ? "bg-[#1D5AA6] text-white"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-                        }`}
-                      >
-                        Pilih BMS
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Card Handler Rekanan */}
-                  <div
-                    onClick={() => setHandlerType("REKANAN")}
-                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
-                      handlerType === "REKANAN"
-                        ? "border-[#1D5AA6] bg-blue-50/50 dark:bg-blue-950/30 ring-2 ring-[#1D5AA6]/20"
-                        : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                    }`}
-                  >
-                    <div className="space-y-1.5">
+                    {/* Direct External System Link Card */}
+                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-slate-900 dark:text-white">
-                          Handler Rekanan
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Sistem Kerja Operasional
                         </span>
-                        <input
-                          type="radio"
-                          name="handler"
-                          checked={handlerType === "REKANAN"}
-                          onChange={() => setHandlerType("REKANAN")}
-                          className="text-[#1D5AA6] focus:ring-[#1D5AA6]"
-                        />
+                        {extSystem.isConfigured ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                            Tersedia
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                            Belum Dikonfigurasi
+                          </span>
+                        )}
                       </div>
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
-                        &ldquo;Estimasi ditangani melalui alur Rekanan.&rdquo;
-                      </p>
-                    </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                        Target: BnM × MANTRA
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setHandlerType("REKANAN");
-                        }}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                          handlerType === "REKANAN"
-                            ? "bg-[#1D5AA6] text-white"
-                            : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
-                        }`}
-                      >
-                        Pilih Rekanan
-                      </button>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                        {extSystem.name}
+                      </p>
+
+                      {extSystem.isConfigured && extSystem.url ? (
+                        <div>
+                          <a
+                            href={extSystem.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-[#1D5AA6] dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-slate-600 transition-colors shadow-sm"
+                          >
+                            <span>Buka Sistem Kerja</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+                          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <span>{extSystem.statusLabel}</span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-[10px] text-slate-400 dark:text-slate-500 leading-normal">
+                        Catatan: Tautan mengarah ke portal kerja eksternal. SPARTA SIAGA tidak melakukan Single Sign-On (SSO) atau sinkronisasi data otomatis dengan sistem kerja tersebut.
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Informational Guidance based on selected Handler */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs text-slate-600 dark:text-slate-300 flex items-start gap-2">
-                <Info className="w-4 h-4 text-[#1D5AA6] shrink-0 mt-0.5" />
-                <p className="text-[11px] leading-relaxed">
-                  {handlerType === "BMS"
-                    ? "Estimasi ditangani melalui alur BMS. SPARTA SIAGA mencatat rute internal dan menunggu hasil estimasi resmi."
-                    : "Estimasi ditangani melalui alur Rekanan. SPARTA SIAGA mencatat rute internal dan menunggu proses penyusunan estimasi rekanan."}
-                </p>
-              </div>
+                );
+              })()}
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
@@ -529,7 +475,7 @@ export function EstimationModal({
                     <span>Memproses...</span>
                   ) : (
                     <>
-                      <span>Simpan Pilihan Handler</span>
+                      <span>Buat Rute Estimasi</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </>
                   )}

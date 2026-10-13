@@ -91,15 +91,29 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
-    // 5. Validate TKP = TOKO (Alur estimasi untuk lokasi DC belum tersedia)
-    const tkp = (incident.tkpType || "").trim().toLowerCase();
-    if (tkp !== "toko") {
+    // 5. Tentukan Handler otomatis berdasarkan TKP (Toko -> BMS, DC/Warehouse -> BES)
+    const tkp = (incident.tkpType || "toko").trim().toLowerCase();
+    const isTkpDc = tkp === "dc";
+    const autoHandler: HandlerType = isTkpDc ? "BES" : "BMS";
+
+    // Validasi kesesuaian role dengan jenis lokasi
+    const actorRole = (sessionUser.role || "").toLowerCase();
+    if (isTkpDc && actorRole === "bms") {
       return NextResponse.json(
         {
-          error: "Alur estimasi untuk lokasi DC belum tersedia.",
-          code: "ESTIMATION_NOT_SUPPORTED",
+          error: "Laporan DC/Warehouse ditangani oleh petugas BES, bukan BMS.",
+          code: "ROLE_LOCATION_MISMATCH",
         },
-        { status: 422 }
+        { status: 403 }
+      );
+    }
+    if (!isTkpDc && actorRole === "bes") {
+      return NextResponse.json(
+        {
+          error: "Laporan Toko ditangani oleh petugas BMS, bukan BES.",
+          code: "ROLE_LOCATION_MISMATCH",
+        },
+        { status: 403 }
       );
     }
 
@@ -135,24 +149,15 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
-    // 8. Validate handler
+    // 8. Tentukan handler (Otomatis berdasarkan lokasi; pilihan manual ditiadakan)
     const body = await request.json().catch(() => ({}));
     const rawHandler = (body.handler || body.handlerType || "").toString().trim().toUpperCase();
-
-    if (rawHandler !== "BMS" && rawHandler !== "REKANAN") {
-      return NextResponse.json(
-        {
-          error: "Handler tidak valid. Pilihan yang tersedia: BMS atau REKANAN.",
-          code: "INVALID_HANDLER",
-        },
-        { status: 400 }
-      );
-    }
+    const handlerType: HandlerType = rawHandler === "BES" || rawHandler === "BMS" ? (rawHandler as HandlerType) : autoHandler;
 
     // 9. Create routing record (clean, no fake data, initial status WAITING_ESTIMATION)
     const created = await EstimationIntegrationService.createRoute({
       reportId: id,
-      handlerType: rawHandler as HandlerType,
+      handlerType,
       actor: {
         id: sessionUser.id,
         name: sessionUser.name,

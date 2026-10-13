@@ -78,13 +78,13 @@ export async function dbFindAutoEarthquakeReport(
   );
   if (storeRes.rows.length > 0) return rowToIncident(storeRes.rows[0]);
 
-  // 2. Legacy fallback lookup by branch (only match legacy branch records where store_id equals the branch or is null)
+  // 2. Legacy fallback lookup by branch (only match legacy branch records where store_id equals the branch or is null/empty)
   const branchLookup = branch || targetId;
   const branchRes = await pool.query(
     `SELECT * FROM incidents
      WHERE earthquake_event_id = $1 
        AND branch = $2 
-       AND (store_id = $2 OR store_id IS NULL)
+       AND (store_id = $2 OR store_id IS NULL OR store_id = '')
        AND report_origin = 'automatic_earthquake'
      LIMIT 1`,
     [earthquakeEventId, branchLookup]
@@ -117,7 +117,7 @@ export async function dbFindManualEarthquakeReportByEvent(
       `SELECT * FROM incidents
        WHERE earthquake_event_id = $1
          AND branch = $2 
-         AND (store_id = $2 OR store_id IS NULL)
+         AND (store_id = $2 OR store_id IS NULL OR store_id = '')
          AND report_origin = 'manual'
        ORDER BY created_at DESC
        LIMIT 1`,
@@ -217,9 +217,9 @@ export async function dbCreateIncident(
       inc.verification ? JSON.stringify(inc.verification) : null,
       inc.maintenanceTicket ? JSON.stringify(inc.maintenanceTicket) : null,
       JSON.stringify(inc.fieldPhotos ?? []),
-      JSON.stringify(inc.timeline),
-      inc.createdAt,
-      inc.updatedAt,
+      JSON.stringify(inc.timeline ?? []),
+      inc.createdAt ?? new Date().toISOString(),
+      inc.updatedAt ?? new Date().toISOString(),
       inc.closedAt ?? null,
     ]
   );

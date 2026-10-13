@@ -619,43 +619,81 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
 
       const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
 
-      if (!isDamaged) {
-        // Toko Aman -> Resolved immediately, moves to History!
+      const isBmApproved = Boolean(
+        report?.bmApproval?.decision === "approved" ||
+        (report?.confirmedBy?.includes("Branch Manager") && isDamaged)
+      );
+      const isBmSafe = Boolean(
+        report?.bmApproval?.decision === "safe" ||
+        (report?.confirmedBy?.includes("Branch Manager") && !isDamaged)
+      );
+      const isBmRejected = report?.bmApproval?.decision === "rejected";
+      const isBmClarification = report?.bmApproval?.decision === "clarification_requested";
+
+      if (isBmSafe || (!isDamaged && report?.confirmedBy?.includes("Manager"))) {
         return {
           ...inc,
-          status: "resolved" as const,
+          status: "confirmed_safe" as const,
           progress: 100,
           verification: {
-            confirmedBy: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
+            confirmedBy: report?.confirmedBy || "Manager Branch",
             confirmedAt: timestamp,
             isDamaged: false,
-            notes: report?.notes || "Toko aman, operasional normal.",
+            notes: report?.notes || "Kondisi dinyatakan aman oleh Manager Branch.",
           },
           timeline: [
             ...inc.timeline,
             {
-              stage: "Verifikasi Selesai",
-              label: "Toko Dikonfirmasi Aman",
+              stage: "Keputusan Manager Branch",
+              label: "Kondisi Dinyatakan Aman oleh Manager Branch",
               timestamp,
-              actor: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
+              actor: report?.confirmedBy || "Manager Branch",
               notes: report?.notes,
             },
           ],
           updatedAt: new Date().toISOString(),
           closedAt: new Date().toISOString(),
         };
-      } else {
-        // Toko Mengalami Kerusakan -> Generate ticket & escalate to Sparta Maintenance!
-        const ticketId = `SPM-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(
-          1000 + Math.random() * 9000
-        )}`;
-
+      } else if (isBmRejected) {
         return {
           ...inc,
-          status: "investigating" as const,
-          progress: 30,
+          status: "rejected_invalid" as const,
+          timeline: [
+            ...inc.timeline,
+            {
+              stage: "Keputusan Manager Branch",
+              label: "Laporan Ditolak Manager Branch (Tidak Valid)",
+              timestamp,
+              actor: report?.confirmedBy || "Manager Branch",
+              notes: report?.notes,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      } else if (isBmClarification) {
+        return {
+          ...inc,
+          status: "clarification_requested" as const,
+          timeline: [
+            ...inc.timeline,
+            {
+              stage: "Keputusan Manager Branch",
+              label: "Permintaan Klarifikasi Hasil Pemeriksaan",
+              timestamp,
+              actor: report?.confirmedBy || "Manager Branch",
+              notes: report?.notes,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      } else if (isBmApproved) {
+        // BM approves damage: allows downstream work readiness and estimation, progress stays 0%
+        return {
+          ...inc,
+          status: "confirmed_affected" as const,
+          progress: inc.progress ?? 0,
           verification: {
-            confirmedBy: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
+            confirmedBy: report?.confirmedBy || "Manager Branch",
             confirmedAt: timestamp,
             isDamaged: true,
             categories: report?.categories || ["Rak Barang"],
@@ -664,25 +702,44 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             notes: report?.notes,
             photos: report?.photos,
           },
-          maintenanceTicket: {
-            ticketId,
-            assignedTechnician: "Penugasan Wilayah Sparta Maintenance",
-            workDescription: `Pemeriksaan kerusakan ${report?.categories?.join(", ") || "fisik"}.`,
+          timeline: [
+            ...inc.timeline,
+            {
+              stage: "Persetujuan Manager Branch",
+              label: `Kerusakan Disetujui (${report?.severity || "Sedang"}) — Siap Penanganan Teknis`,
+              timestamp,
+              actor: report?.confirmedBy || "Manager Branch",
+              notes: report?.notes,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        // BMS/BES submitted inspection: status transitions to pending_bm_approval, progress stays 0%
+        return {
+          ...inc,
+          status: "pending_bm_approval" as const,
+          progress: inc.progress ?? 0,
+          verification: {
+            confirmedBy: report?.confirmedBy || "Petugas Pemeriksa Lapangan",
+            confirmedAt: timestamp,
+            isDamaged,
+            categories: report?.categories || ["Rak Barang"],
+            severity: report?.severity || "Sedang",
+            operationalStatus: report?.operationalStatus || "Buka Normal",
+            notes: report?.notes,
+            photos: report?.photos,
           },
           timeline: [
             ...inc.timeline,
             {
-              stage: "Verifikasi Kerusakan",
-              label: `Kerusakan Terkonfirmasi (${report?.severity || "Sedang"})`,
+              stage: "Pemeriksaan Lapangan",
+              label: isDamaged
+                ? `Hasil Pemeriksaan Diajukan: Ada Kerusakan (${report?.severity || "Sedang"})`
+                : "Hasil Pemeriksaan Diajukan: Kondisi Aman",
               timestamp,
-              actor: report?.confirmedBy || "Petugas Lapangan Terotorisasi",
+              actor: report?.confirmedBy || "Petugas Pemeriksa",
               notes: report?.notes,
-            },
-            {
-              stage: "Tiket Maintenance Dibuat",
-              label: `Tiket ${ticketId} Diteruskan ke Tim Maintenance`,
-              timestamp,
-              actor: "Sistem Sparta Siaga",
             },
           ],
           updatedAt: new Date().toISOString(),

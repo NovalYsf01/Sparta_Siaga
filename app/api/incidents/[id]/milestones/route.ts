@@ -1,0 +1,133 @@
+import { NextResponse } from "next/server";
+import { getSessionUser } from "@/lib/auth";
+import { dbGetIncidentById } from "@/lib/incident-db";
+import { canViewReportAsync } from "@/lib/permission-service";
+import {
+  getMilestones,
+  submitMilestoneDocument,
+} from "@/lib/milestone-service";
+import { MilestoneKey, MILESTONE_CONFIG } from "@/types/incident";
+
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function GET(_: Request, { params }: RouteContext) {
+  try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const incident = await dbGetIncidentById(id);
+    if (!incident) {
+      return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
+    }
+
+    const canView = await canViewReportAsync(sessionUser, incident);
+    if (!canView) {
+      return NextResponse.json(
+        { error: "Unauthorized: Anda tidak memiliki izin untuk melihat laporan ini." },
+        { status: 403 }
+      );
+    }
+
+    const milestones = await getMilestones(id);
+    const activeIndex = milestones.findIndex((m) => m.status !== "SUBMITTED");
+    const activeMilestone = activeIndex !== -1 ? milestones[activeIndex] : null;
+
+    return NextResponse.json({
+      data: {
+        reportId: id,
+        currentProgress: incident.progress,
+        status: incident.status,
+        milestones,
+        activeMilestone,
+        isCompleted: milestones.every((m) => m.status === "SUBMITTED"),
+      },
+    });
+  } catch (err: unknown) {
+    console.error("[GET /api/incidents/:id/milestones]", err);
+    return NextResponse.json(
+      { error: "Gagal memuat status milestone laporan." },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: Request, { params }: RouteContext) {
+  try {
+    const sessionUser = await getSessionUser();
+    if (!sessionUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        { error: "Permintaan harus menggunakan format multipart/form-data." },
+        { status: 400 }
+      );
+    }
+
+    const formData = await request.formData();
+    const stageKey = (formData.get("stage_key") as string)?.toUpperCase() as MilestoneKey;
+    const notes = (formData.get("notes") as string)?.trim() || "";
+    const isSimulation = formData.get("is_simulation") === "true";
+
+    if (!stageKey || !MILESTONE_CONFIG[stageKey]) {
+      return NextResponse.json(
+        { error: `Stage milestone tidak valid. Pilihan: CEKLIS, ESTIMASI, APPROVE_PROXY, SPK, SERAH_TERIMA.` },
+        { status: 400 }
+      );
+    }
+
+    // Extract file
+    let targetFile: File | null = null;
+    for (const [key, val] of formData.entries()) {
+      if ((key === "file" || key === "document" || key === "photo") && val instanceof File && val.size > 0) {
+        targetFile = val;
+        break;
+      }
+    }
+
+    if (!targetFile) {
+      return NextResponse.json(
+        { error: "Berkas dokumen bukti wajib dilampirkan (PDF atau JPEG/PNG)." },
+        { status: 400 }
+      );
+    }
+
+    if (targetFile.size > 15 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: "Ukuran berkas melebihi batas maksimal 15 MB." },
+        { status: 400 }
+      );
+    }
+
+    const arrayBuffer = await targetFile.arrayBuffer();
+    const fileBuffer = Buffer.from(arrayBuffer);
+
+    const result = await submitMilestoneDocument({
+      reportId: id,
+      stageKey,
+      actor: sessionUser,
+      fileBuffer,
+      originalFilename: targetFile.name,
+      notes,
+      isTestSimulation: isSimulation,
+    });
+
+    return NextResponse.json(
+      {
+        message: `Milestone ${result.milestone.stageName} (${result.milestone.targetProgress}%) berhasil diselesaikan.`,
+        data: result,
+      },
+      { status: 200 }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Gagal memproses pengajuan milestone.";
+    console.error("[POST /api/incidents/:id/milestones]", err);
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+}

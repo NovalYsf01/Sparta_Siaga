@@ -1,0 +1,650 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  CheckCircle2,
+  Clock,
+  Lock,
+  Upload,
+  FileText,
+  AlertTriangle,
+  FileCheck,
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  ShieldCheck,
+  RotateCcw,
+  Send,
+  Info,
+} from "lucide-react";
+import {
+  MilestoneRecord,
+  MilestoneKey,
+  MILESTONE_ORDER,
+  MILESTONE_CONFIG,
+  IncidentRecord,
+} from "@/types/incident";
+import { UserIdentity } from "@/lib/identity";
+
+interface MilestoneProgressionCardProps {
+  incident: IncidentRecord;
+  identity: UserIdentity | null;
+  onMilestoneUpdated?: () => void;
+}
+
+export function MilestoneProgressionCard({
+  incident,
+  identity,
+  onMilestoneUpdated,
+}: MilestoneProgressionCardProps) {
+  const [milestones, setMilestones] = useState<MilestoneRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [submitNotes, setSubmitNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Expanded revisions
+  const [expandedRevisions, setExpandedRevisions] = useState<Record<string, boolean>>({});
+
+  // BM Final Decision State
+  const [isBmDecisionLoading, setIsBmDecisionLoading] = useState(false);
+  const [bmDecisionNotes, setBmDecisionNotes] = useState("");
+  const [bmActionType, setBmActionType] = useState<"approve" | "revise" | null>(null);
+  const [isSubmittingToBm, setIsSubmittingToBm] = useState(false);
+
+  const loadMilestones = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/incidents/${incident.id}/milestones`);
+      if (res.ok) {
+        const json = await res.json();
+        setMilestones(json.data || []);
+      }
+    } catch (err) {
+      console.error("[MilestoneProgressionCard] Gagal memuat milestones:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMilestones();
+  }, [incident.id]);
+
+  // Find active milestone
+  const activeMilestone = milestones.find((m) => m.status === "NOT_STARTED" || m.status === "REVISION_REQUESTED");
+  const allCompleted = milestones.length === 5 && milestones.every((m) => m.status === "SUBMITTED");
+  const currentProgress = incident.progress ?? 0;
+
+  const isBmUser = identity?.businessRole === "bm" || identity?.role === "bm";
+  const isPicUser =
+    identity?.businessRole === "bms" ||
+    identity?.role === "bms" ||
+    identity?.businessRole === "bes" ||
+    identity?.role === "bes";
+
+  const isClosed = incident.status === "closed" || incident.status === "resolved";
+  const isAwaitingFinalBm =
+    incident.status === "pending_final_approval" ||
+    incident.status === "awaiting_st" ||
+    (currentProgress === 100 && !isClosed);
+
+  const handleFileUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeMilestone || !selectedFile) return;
+
+    setSubmitting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("stageKey", activeMilestone.stageKey);
+      formData.append("file", selectedFile);
+      if (submitNotes.trim()) {
+        formData.append("notes", submitNotes.trim());
+      }
+
+      const res = await fetch(`/api/incidents/${incident.id}/milestones`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuccessMessage(`Milestone ${activeMilestone.stageName} (${activeMilestone.targetProgress}%) berhasil disubmit.`);
+        setSelectedFile(null);
+        setSubmitNotes("");
+        await loadMilestones();
+        if (onMilestoneUpdated) onMilestoneUpdated();
+      } else {
+        setErrorMessage(json.error || "Gagal mengunggah berkas milestone.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage("Terjadi kesalahan jaringan saat mengunggah dokumen.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBmFinalDecision = async (decision: "approve" | "revise") => {
+    if (decision === "revise" && !bmDecisionNotes.trim()) {
+      setErrorMessage("Alasan permintaan revisi wajib diisi.");
+      return;
+    }
+
+    setIsBmDecisionLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const action = decision === "approve" ? "APPROVE_MANAGER" : "REJECT_MANAGER";
+      const res = await fetch(`/api/incidents/${incident.id}/completion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          notes: bmDecisionNotes.trim() || undefined,
+          reason: bmDecisionNotes.trim() || undefined,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuccessMessage(
+          decision === "approve"
+            ? "Laporan resmi disetujui dan berstatus CLOSED."
+            : "Permintaan revisi berhasil dikirim kepada pelaksana pekerjaan."
+        );
+        setBmActionType(null);
+        setBmDecisionNotes("");
+        await loadMilestones();
+        if (onMilestoneUpdated) onMilestoneUpdated();
+      } else {
+        setErrorMessage(json.error || "Gagal memproses keputusan final Branch Manager.");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Terjadi kesalahan saat memproses approval final.");
+    } finally {
+      setIsBmDecisionLoading(false);
+    }
+  };
+
+  const handleSubmitToBm = async () => {
+    setIsSubmittingToBm(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch(`/api/incidents/${incident.id}/completion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "SUBMIT_COMPLETION",
+          notes: "Pekerjaan fisik telah 100% selesai (Serah Terima) dan diajukan ke Branch Manager.",
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuccessMessage("Penyelesaian pekerjaan berhasil diajukan kepada Branch Manager.");
+        await loadMilestones();
+        if (onMilestoneUpdated) onMilestoneUpdated();
+      } else {
+        setErrorMessage(json.error || "Gagal mengajukan penyelesaian ke Branch Manager.");
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage("Terjadi kesalahan jaringan saat mengajukan penyelesaian.");
+    } finally {
+      setIsSubmittingToBm(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Banner: Progress Bar & Status */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600 dark:text-blue-400">
+              Alur Penanganan Operasional
+            </span>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>Progres 5 Milestone Penanganan</span>
+              {isClosed && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                  CLOSED
+                </span>
+              )}
+            </h3>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="text-2xl font-black text-[#1D5AA6] dark:text-blue-400 font-mono">
+              {currentProgress}%
+            </span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              / 100%
+            </span>
+          </div>
+        </div>
+
+        {/* Visual Progress Bar */}
+        <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-500 ${
+              isClosed ? "bg-emerald-600" : "bg-[#1D5AA6]"
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, currentProgress))}%` }}
+          />
+        </div>
+
+        {/* Milestone Steps Stepper (Responsive) */}
+        <div className="grid grid-cols-5 gap-2 pt-1 text-center">
+          {MILESTONE_ORDER.map((key, idx) => {
+            const cfg = MILESTONE_CONFIG[key];
+            const ms = milestones.find((m) => m.stageKey === key);
+            const isCompleted = ms?.status === "SUBMITTED";
+            const isCurrent = activeMilestone?.stageKey === key;
+            const isRevision = ms?.status === "REVISION_REQUESTED";
+
+            return (
+              <div key={key} className="flex flex-col items-center space-y-1">
+                <div
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    isCompleted
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
+                      : isRevision
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse"
+                      : isCurrent
+                      ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-300"
+                      : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border border-slate-200 dark:border-slate-700"
+                  }`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-4 h-4" />
+                  ) : (
+                    <span>{idx + 1}</span>
+                  )}
+                </div>
+                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full">
+                  {cfg.label}
+                </span>
+                <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
+                  {cfg.progress}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Messages */}
+      {errorMessage && (
+        <div className="p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-xs text-red-700 dark:text-red-300 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
+      {/* Upload & Submit Active Milestone (PIC only) */}
+      {activeMilestone && isPicUser && !isClosed && (
+        <div className="bg-white dark:bg-slate-900 border-2 border-blue-200 dark:border-blue-900/60 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-[#1D5AA6] dark:text-blue-400" />
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Unggah Bukti: {activeMilestone.stageName} ({activeMilestone.targetProgress}%)
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Dokumen bukti fisik (PDF/JPEG/PNG) wajib diunggah sebelum submit.
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+              Tahap {activeMilestone.stageOrder} dari 5
+            </span>
+          </div>
+
+          {activeMilestone.stageKey === "APPROVE_PROXY" && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold">
+                <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Pemberitahuan Kebijakan Approve Proxy (30%):</span>
+              </div>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                Unggah dokumen pendukung untuk mencatat bukti di sistem. Perpindahan operasional ke tahap SPK (50%) akan tertahan sampai aturan pengesahan resmi terkonfirmasi.
+              </p>
+            </div>
+          )}
+
+          <form onSubmit={handleFileUpload} className="space-y-4">
+            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-slate-800/30">
+              <input
+                type="file"
+                id="milestone-file-input"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              <label
+                htmlFor="milestone-file-input"
+                className="cursor-pointer flex flex-col items-center space-y-1.5"
+              >
+                <Upload className="w-6 h-6 text-slate-400" />
+                <span className="text-xs font-bold text-[#1D5AA6] dark:text-blue-400">
+                  {selectedFile ? selectedFile.name : "Pilih Dokumen Bukti (PDF / Foto JPEG)"}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  Maksimal 10MB • Format PDF, JPEG, JPG, PNG
+                </span>
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Catatan Pekerjaan (Opsional):
+              </label>
+              <textarea
+                value={submitNotes}
+                onChange={(e) => setSubmitNotes(e.target.value)}
+                rows={2}
+                placeholder="Tambahkan keterangan teknis milestone..."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="submit"
+                disabled={submitting || !selectedFile}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                {submitting ? (
+                  <span>Mengunggah Berkas...</span>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Submit {activeMilestone.stageName} ({activeMilestone.targetProgress}%)</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Ready for Final BM Submission (100% reached, pending BM submit) */}
+      {allCompleted && !isClosed && isPicUser && incident.status !== "pending_final_approval" && (
+        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <h4 className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
+              Seluruh 5 Milestone Telah Selesai (100%)
+            </h4>
+          </div>
+          <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+            Tahap Serah Terima telah diverifikasi. Silakan ajukan penyelesaian pekerjaan kepada Branch Manager untuk mendapatkan peninjauan dan persetujuan resmi (CLOSED).
+          </p>
+          <div className="pt-1">
+            <button
+              onClick={handleSubmitToBm}
+              disabled={isSubmittingToBm}
+              className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {isSubmittingToBm ? (
+                <span>Mengajukan...</span>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Ajukan Penyelesaian ke Manager Branch</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Branch Manager Final Review Card */}
+      {isAwaitingFinalBm && isBmUser && (
+        <div className="bg-white dark:bg-slate-900 border-2 border-purple-200 dark:border-purple-900/60 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Persetujuan Final Manager Branch (Penutupan Laporan)
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Periksa seluruh 5 bukti fisik milestone sebelum memutuskan penyelesaian.
+                </p>
+              </div>
+            </div>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+              Wewenang BM
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Catatan Persetujuan / Alasan Revisi:
+              </label>
+              <textarea
+                value={bmDecisionNotes}
+                onChange={(e) => setBmDecisionNotes(e.target.value)}
+                rows={2}
+                placeholder="Tuliskan catatan persetujuan atau alasan detail jika meminta perbaikan..."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => handleBmFinalDecision("revise")}
+                disabled={isBmDecisionLoading}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 transition-colors flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Minta Revisi Dokumen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleBmFinalDecision("approve")}
+                disabled={isBmDecisionLoading}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Setujui & Tutup (CLOSED)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* List of 5 Milestones with Document Download & Revision History */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+            <FileCheck className="w-4 h-4 text-[#1D5AA6]" />
+            Daftar Bukti Fisik Milestone
+          </span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+            5 Tahapan Kumulatif
+          </span>
+        </div>
+
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+          {milestones.map((ms) => {
+            const isCompleted = ms.status === "SUBMITTED";
+            const isExpanded = Boolean(expandedRevisions[ms.id]);
+            const revisionsCount = ms.revisions?.length || 0;
+
+            return (
+              <div key={ms.id} className="p-4 sm:p-5 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                        isCompleted
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"
+                      }`}
+                    >
+                      {ms.stageOrder}
+                    </span>
+                    <div>
+                      <h5 className="font-bold text-xs text-slate-900 dark:text-white">
+                        {ms.stageName} ({ms.targetProgress}%)
+                      </h5>
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500">
+                        {isCompleted
+                          ? `Disubmit oleh ${ms.actorName || "Petugas"} (${(ms.actorRole || "").toUpperCase()}) • ${
+                              ms.submittedAt ? new Date(ms.submittedAt).toLocaleString("id-ID") : "-"
+                            }`
+                          : "Belum disubmit"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Document Access Button */}
+                  {isCompleted && ms.documentStorageKey && (
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <a
+                        href={`/api/incidents/${incident.id}/milestones/document/${ms.documentStorageKey}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 dark:bg-blue-950/50 text-[#1D5AA6] dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span className="truncate max-w-[140px]">
+                          {ms.documentOriginalName || "Lihat Bukti"}
+                        </span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes if any */}
+                {ms.notes && (
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                    {ms.notes}
+                  </p>
+                )}
+
+                {/* Revision History Toggle (Rule 10: Prior evidence is never lost) */}
+                {revisionsCount > 0 && (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedRevisions((prev) => ({
+                          ...prev,
+                          [ms.id]: !prev[ms.id],
+                        }))
+                      }
+                      className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                      <span>Riwayat Revisi ({revisionsCount} berkas sebelumnya)</span>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-2 pl-4 border-l-2 border-slate-200 dark:border-slate-700 space-y-2">
+                        {ms.revisions.map((rev) => (
+                          <div
+                            key={rev.revisionNumber}
+                            className="text-[10px] text-slate-600 dark:text-slate-400 flex items-center justify-between py-1 border-b border-slate-100 dark:border-slate-800 last:border-0"
+                          >
+                            <div>
+                              <span className="font-bold">Revisi #{rev.revisionNumber}:</span>{" "}
+                              <span>{rev.documentOriginalName}</span> •{" "}
+                              <span>{rev.actorName}</span>
+                            </div>
+                            <a
+                              href={`/api/incidents/${incident.id}/milestones/document/${rev.documentStorageKey}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              Lihat
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* PDF Export Section */}
+      <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h5 className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+            <Download className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+            Dokumen Laporan Resmi
+          </h5>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">
+            Unduh laporan digital terverifikasi dalam format PDF standar.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Initial PDF */}
+          <a
+            href={`/api/incidents/${incident.id}/export/initial-pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 transition-colors shadow-sm flex items-center gap-1.5"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
+            <span>PDF Laporan Awal</span>
+          </a>
+
+          {/* Final PDF (Enabled when CLOSED) */}
+          {isClosed ? (
+            <a
+              href={`/api/incidents/${incident.id}/export/final-pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>PDF Berita Acara (CLOSED)</span>
+            </a>
+          ) : (
+            <span
+              title="Tersedia setelah laporan disetujui BM (CLOSED)"
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-200/60 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed flex items-center gap-1.5"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>PDF Final (Terkunci)</span>
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

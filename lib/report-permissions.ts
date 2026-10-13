@@ -53,6 +53,35 @@ export function canConfirmAffectedStore(
   return canActOnReport(user, report);
 }
 
+export function canInspectReport(
+  user: UserContext,
+  report: IncidentRecord
+): boolean {
+  if (user.systemRole === "ADMIN" || user.scope === "HO") return false;
+
+  const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
+  const reportBranch = report.branch ? report.branch.trim().toLowerCase() : "";
+  if (userBranch !== reportBranch) return false;
+
+  const tkp = report.tkpType || "toko";
+  if (tkp === "dc") {
+    return user.role === "bes";
+  }
+  return user.role === "bms";
+}
+
+export function canApproveAsBm(
+  user: UserContext,
+  report: IncidentRecord
+): boolean {
+  if (user.systemRole === "ADMIN" || user.scope === "HO") return false;
+  if (user.role !== "bm") return false;
+
+  const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
+  const reportBranch = report.branch ? report.branch.trim().toLowerCase() : "";
+  return userBranch === reportBranch;
+}
+
 export function canCreateManagementInstruction(
   user: UserContext
 ): boolean {

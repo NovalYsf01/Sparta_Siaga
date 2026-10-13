@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Koneksi Terputus — SPARTA SIAGA</title>
+  <meta name="theme-color" content="#123B6D">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #F5F7FA;
+      color: #0F172A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 1.25rem;
+      max-width: 440px;
+      width: 100%;
+      padding: 2rem 1.75rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      text-align: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .brand img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+    }
+    .brand-title {
+      font-size: 1.125rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: #123B6D;
+      text-align: left;
+      line-height: 1.1;
+    }
+    .brand-subtitle {
+      font-size: 0.625rem;
+      color: #64748B;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .icon-container {
+      width: 64px;
+      height: 64px;
+      background: #EAF2FB;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      color: #1D5AA6;
+    }
+    .icon-container svg {
+      width: 32px;
+      height: 32px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 0.5rem;
+    }
+    p {
+      font-size: 0.875rem;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+    .notice {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      font-size: 0.75rem;
+      color: #64748B;
+      margin-bottom: 1.5rem;
+      text-align: left;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 44px;
+      padding: 0.75rem 1.25rem;
+      background: #1D5AA6;
+      color: #FFFFFF;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border-radius: 0.75rem;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s ease;
+    }
+    .btn:hover {
+      background: #123B6D;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <img src="/brand/building_logo.png" alt="SPARTA Logo">
+      <div>
+        <div class="brand-title">SPARTA SIAGA</div>
+        <div class="brand-subtitle">Mitigasi Bencana Alfamart</div>
+      </div>
+    </div>
+
+    <div class="icon-container">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 3l18 18M10.5 10.5a5 5 0 017.07 0M6.34 6.34a10 10 0 0114.14 0M1.76 1.76a15 15 0 0120.48 0M12 18h.01" />
+      </svg>
+    </div>
+
+    <h1>Koneksi Internet Terputus</h1>
+    <p>SPARTA SIAGA beroperasi secara online-first untuk menjamin akurasi data bencana dan integritas pelaporan operasional.</p>
+
+    <div class="notice">
+      Proses pemantauan gempa, pemeriksaan lapangan, upload bukti, dan persetujuan cabang memerlukan jaringan aktif. Silakan hubungkan kembali perangkat Anda.
+    </div>
+
+    <button class="btn" onclick="window.location.reload()">
+      Muat Ulang Halaman
+    </button>
+  </div>
+</body>
+</html>

@@ -25,6 +25,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { RoleType } from "@/types/incident";
+import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 
 export interface IncidentAppShellProps {
   activeRole: RoleType;
@@ -99,6 +100,41 @@ export function IncidentAppShell({
     return `${business} • ${loc}`;
   };
 
+  const getPageTitle = (currentPath: string) => {
+    if (currentPath === "/") return "Ringkasan Operasional";
+    if (currentPath.startsWith("/monitoring")) return "Peta Monitoring Spasial";
+    if (currentPath.startsWith("/alerts")) return "Event & Deteksi Bencana";
+    if (currentPath.startsWith("/reports/tracking")) return "Tracking Alur Penanganan";
+    if (currentPath.startsWith("/reports/history")) return "Riwayat Laporan Historis";
+    if (currentPath.startsWith("/reports")) return "Pusat Laporan Kejadian";
+    if (currentPath.startsWith("/settings")) return "Pengaturan Sistem";
+    if (currentPath.startsWith("/admin")) return "Manajemen User & Hak Akses";
+    return "Sistem Mitigasi";
+  };
+
+  // Lock body scroll when mobile drawer is open
+  React.useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
+  // Close drawer on Escape key
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isMobileMenuOpen) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobileMenuOpen]);
+
   React.useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
@@ -111,6 +147,7 @@ export function IncidentAppShell({
   }, []);
 
   const isDark = theme === "dark";
+
 
   const roleLabels: Record<RoleType, { title: string; subtitle: string; icon: React.ReactNode }> = {
     ho_admin: {
@@ -298,11 +335,11 @@ export function IncidentAppShell({
             isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
           }`}
         >
-          {/* Left: Mobile hamburger or Universal Search */}
-          <div className="flex items-center gap-3 flex-1 max-w-xl">
+          {/* Left: Mobile hamburger, Breadcrumbs, or Search */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={`lg:hidden p-2 rounded-lg transition-colors border border-transparent ${
+              className={`lg:hidden p-2.5 rounded-xl transition-colors border border-transparent min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0 ${
                 isDark 
                   ? "text-slate-300 hover:bg-slate-800 hover:border-slate-700" 
                   : "text-slate-600 hover:bg-slate-100 hover:border-slate-300"
@@ -312,17 +349,24 @@ export function IncidentAppShell({
               {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
+            {/* Desktop Breadcrumbs (SPARTA Enterprise Style) */}
+            <div className="hidden lg:flex items-center gap-2 text-xs shrink-0">
+              <span className="font-bold text-[#123B6D] dark:text-blue-400">SPARTA SIAGA</span>
+              <span className="text-slate-300 dark:text-slate-600">/</span>
+              <span className="text-slate-800 dark:text-slate-200 font-semibold">{getPageTitle(pathname)}</span>
+            </div>
+
             {/* Universal Search Bar */}
             <div
               onClick={onSearchClick}
-              className={`flex-1 hidden sm:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-md ${
+              className={`hidden sm:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-sm w-full ${
                 isDark
                   ? "bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300"
                   : "bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-500"
               }`}
             >
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="truncate text-xs">Cari toko, lokasi, atau nomor laporan...</span>
+              <span className="truncate text-xs">Cari toko, lokasi, laporan...</span>
               <kbd
                 className={`hidden md:inline-block ml-auto text-[10px] border px-1.5 py-0.5 rounded font-mono ${
                   isDark ? "bg-slate-900 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-400"
@@ -333,9 +377,10 @@ export function IncidentAppShell({
             </div>
           </div>
 
-          {/* Right: Date Range, Notifications, Role */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            
+          {/* Right: PWA Install, Buat Laporan, Notifications, Role */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <PwaInstallPrompt variant="compact" />
+
             {identity?.systemRole !== "ADMIN" && (
               <button
                 onClick={() => {
@@ -346,13 +391,14 @@ export function IncidentAppShell({
                     window.dispatchEvent(event);
                   }
                 }}
-                className="hidden md:flex items-center gap-2 px-4 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+                className="hidden md:flex items-center gap-2 px-3.5 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors min-h-[38px]"
               >
                 <ClipboardList className="w-4 h-4" />
-                Buat Laporan
+                <span>Buat Laporan</span>
               </button>
             )}
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden md:block mx-1"></div>
+            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden md:block mx-0.5"></div>
+
 
 
 
@@ -495,8 +541,8 @@ export function IncidentAppShell({
 
         {/* MAIN BODY VIEW */}
         <main
-          className={`relative flex-1 overflow-y-auto pb-16 lg:pb-6 lg:px-6 transition-colors duration-200 flex flex-col ${
-            isDark ? "bg-slate-900" : "bg-[#f5f7f9]"
+          className={`relative flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-6 transition-colors duration-200 flex flex-col ${
+            isDark ? "bg-slate-900" : "bg-[#f5f7fa]"
           }`}
         >
           <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
@@ -504,17 +550,17 @@ export function IncidentAppShell({
           </div>
         </main>
 
-        {/* MOBILE BOTTOM NAVIGATION BAR */}
+        {/* MOBILE BOTTOM NAVIGATION BAR (antislop-layoutmobile) */}
         <nav
-          className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 border-t flex items-center justify-around z-40 px-2 shadow-lg transition-colors duration-200 ${
-            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+          className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 safe-area-bottom border-t flex items-center justify-around z-40 px-1 shadow-lg transition-colors duration-200 ${
+            isDark ? "bg-slate-900/95 border-slate-800 backdrop-blur-md" : "bg-white/95 border-slate-200 backdrop-blur-md"
           }`}
         >
           <Link
             href="/"
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
               pathname === "/"
-                ? "text-blue-500 font-bold"
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
@@ -526,9 +572,9 @@ export function IncidentAppShell({
 
           <Link
             href="/monitoring"
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
               pathname.startsWith("/monitoring")
-                ? "text-blue-500 font-bold"
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
@@ -539,10 +585,10 @@ export function IncidentAppShell({
           </Link>
 
           <Link
-            href="/alerts"
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors relative ${
-              pathname.startsWith("/alerts")
-                ? "text-blue-500 font-bold"
+            href="/reports"
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors relative min-h-[44px] min-w-[52px] ${
+              pathname === "/reports" || pathname.startsWith("/reports/tracking") || pathname.startsWith("/reports/history")
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
@@ -551,29 +597,29 @@ export function IncidentAppShell({
             <ClipboardList className="w-5 h-5" />
             <span>Laporan</span>
             {(activeIncidentCount ?? 0) > 0 && (
-              <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-red-500" />
+              <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-500" />
             )}
           </Link>
 
           <Link
-            href="/reports"
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
-              pathname.startsWith("/reports")
-                ? "text-blue-500 font-bold"
+            href="/alerts"
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
+              pathname.startsWith("/alerts")
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
             }`}
           >
-            <History className="w-5 h-5" />
-            <span>Riwayat</span>
+            <Bell className="w-5 h-5" />
+            <span>Event</span>
           </Link>
 
           <Link
             href="/settings"
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
               pathname.startsWith("/settings")
-                ? "text-blue-500 font-bold"
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
                 : "text-slate-500 hover:text-slate-900"
@@ -585,33 +631,37 @@ export function IncidentAppShell({
         </nav>
       </div>
 
-      {/* MOBILE FULL SCREEN SLIDE-OVER MENU */}
+      {/* MOBILE FULL SCREEN SLIDE-OVER DRAWER MENU (SPARTA Enterprise Style) */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-[3000] flex">
+        <div className="lg:hidden fixed inset-0 z-[3000] flex" role="dialog" aria-modal="true" aria-label="Menu Navigasi Mobile">
           <div
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className={`relative w-72 flex flex-col h-full shadow-2xl p-5 border-r ${
-            isDark ? "bg-slate-950 text-white border-slate-800" : "bg-white text-slate-900 border-slate-200"
-          }`}>
-            <div className={`flex items-center justify-between pb-4 border-b ${isDark ? "border-slate-800" : "border-slate-200"}`}>
-              <div className="flex items-center gap-2">
-                <Store className="w-6 h-6 text-red-500" />
-                <span className="font-bold text-base">SPARTA Siaga</span>
+          <div className="relative w-72 max-w-[85vw] flex flex-col h-full shadow-2xl p-5 border-r border-white/10 bg-[#123B6D] text-white">
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <Image src="/brand/building_logo.png" alt="SPARTA Logo" width={34} height={34} className="shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-extrabold text-sm tracking-wider text-white leading-tight">SPARTA SIAGA</span>
+                  <span className="text-[9px] text-blue-200 font-medium leading-tight">Mitigasi Bencana Alfamart</span>
+                </div>
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white"
+                className="p-2 rounded-xl text-blue-200 hover:text-white hover:bg-white/10 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Tutup Menu Navigasi"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <nav className="flex-1 py-4 space-y-4">
+            {/* Drawer Navigation List */}
+            <nav className="flex-1 py-4 space-y-4 overflow-y-auto">
               {navGroups.map((group, gIdx) => (
-                <div key={gIdx} className="space-y-1.5">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500 px-2 mb-2">
+                <div key={gIdx} className="space-y-1">
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-blue-200/60 px-2 mb-1.5">
                     {group.title}
                   </div>
                   {group.items.map((item) => {
@@ -621,21 +671,19 @@ export function IncidentAppShell({
                       <Link
                         key={item.id}
                         href={item.href}
-                        onClick={() => {
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all min-h-[44px] ${
                           isActive 
-                            ? isDark ? "bg-blue-600/20 text-blue-400 font-bold" : "bg-blue-50 text-blue-700 font-bold"
-                            : isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                            ? "bg-[#1D5AA6] text-white shadow-sm border border-white/10" 
+                            : "text-blue-100 hover:bg-white/10 hover:text-white"
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <Icon className={`w-5 h-5 ${isActive ? (isDark ? "text-blue-400" : "text-blue-600") : ""}`} />
+                          <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-[#F6C800]" : "text-blue-200"}`} />
                           <span>{item.label}</span>
                         </div>
                         {item.badge && (
-                          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-red-500 text-white">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#D9272E] text-white">
                             {item.badge}
                           </span>
                         )}
@@ -645,9 +693,26 @@ export function IncidentAppShell({
                 </div>
               ))}
             </nav>
+
+            {/* Contextual PWA Install & User Info in Drawer Footer */}
+            <div className="pt-3 border-t border-white/10 space-y-3">
+              <PwaInstallPrompt variant="compact" className="w-full justify-center bg-white/10 text-white hover:bg-white/20" />
+              {identity && (
+                <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-white/5 text-xs text-blue-200">
+                  <div className="w-7 h-7 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                    {identity.name ? identity.name.charAt(0).toUpperCase() : "U"}
+                  </div>
+                  <div className="truncate">
+                    <div className="font-bold text-white truncate text-xs">{identity.name}</div>
+                    <div className="text-[10px] text-blue-300 truncate">{getRoleSubtitle(identity)}</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+

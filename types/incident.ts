@@ -27,10 +27,13 @@ export type ReportOrigin =
  * Sesuai flowchart: laporan → estimasi → SPK → ST → Close
  */
 export type IncidentStatus =
-  | "pending_confirmation"  // Auto-report dibuat, menunggu konfirmasi lapangan cabang
+  | "pending_confirmation"  // Auto-report dibuat, menunggu konfirmasi/pemeriksaan lapangan cabang
   | "verifying"             // Menunggu verifikasi kondisi toko
-  | "confirmed_affected"    // Cabang telah mengonfirmasi kondisi terkena dampak
-  | "confirmed_safe"        // Cabang mengonfirmasi aman, tidak ada kerusakan berarti
+  | "pending_bm_approval"   // Hasil pemeriksaan diajukan oleh BMS/BES, menunggu keputusan Branch Manager
+  | "clarification_requested" // Branch Manager meminta klarifikasi hasil pemeriksaan
+  | "confirmed_affected"    // Kerusakan disetujui Branch Manager, siap masuk penanganan pekerjaan
+  | "confirmed_safe"        // Kondisi aman disetujui/dinyatakan oleh Branch Manager
+  | "rejected_invalid"      // Laporan ditolak oleh Branch Manager (tidak valid / hoax / salah TKP)
   | "investigating"         // Dalam penyelidikan/penugasan
   | "in_estimation"         // Sedang dalam proses Buat Estimasi
   | "in_maintenance"        // Sedang dalam perbaikan (MTC/ES)
@@ -38,7 +41,10 @@ export type IncidentStatus =
   | "awaiting_spk"          // Menunggu Surat Perintah Kerja
   | "spk_issued"            // SPK sudah diterbitkan
   | "awaiting_st"           // Menunggu Serah Terima
-  | "resolved"              // Selesai (ST selesai)
+  | "pending_final_approval" // Serah Terima 100% diajukan, menunggu persetujuan final Branch Manager
+  | "revision_requested"    // Branch Manager meminta revisi pada persetujuan final
+  | "resolved"              // Selesai (legacy status)
+  | "closed"                // Laporan resmi disetujui final Branch Manager & ditutup
   | "archived";             // Diarsipkan
 
 /**
@@ -77,10 +83,60 @@ export type RoleType =
   | "store_manager_normal"
   | "sparta_maintenance";
 
+export type InspectionMethod = "kunjungan_langsung" | "informasi_petugas";
+export type InspectionCondition = "damaged" | "safe" | "uncertain";
+export type BmDecision = "approved" | "safe" | "rejected" | "clarification_requested";
+
+export interface InspectionEvidence {
+  photoUrl: string;
+  photoPath?: string;
+  sourceType: "camera" | "gallery" | "officer_upload";
+  caption?: string;
+  officerName?: string;
+  officerContact?: string;
+  officerRole?: string;
+  timestamp: string;
+}
+
+export interface OfficerSource {
+  name: string;
+  contact?: string;
+  role?: string;
+  channel?: string; // e.g. "WhatsApp", "Media Perusahaan"
+}
+
+export interface BmApprovalRecord {
+  decision: BmDecision;
+  decidedBy: string;
+  decidedAt: string;
+  decisionNotes?: string;
+  rejectionReason?: string;
+  clarificationReason?: string;
+}
+
+export interface InspectionRevision {
+  revisionNumber: number;
+  submittedAt: string;
+  inspectorName: string;
+  inspectorRole: string;
+  inspectionMethod: InspectionMethod;
+  condition: InspectionCondition;
+  notes: string;
+  categories?: string[];
+  severity?: "Ringan" | "Sedang" | "Berat";
+  photos: string[];
+  evidenceDetails?: InspectionEvidence[];
+  officerSource?: OfficerSource;
+}
+
 export interface DamageReport {
   confirmedBy: string;
   confirmedAt: string;
   isDamaged: boolean;
+  condition?: InspectionCondition;
+  inspectionMethod?: InspectionMethod;
+  officerSource?: OfficerSource;
+  evidenceDetails?: InspectionEvidence[];
   categories?: (
     | "Dinding/Struktur"
     | "Kaca/Pintu"
@@ -93,6 +149,8 @@ export interface DamageReport {
   photos?: string[];
   operationalStatus?: "Buka Normal" | "Tutup Sementara";
   notes?: string;
+  bmApproval?: BmApprovalRecord;
+  revisions?: InspectionRevision[];
 }
 
 export interface MaintenanceTicket {
@@ -240,6 +298,11 @@ export interface IncidentStats {
   severe_building_damage: number;
   wind: number; // legacy
   other: number;
+  autoEarthquake?: number;
+  waitingInspection?: number;
+  waitingBmApproval?: number;
+  inHandling?: number;
+  closed?: number;
   statusBreakdown: {
     resolved: number;
     inMaintenance: number;
@@ -248,3 +311,78 @@ export interface IncidentStats {
     unhandled: number;
   };
 }
+
+// ============================================================
+// 5 MILESTONES WORKFLOW TYPES (CEKLIS -> ESTIMASI -> APPROVE PROXY -> SPK -> SERAH TERIMA)
+// ============================================================
+
+export type MilestoneKey =
+  | "CEKLIS"
+  | "ESTIMASI"
+  | "APPROVE_PROXY"
+  | "SPK"
+  | "SERAH_TERIMA";
+
+export const MILESTONE_ORDER: readonly MilestoneKey[] = [
+  "CEKLIS",
+  "ESTIMASI",
+  "APPROVE_PROXY",
+  "SPK",
+  "SERAH_TERIMA",
+] as const;
+
+export const MILESTONE_CONFIG: Record<
+  MilestoneKey,
+  { order: number; label: string; progress: number }
+> = {
+  CEKLIS: { order: 1, label: "Ceklis", progress: 10 },
+  ESTIMASI: { order: 2, label: "Estimasi", progress: 25 },
+  APPROVE_PROXY: { order: 3, label: "Approve Proxy", progress: 30 },
+  SPK: { order: 4, label: "SPK", progress: 50 },
+  SERAH_TERIMA: { order: 5, label: "Serah Terima", progress: 100 },
+};
+
+export interface MilestoneRevision {
+  revisionNumber: number;
+  submittedAt: string;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  documentUrl: string;
+  documentStorageKey: string;
+  documentOriginalName: string;
+  documentMimeType: string;
+  documentFileSize: number;
+  notes?: string;
+}
+
+export type MilestoneStatus =
+  | "NOT_STARTED"
+  | "PENDING_SUBMISSION"
+  | "SUBMITTED"
+  | "REVISION_REQUESTED";
+
+export interface MilestoneRecord {
+  id: string;
+  reportId: string;
+  stageOrder: number;
+  stageKey: MilestoneKey;
+  stageName: string;
+  targetProgress: number;
+  status: MilestoneStatus;
+  documentUrl?: string;
+  documentStorageKey?: string;
+  documentOriginalName?: string;
+  documentMimeType?: string;
+  documentFileSize?: number;
+  actorId?: string;
+  actorName?: string;
+  actorRole?: string;
+  submittedAt?: string;
+  notes?: string;
+  proxyApprovalStatus?: "EVIDENCE_SUBMITTED_AWAITING_POLICY" | "VALIDATED";
+  revisions: MilestoneRevision[];
+  createdAt: string;
+  updatedAt: string;
+}
+

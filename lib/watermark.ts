@@ -1,5 +1,3 @@
-import fs from "fs/promises";
-import path from "path";
 import sharp from "sharp";
 import { saveProgressPhoto } from "./progress-storage";
 
@@ -9,7 +7,7 @@ export interface WatermarkOptions {
   storeName?: string; // Store name (e.g. Alfamart Mekarwangi)
   progressPercentage: number;
   actorName?: string;
-  photoType?: "PROGRESS" | "FINAL" | "HANDOVER";
+  photoType?: "PROGRESS" | "FINAL" | "HANDOVER" | "INSPECTION";
   customDate?: Date; // Optional server-trusted date override (default: new Date())
 }
 
@@ -129,6 +127,8 @@ export async function processAndWatermarkPhoto(
       ? " [BUKTI FINAL]"
       : options.photoType === "HANDOVER"
       ? " [SERAH TERIMA]"
+      : options.photoType === "INSPECTION"
+      ? " [PEMERIKSAAN]"
       : "";
 
   const displayReportNumber = options.reportNumber || options.reportId;
