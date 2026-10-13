@@ -13,7 +13,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "SPARTA Siaga — Monitoring & Mitigasi Bencana Alfamart",
   description: "Pusat Intelijen Mitigasi Bencana & Pemantauan Operasional Cabang PT Sumber Alfaria Trijaya Tbk",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

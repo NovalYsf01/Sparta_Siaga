@@ -44,31 +44,13 @@ export function checkClientPermission(params: ClientPermissionCheckParams): Clie
   const contextBranch = cleanBranch(targetBranch || report?.branch);
   const userBranch = cleanBranch(identity.branch);
 
-  // 1. SYSTEM ADMIN CLASSIFICATION (ADMINISTRATIVE ≠ OPERATIONAL)
-  // System Admin is a SYSTEM / DEVELOPER ADMINISTRATOR, not an operational actor.
-  // - Operational permissions are STRICTLY DENIED without exception.
-  // - Monitoring permissions (REPORT_VIEW_ALL, NOTIFICATION_VIEW, ESTIMATION_VIEW) are allowed for support/audit.
+  // 1. SYSTEM ADMIN CLASSIFICATION
+  // Admin SPARTA SIAGA is the super administrator with full application access across all branches.
   if (identity.systemRole === "ADMIN") {
-    if (isOperationalPermission(permission)) {
-      return {
-        authorized: false,
-        reason: "Anda tidak memiliki izin untuk melakukan tindakan ini.",
-        scopeReason: "Akses ditentukan berdasarkan permission dan cakupan laporan yang dimiliki akun Anda.",
-      };
-    }
-
-    if (isMonitoringPermission(permission)) {
-      return {
-        authorized: true,
-        reason: "Akses pemantauan diizinkan untuk kebutuhan troubleshooting, support, dan audit.",
-        scopeReason: "Akses pemantauan sistem nasional",
-      };
-    }
-
     return {
-      authorized: false,
-      reason: "Anda tidak memiliki izin untuk melakukan tindakan ini.",
-      scopeReason: "Permission belum diberikan pada akun Anda.",
+      authorized: true,
+      reason: "Admin SPARTA SIAGA memiliki akses penuh aplikasi.",
+      scopeReason: "Super Administrator Nasional",
     };
   }
 

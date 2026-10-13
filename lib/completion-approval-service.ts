@@ -279,6 +279,7 @@ export class CompletionApprovalService {
   static async validateCompletionPrerequisites(reportId: string): Promise<{
     report: IncidentRecord;
     route: import("./estimation-service").EstimationRouteRecord | null;
+    hasMilestoneSt: boolean;
   }> {
     const report = await dbGetIncidentById(reportId);
     if (!report) {
@@ -338,7 +339,7 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    return { report, route };
+    return { report, route, hasMilestoneSt };
   }
 
   /**
@@ -362,12 +363,14 @@ export class CompletionApprovalService {
     const { report, route } = await this.validateCompletionPrerequisites(params.reportId);
     const approval = await this.getOrCreateApproval(params.reportId);
 
-    // 1. Zero Operational Bypass untuk System Admin
-    if (params.actor.systemRole === "ADMIN") {
-      const err: any = new Error("Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional.");
+    // 1. Scope and System Admin checks
+    if (params.actor.scope === "HO") {
+      const err: any = new Error("Forbidden: User dengan scope Head Office tidak memiliki izin operasional pengajuan penyelesaian.");
       err.status = 403;
       throw err;
     }
+
+    const isSystemAdmin = params.actor.systemRole === "ADMIN";
 
     // 2. State Check
     if (approval.status !== "WAITING_PIC_SUBMISSION" && approval.status !== "REVISION_REQUIRED") {
@@ -381,9 +384,9 @@ export class CompletionApprovalService {
 
     // 3. Actor Role Validation (Server-side resolved)
     const expectedRoute = resolveApprovalRoute(report, route);
-    const actorRole = (params.actor.role || "").toLowerCase();
+    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
 
-    if (actorRole !== expectedRoute.picRole) {
+    if (!isSystemAdmin && actorRole !== expectedRoute.picRole) {
       const err: any = new Error(
         `Pengajuan penyelesaian hanya dapat diajukan oleh PIC resmi jalur ${expectedRoute.flowType} (${expectedRoute.picRole.toUpperCase()}), bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
@@ -392,16 +395,18 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 4. Branch Scope Validation
-    const userBranch = cleanBranch(params.actor.branch);
-    const reportBranch = cleanBranch(report.branch);
-    if (!userBranch || userBranch !== reportBranch) {
-      const err: any = new Error(
-        `Aksi pengajuan penyelesaian hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
-      );
-      err.status = 403;
-      err.code = "BRANCH_SCOPE_VIOLATION";
-      throw err;
+    // 4. Branch Scope Validation (Admin is not restricted to single branch)
+    if (!isSystemAdmin) {
+      const userBranch = cleanBranch(params.actor.branch);
+      const reportBranch = cleanBranch(report.branch);
+      if (!userBranch || userBranch !== reportBranch) {
+        const err: any = new Error(
+          `Aksi pengajuan penyelesaian hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
+        );
+        err.status = 403;
+        err.code = "BRANCH_SCOPE_VIOLATION";
+        throw err;
+      }
     }
 
     // 5. Central Permission Resolver check (COMPLETION_SUBMIT)
@@ -496,18 +501,20 @@ export class CompletionApprovalService {
     const { report, route } = await this.validateCompletionPrerequisites(params.reportId);
     const approval = await this.getOrCreateApproval(params.reportId);
 
-    // 1. Zero Operational Bypass
-    if (params.actor.systemRole === "ADMIN") {
-      const err: any = new Error("Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional.");
+    // 1. Scope and System Admin checks
+    if (params.actor.scope === "HO") {
+      const err: any = new Error("Forbidden: User dengan scope Head Office tidak memiliki izin persetujuan koordinator.");
       err.status = 403;
       throw err;
     }
 
+    const isSystemAdmin = params.actor.systemRole === "ADMIN";
+
     // 2. Domain Routing Check
     const expectedRoute = resolveApprovalRoute(report, route);
-    const actorRole = (params.actor.role || "").toLowerCase();
+    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
 
-    if (actorRole !== expectedRoute.coordinatorRole) {
+    if (!isSystemAdmin && actorRole !== expectedRoute.coordinatorRole) {
       const err: any = new Error(
         `Laporan jalur ${expectedRoute.flowType} hanya dapat disetujui oleh ${expectedRoute.coordinatorRole.toUpperCase()}, bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
@@ -516,16 +523,18 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 3. Branch Scope Check
-    const userBranch = cleanBranch(params.actor.branch);
-    const reportBranch = cleanBranch(report.branch);
-    if (!userBranch || userBranch !== reportBranch) {
-      const err: any = new Error(
-        `Aksi persetujuan koordinator hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
-      );
-      err.status = 403;
-      err.code = "BRANCH_SCOPE_VIOLATION";
-      throw err;
+    // 3. Branch Scope Check (Admin is not restricted to single branch)
+    if (!isSystemAdmin) {
+      const userBranch = cleanBranch(params.actor.branch);
+      const reportBranch = cleanBranch(report.branch);
+      if (!userBranch || userBranch !== reportBranch) {
+        const err: any = new Error(
+          `Aksi persetujuan koordinator hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
+        );
+        err.status = 403;
+        err.code = "BRANCH_SCOPE_VIOLATION";
+        throw err;
+      }
     }
 
     // 4. Central Permission Resolver check (COMPLETION_APPROVE_COORDINATOR)
@@ -635,17 +644,19 @@ export class CompletionApprovalService {
     const route = await EstimationIntegrationService.getRouteByReportId(params.reportId);
     const approval = await this.getOrCreateApproval(params.reportId);
 
-    // 1. Zero Operational Bypass
-    if (params.actor.systemRole === "ADMIN") {
-      const err: any = new Error("Forbidden: Akun System Administrator tidak memiliki izin operasional.");
+    // 1. Scope and System Admin checks
+    if (params.actor.scope === "HO") {
+      const err: any = new Error("Forbidden: User dengan scope Head Office tidak memiliki izin revisi koordinator.");
       err.status = 403;
       throw err;
     }
 
+    const isSystemAdmin = params.actor.systemRole === "ADMIN";
+
     // 2. Domain Routing Check
     const expectedRoute = resolveApprovalRoute(report, route);
-    const actorRole = (params.actor.role || "").toLowerCase();
-    if (actorRole !== expectedRoute.coordinatorRole) {
+    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
+    if (!isSystemAdmin && actorRole !== expectedRoute.coordinatorRole) {
       const err: any = new Error(
         `Laporan jalur ${expectedRoute.flowType} hanya dapat direvisi oleh ${expectedRoute.coordinatorRole.toUpperCase()}.`
       );
@@ -653,15 +664,17 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 3. Branch Scope Check
-    const userBranch = cleanBranch(params.actor.branch);
-    const reportBranch = cleanBranch(report.branch);
-    if (!userBranch || userBranch !== reportBranch) {
-      const err: any = new Error(
-        `Aksi revisi koordinator hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}).`
-      );
-      err.status = 403;
-      throw err;
+    // 3. Branch Scope Check (Admin is not restricted to single branch)
+    if (!isSystemAdmin) {
+      const userBranch = cleanBranch(params.actor.branch);
+      const reportBranch = cleanBranch(report.branch);
+      if (!userBranch || userBranch !== reportBranch) {
+        const err: any = new Error(
+          `Aksi revisi koordinator hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}).`
+        );
+        err.status = 403;
+        throw err;
+      }
     }
 
     // 4. State Check
@@ -752,50 +765,47 @@ export class CompletionApprovalService {
     };
     notes?: string;
   }): Promise<IncidentRecord> {
-    const { report } = await this.validateCompletionPrerequisites(params.reportId);
+    const { report, hasMilestoneSt } = await this.validateCompletionPrerequisites(params.reportId);
     const approval = await this.getOrCreateApproval(params.reportId);
 
-    // 1. Zero Operational Bypass
-    if (params.actor.systemRole === "ADMIN") {
-      const err: any = new Error("Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional.");
-      err.status = 403;
-      throw err;
-    }
-
-    // 2. HO Role Substitution Blocked
+    // 1. HO Role Substitution Blocked
     if (params.actor.scope === "HO" || ["ho_admin", "gm_ho", "sm_ho"].includes(params.actor.role || "")) {
       const err: any = new Error(
-        "Forbidden: User dengan role atau scope Head Office (HO) tidak dapat menggantikan kewenangan Branch Manager cabang."
+        "Forbidden: User dengan role atau scope Head Office (HO) tidak dapat menggantikan kewenangan Building & Maintenance Manager cabang."
       );
       err.status = 403;
       err.code = "HO_MANAGER_SUBSTITUTION_BLOCKED";
       throw err;
     }
 
-    // 3. Role Check: Manager Branch ('bm')
-    const actorRole = (params.actor.role || "").toLowerCase();
-    if (actorRole !== "bm") {
+    const isSystemAdmin = params.actor.systemRole === "ADMIN";
+
+    // 2. Role Check: Building & Maintenance Manager ('bm') or Admin
+    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
+    if (!isSystemAdmin && actorRole !== "bm") {
       const err: any = new Error(
-        `Persetujuan final dan penutupan laporan hanya dapat dilakukan oleh Branch Manager (BM), bukan '${actorRole.toUpperCase() || "N/A"}'.`
+        `Persetujuan final dan penutupan laporan hanya dapat dilakukan oleh Building & Maintenance Manager (BMM), bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
       err.status = 403;
       err.code = "ROLE_MISMATCH";
       throw err;
     }
 
-    // 4. Branch Scope Isolation
-    const userBranch = cleanBranch(params.actor.branch);
-    const reportBranch = cleanBranch(report.branch);
-    if (!userBranch || userBranch !== reportBranch) {
-      const err: any = new Error(
-        `Aksi persetujuan final Branch Manager hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
-      );
-      err.status = 403;
-      err.code = "BRANCH_SCOPE_VIOLATION";
-      throw err;
+    // 3. Branch Scope Isolation (Admin is not restricted to single branch)
+    if (!isSystemAdmin) {
+      const userBranch = cleanBranch(params.actor.branch);
+      const reportBranch = cleanBranch(report.branch);
+      if (!userBranch || userBranch !== reportBranch) {
+        const err: any = new Error(
+          `Aksi persetujuan final Building & Maintenance Manager hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
+        );
+        err.status = 403;
+        err.code = "BRANCH_SCOPE_VIOLATION";
+        throw err;
+      }
     }
 
-    // 5. Central Permission Resolver check (REPORT_CLOSE)
+    // 4. Central Permission Resolver check (REPORT_CLOSE)
     const permCheck = await checkUserPermission({
       user: params.actor as any,
       permission: "REPORT_CLOSE",
@@ -807,33 +817,40 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 6. Status Check: WAITING_MANAGER_APPROVAL or WAITING_COORDINATOR_APPROVAL (legacy fallback)
-    if (approval.status !== "WAITING_MANAGER_APPROVAL" && approval.status !== "WAITING_COORDINATOR_APPROVAL") {
+    // 5. Status Check: WAITING_MANAGER_APPROVAL, legacy WAITING_COORDINATOR_APPROVAL, or WAITING_PIC_SUBMISSION when hasMilestoneSt is true
+    const isReadyForManager =
+      approval.status === "WAITING_MANAGER_APPROVAL" ||
+      approval.status === "WAITING_COORDINATOR_APPROVAL" ||
+      (approval.status === "WAITING_PIC_SUBMISSION" && hasMilestoneSt);
+
+    if (!isReadyForManager) {
       const err: any = new Error(
-        `Persetujuan final Branch Manager ditolak: Status approval saat ini adalah '${approval.status}'.`
+        `Persetujuan final ditolak: Status approval saat ini adalah '${approval.status}'.`
       );
       err.status = 400;
       err.code = "INVALID_APPROVAL_STATE";
       throw err;
     }
 
-    // 7. Update Approval State -> CLOSED
+    // 6. Update Approval State -> CLOSED
     const pool = getDbPool();
     const managerNotes = (params.notes || "").trim() || "Pekerjaan diverifikasi selesai 100% dan laporan resmi ditutup.";
+    const actorDisplayName = isSystemAdmin ? `${params.actor.name} (ADMIN)` : params.actor.name;
 
     await pool.query(
       `UPDATE report_completion_approvals SET
         status = 'CLOSED',
-        manager_user_id = $1,
-        manager_user_name = $2,
+        manager_role = $1,
+        manager_user_id = $2,
+        manager_user_name = $3,
         manager_approved_at = NOW(),
-        manager_notes = $3,
+        manager_notes = $4,
         updated_at = NOW()
-       WHERE report_id = $4`,
-      [params.actor.id, params.actor.name, managerNotes, params.reportId]
+       WHERE report_id = $5`,
+      [isSystemAdmin ? "ADMIN" : "bm", params.actor.id, actorDisplayName, managerNotes, params.reportId]
     );
 
-    // 8. Append History
+    // 7. Append History
     const historyId = `hist_${params.reportId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     await pool.query(
       `INSERT INTO report_completion_approval_history (
@@ -845,20 +862,21 @@ export class CompletionApprovalService {
         "CLOSE",
         "APPROVE_MANAGER",
         params.actor.id,
-        params.actor.name,
-        actorRole,
+        actorDisplayName,
+        actorRole.toUpperCase(),
         report.branch || "",
         managerNotes,
       ]
     );
 
-    // 9. Update Incident: status = closed, progress = 100, closedAt
+    // 8. Update Incident: status = closed, progress = 100, closedAt
     const nowWib = formatServerTimestampWib();
+    const actorLabel = isSystemAdmin ? `${params.actor.name} (ADMIN)` : `${params.actor.name} (BMM ${report.branch || ""})`;
     const closeTimelineEntry = {
       stage: "Laporan Ditutup",
-      label: "Pekerjaan Disetujui Final & Laporan Resmi Ditutup (CLOSED)",
+      label: `Pekerjaan Disetujui Final & Laporan Resmi Ditutup (${isSystemAdmin ? "Admin SPARTA SIAGA" : "Building & Maintenance Manager"})`,
       timestamp: nowWib,
-      actor: `${params.actor.name} (BM ${report.branch || ""})`,
+      actor: actorLabel,
       notes: managerNotes,
     };
 
@@ -869,7 +887,7 @@ export class CompletionApprovalService {
       timeline: [...(report.timeline || []), closeTimelineEntry],
     });
 
-    // 10. Audit Log
+    // 9. Audit Log
     try {
       const auditId = `audit_close_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       await pool.query(
@@ -880,14 +898,14 @@ export class CompletionApprovalService {
         [
           auditId,
           params.actor.id,
-          params.actor.name,
+          actorDisplayName,
           "REPORT_CLOSED",
           params.reportId,
           "REPORT_CLOSE",
           "ALLOW",
-          "BRANCH",
+          isSystemAdmin ? "ALL_BRANCHES" : "BRANCH",
           report.branch || null,
-          `Case Closed oleh BM ${params.actor.name}. Catatan: ${managerNotes}`,
+          `Case Closed oleh ${actorLabel}. Catatan: ${managerNotes}`,
         ]
       );
     } catch (auditErr) {
@@ -898,7 +916,7 @@ export class CompletionApprovalService {
   }
 
   /**
-   * STEP 3B: BRANCH MANAGER MENOLAK / MEMINTA REVISI (REJECT)
+   * STEP 3B: BUILDING & MAINTENANCE MANAGER MENOLAK / MEMINTA REVISI (REJECT)
    */
   static async rejectByManager(params: {
     reportId: string;
@@ -927,30 +945,34 @@ export class CompletionApprovalService {
 
     const approval = await this.getOrCreateApproval(params.reportId);
 
-    // 1. Zero Operational Bypass
-    if (params.actor.systemRole === "ADMIN") {
-      const err: any = new Error("Forbidden: Akun System Administrator tidak memiliki izin operasional.");
+    // 1. HO Blocked
+    if (params.actor.scope === "HO" || ["ho_admin", "gm_ho", "sm_ho"].includes(params.actor.role || "")) {
+      const err: any = new Error("Forbidden: User dengan scope Head Office tidak memiliki izin revisi manager.");
       err.status = 403;
       throw err;
     }
 
-    // 2. Role Check
-    const actorRole = (params.actor.role || "").toLowerCase();
-    if (actorRole !== "bm") {
-      const err: any = new Error(`Hanya Branch Manager (BM) yang dapat meminta revisi pada tahap ini.`);
+    const isSystemAdmin = params.actor.systemRole === "ADMIN";
+
+    // 2. Role Check: BMM ('bm') or Admin
+    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
+    if (!isSystemAdmin && actorRole !== "bm") {
+      const err: any = new Error(`Hanya Building & Maintenance Manager (BMM) yang dapat meminta revisi pada tahap ini.`);
       err.status = 403;
       throw err;
     }
 
-    // 3. Branch Scope
-    const userBranch = cleanBranch(params.actor.branch);
-    const reportBranch = cleanBranch(report.branch);
-    if (!userBranch || userBranch !== reportBranch) {
-      const err: any = new Error(
-        `Aksi penolakan Branch Manager hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}).`
-      );
-      err.status = 403;
-      throw err;
+    // 3. Branch Scope (Admin is not restricted to single branch)
+    if (!isSystemAdmin) {
+      const userBranch = cleanBranch(params.actor.branch);
+      const reportBranch = cleanBranch(report.branch);
+      if (!userBranch || userBranch !== reportBranch) {
+        const err: any = new Error(
+          `Aksi penolakan Building & Maintenance Manager hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}).`
+        );
+        err.status = 403;
+        throw err;
+      }
     }
 
     // 4. State Check

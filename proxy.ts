@@ -6,9 +6,33 @@ import { getJwtSecret } from './lib/runtime-config';
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Public paths
-  const publicPaths = ['/login', '/api/auth/login', '/brand', '/_next', '/api/health/live', '/api/health/ready'];
-  if (publicPaths.some(p => pathname.startsWith(p)) || pathname.endsWith('.png') || pathname.endsWith('.jpg')) {
+  // Public and PWA infrastructure assets (Must NEVER be redirected to /login)
+  const isPwaOrStatic =
+    pathname === '/manifest.webmanifest' ||
+    pathname === '/manifest.json' ||
+    pathname === '/sw.js' ||
+    pathname === '/offline.html' ||
+    pathname === '/favicon.ico' ||
+    pathname.startsWith('/icons/') ||
+    pathname.startsWith('/brand/') ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.webp') ||
+    pathname.endsWith('.svg') ||
+    pathname.endsWith('.ico') ||
+    pathname.endsWith('.webmanifest');
+
+  const publicPrefixes = [
+    '/login',
+    '/api/auth/login',
+    '/brand',
+    '/_next',
+    '/api/health/live',
+    '/api/health/ready',
+  ];
+
+  if (isPwaOrStatic || publicPrefixes.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
@@ -42,11 +66,8 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Match all request paths except static Next.js assets and PWA files:
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|manifest.json|offline.html).*)',
   ],
 };

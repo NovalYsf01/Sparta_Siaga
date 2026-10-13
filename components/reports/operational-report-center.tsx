@@ -57,8 +57,8 @@ export function OperationalReportCenter({
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {
-      // Exclude resolved/archived permanently from active operational center
-      if (inc.status === "resolved" || inc.status === "archived") return false;
+      // Exclude closed/resolved/archived permanently from active operational center
+      if (inc.status === "closed" || inc.status === "resolved" || inc.status === "archived") return false;
 
       // Detailed active status filter
       if (filterStatus !== "all" && inc.status !== filterStatus) return false;
@@ -84,10 +84,10 @@ export function OperationalReportCenter({
     });
   }, [incidents, searchQuery, filterStatus, filterType]);
 
-  const activeCount = incidents.filter(i => i.status !== "resolved").length;
+  const activeCount = incidents.filter(i => i.status !== "closed" && i.status !== "resolved" && i.status !== "archived").length;
   const pendingCount = incidents.filter(i => i.status === "pending_confirmation").length;
   const maintenanceCount = incidents.filter(i => i.status === "in_maintenance").length;
-  const resolvedCount = incidents.filter(i => i.status === "resolved").length;
+  const resolvedCount = incidents.filter(i => i.status === "closed" || i.status === "resolved" || i.status === "archived").length;
 
   const getStatusBadge = (status: IncidentStatus) => {
     switch (status) {

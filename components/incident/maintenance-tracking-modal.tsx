@@ -284,9 +284,9 @@ export function MaintenanceTrackingModal({
     if (latestProgress === 100) {
       if (completionApproval?.status === "WAITING_MANAGER_APPROVAL") {
         return {
-          label: "Menunggu Approval Branch Manager",
+          label: "Menunggu Approval Building & Maintenance Manager",
           badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-700",
-          desc: "Koordinator cabang telah menyetujui hasil serah terima. Menunggu persetujuan Branch Manager.",
+          desc: "Koordinator cabang telah menyetujui hasil serah terima. Menunggu persetujuan Building & Maintenance Manager.",
         };
       }
       if (completionApproval?.status === "WAITING_COORDINATOR_APPROVAL") {
@@ -408,30 +408,30 @@ export function MaintenanceTrackingModal({
 
     if (isStep2PendingBm) {
       step2PrimaryDetail =
-        "Hasil pemeriksaan diajukan oleh BMS/BES. Menunggu peninjauan & keputusan Manager Branch.";
-      step2StateLabel = "Menunggu Approval BM";
+        "Hasil pemeriksaan diajukan oleh BMS/BES. Menunggu peninjauan & keputusan Building & Maintenance Manager.";
+      step2StateLabel = "Menunggu Approval BMM";
     } else if (incident.status === "clarification_requested") {
       step2PrimaryDetail =
-        `Manager Branch meminta klarifikasi/revisi: "${incident.verification?.bmApproval?.clarificationReason || "Mohon lengkapi data"}"`;
+        `Building & Maintenance Manager meminta klarifikasi/revisi: "${incident.verification?.bmApproval?.clarificationReason || "Mohon lengkapi data"}"`;
       step2StateLabel = "Klarifikasi Diminta";
     } else if (incident.status === "confirmed_safe") {
-      step2PrimaryDetail = "Kondisi dinyatakan AMAN oleh Manager Branch. Operasional normal.";
+      step2PrimaryDetail = "Kondisi dinyatakan AMAN oleh Building & Maintenance Manager. Operasional normal.";
       step2StateLabel = "Selesai (Aman)";
     } else if (incident.status === "rejected_invalid") {
-      step2PrimaryDetail = "Laporan DITOLAK oleh Manager Branch (Data Tidak Valid).";
-      step2StateLabel = "Ditolak BM";
+      step2PrimaryDetail = "Laporan DITOLAK oleh Building & Maintenance Manager (Data Tidak Valid).";
+      step2StateLabel = "Ditolak BMM";
     } else if (isStep2Completed) {
       step2PrimaryDetail =
         incident.verification?.isDamaged
-          ? "Pemeriksaan kerusakan disetujui Manager Branch. Lanjut penanganan teknis."
-          : "Pemeriksaan selesai dan disetujui Manager Branch.";
-      step2StateLabel = "Disetujui BM";
+          ? "Pemeriksaan kerusakan disetujui Building & Maintenance Manager. Lanjut penanganan teknis."
+          : "Pemeriksaan selesai dan disetujui Building & Maintenance Manager.";
+      step2StateLabel = "Disetujui BMM";
     }
 
     const step2: LifecycleStepView = {
       key: "KONFIRMASI_TOKO",
       number: 2,
-      title: "Pemeriksaan & Persetujuan BM",
+      title: "Pemeriksaan & Persetujuan BMM",
       state: isStep2Completed ? "completed" : "current",
       stateLabel: step2StateLabel,
       primaryDetail: step2PrimaryDetail,
@@ -592,10 +592,10 @@ export function MaintenanceTrackingModal({
 
     let step7Detail = "Belum dilakukan";
     if (isStep7Completed) {
-      step7Detail = "Laporan resmi disetujui Branch Manager & ditutup";
+      step7Detail = "Laporan resmi disetujui Building & Maintenance Manager & ditutup";
     } else if (isStep7Current) {
       if (completionApproval?.status === "WAITING_MANAGER_APPROVAL") {
-        step7Detail = "Menunggu persetujuan akhir & penutupan laporan oleh Branch Manager";
+        step7Detail = "Menunggu persetujuan akhir & penutupan laporan oleh Building & Maintenance Manager";
       } else if (completionApproval?.status === "WAITING_COORDINATOR_APPROVAL") {
         step7Detail = `Menunggu persetujuan Koordinator (${completionRoute?.coordinatorRole?.toUpperCase() || "Cabang"})`;
       } else {
@@ -611,7 +611,7 @@ export function MaintenanceTrackingModal({
       stateLabel: isStep7Completed ? "Selesai" : isStep7Current ? "Sedang Berlangsung" : "Belum dilakukan",
       primaryDetail: step7Detail,
       secondaryDetail: isStep7Completed && completionApproval?.managerApprovedAt
-        ? `Disetujui Branch Manager (${completionApproval.managerUserName || "BM"}) pada ${safeFormatDate(completionApproval.managerApprovedAt)}`
+        ? `Disetujui Building & Maintenance Manager (${completionApproval.managerUserName || "BMM"}) pada ${safeFormatDate(completionApproval.managerApprovedAt)}`
         : null,
       actorDetail: completionApproval?.managerUserName || null,
       timestampDetail: completionApproval?.managerApprovedAt
@@ -843,7 +843,7 @@ export function MaintenanceTrackingModal({
                       {/* CONTEXTUAL ACTIONS IN ACTIVE STAGE ONLY */}
                       {st.key === "KONFIRMASI_TOKO" && isCurrent && (
                         <div className="mt-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-2 flex-wrap">
-                          {/* Case 1: Branch Manager Review Action */}
+                          {/* Case 1: Building & Maintenance Manager Review Action */}
                           {incident.status === "pending_bm_approval" && canBmApprove ? (
                             <button
                               type="button"
@@ -851,12 +851,12 @@ export function MaintenanceTrackingModal({
                               className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
                             >
                               <ShieldAlert className="w-3.5 h-3.5" />
-                              Review & Berikan Keputusan BM
+                              Review & Berikan Keputusan BMM
                             </button>
                           ) : incident.status === "pending_bm_approval" && !canBmApprove ? (
                             <div className="flex items-center gap-1.5 text-[11px] text-indigo-800 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1.5 rounded-md border border-indigo-200 dark:border-indigo-800">
                               <Lock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span>Menunggu keputusan Branch Manager ({incident.branch}).</span>
+                              <span>Menunggu keputusan Building & Maintenance Manager ({incident.branch}).</span>
                             </div>
                           ) : canConfirm ? (
                             /* Case 2: BMS / BES Inspection Action */

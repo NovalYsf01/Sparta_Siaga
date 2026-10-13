@@ -447,34 +447,13 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
   const contextBranch = cleanBranch(targetBranch || report?.branch);
   const userBranch = cleanBranch(user.branch);
 
-  // 1. SYSTEM ADMIN CLASSIFICATION (ADMINISTRATIVE ≠ OPERATIONAL)
-  // System Admin is a SYSTEM / DEVELOPER ADMINISTRATOR, not an operational actor.
-  // - Administrative capabilities (manage users, roles, overrides, audit, system config) are inherent to ADMIN.
-  // - Monitoring permissions (REPORT_VIEW_ALL, NOTIFICATION_VIEW, ESTIMATION_VIEW) are allowed for support/troubleshooting/audit.
-  // - Operational permissions (REPORT_CONFIRM, REPORT_FOLLOW_UP, REPORT_UPDATE_PROGRESS, REPORT_CLOSE,
-  //   MANAGEMENT_INSTRUCTION_CREATE, ESTIMATION_TRIGGER) are STRICTLY DENIED without exception.
-  // - System Admin does NOT receive or use business permission overrides.
+  // 1. SYSTEM ADMIN CLASSIFICATION
+  // Admin SPARTA SIAGA is the super administrator with full application access across all branches.
   if (user.systemRole === "ADMIN") {
-    if (isOperationalPermission(permission)) {
-      return {
-        authorized: false,
-        source: "SYSTEM_ADMIN",
-        reason: "Anda tidak memiliki izin untuk melakukan tindakan ini.",
-      };
-    }
-
-    if (isMonitoringPermission(permission)) {
-      return {
-        authorized: true,
-        source: "SYSTEM_ADMIN",
-        reason: "System Administrator memiliki akses pemantauan sistem (troubleshooting, support, audit).",
-      };
-    }
-
     return {
-      authorized: false,
+      authorized: true,
       source: "SYSTEM_ADMIN",
-      reason: "Anda tidak memiliki izin untuk melakukan tindakan ini.",
+      reason: "Admin SPARTA SIAGA memiliki akses penuh aplikasi.",
     };
   }
 
@@ -720,18 +699,16 @@ export async function canSubmitInspectionAsync(
   user: UserContext,
   report: IncidentRecord
 ): Promise<{ authorized: boolean; reason?: string }> {
-  if (user.systemRole === "ADMIN") {
-    return {
-      authorized: false,
-      reason: "System Administrator tidak dapat melakukan tindakan operasional pemeriksaan.",
-    };
-  }
-
   if (user.scope === "HO") {
     return {
       authorized: false,
       reason: "User dengan scope Head Office tidak memiliki izin operasional pemeriksaan cabang.",
     };
+  }
+
+  // Admin SPARTA SIAGA has full access to inspect Toko and DC across branches
+  if (user.systemRole === "ADMIN") {
+    return { authorized: true };
   }
 
   const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
@@ -759,7 +736,7 @@ export async function canSubmitInspectionAsync(
         reason: "BES tidak berwenang mengambil alih pemeriksaan laporan toko. Laporan toko ditangani oleh BMS cabang terkait.",
       };
     }
-    if (user.role !== "bms" && user.role !== "tim_toko") {
+    if (user.role !== "bms") {
       return {
         authorized: false,
         reason: "Laporan gerai toko hanya dapat diperiksa oleh BMS cabang terkait.",
@@ -780,24 +757,22 @@ export async function canApproveAsBmAsync(
   user: UserContext,
   report: IncidentRecord
 ): Promise<{ authorized: boolean; reason?: string }> {
-  if (user.systemRole === "ADMIN") {
-    return {
-      authorized: false,
-      reason: "System Administrator tidak dapat melakukan persetujuan Branch Manager.",
-    };
-  }
-
   if (user.scope === "HO") {
     return {
       authorized: false,
-      reason: "Scope Head Office tidak berwenang memberikan keputusan persetujuan Branch Manager.",
+      reason: "Scope Head Office tidak berwenang memberikan keputusan persetujuan Building & Maintenance Manager.",
     };
+  }
+
+  // Admin SPARTA SIAGA has full access to approve across branches
+  if (user.systemRole === "ADMIN") {
+    return { authorized: true };
   }
 
   if (user.role !== "bm") {
     return {
       authorized: false,
-      reason: "Hanya Branch Manager cabang terkait yang berwenang memberikan keputusan persetujuan.",
+      reason: "Hanya Building & Maintenance Manager cabang terkait yang berwenang memberikan keputusan persetujuan.",
     };
   }
 
@@ -805,7 +780,7 @@ export async function canApproveAsBmAsync(
   if (!user.branch || clean(user.branch) !== clean(report.branch)) {
     return {
       authorized: false,
-      reason: `Branch Manager hanya berwenang untuk cabangnya sendiri (${user.branch || "N/A"}), bukan ${report.branch}.`,
+      reason: `Building & Maintenance Manager hanya berwenang untuk cabangnya sendiri (${user.branch || "N/A"}), bukan ${report.branch}.`,
     };
   }
 

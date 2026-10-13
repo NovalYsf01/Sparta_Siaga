@@ -144,7 +144,7 @@ export function CompletionApprovalCard({
             8. Alur Persetujuan Penyelesaian & Case Close
           </h4>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Jalur: {route?.flowType || "BMS"} • {picLabel} → {coordLabel} → Branch Manager (BM {incident.branch})
+            Jalur: {route?.flowType || "BMS"} • {picLabel} → {coordLabel} → Building & Maintenance Manager (BMM {incident.branch})
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export function CompletionApprovalCard({
           ) : status === "WAITING_MANAGER_APPROVAL" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
               <Clock className="w-3.5 h-3.5 text-amber-600" />
-              Menunggu Approval BM
+              Menunggu Approval BMM
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -317,10 +317,6 @@ export function CompletionApprovalCard({
                   <AlertTriangle className="w-4 h-4" />
                   Prasyarat belum lengkap (100% + Bukti Handover)
                 </span>
-              ) : isSysAdmin ? (
-                <span className="text-xs text-slate-400 flex items-center gap-1" title="Zero Operational Bypass">
-                  <Lock className="w-3.5 h-3.5" /> Read-Only (System Administrator)
-                </span>
               ) : canSubmitCompletion ? (
                 <button
                   type="button"
@@ -353,11 +349,7 @@ export function CompletionApprovalCard({
                 </p>
               </div>
 
-              {isSysAdmin ? (
-                <span className="text-xs text-slate-400 flex items-center gap-1">
-                  <Lock className="w-3.5 h-3.5" /> Read-Only (System Administrator)
-                </span>
-              ) : canApproveCoordinator ? (
+              {canApproveCoordinator ? (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -395,18 +387,14 @@ export function CompletionApprovalCard({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Tahap 3: Persetujuan Final Branch Manager & Case Close
+                  Tahap 3: Persetujuan Final Building & Maintenance Manager & Case Close
                 </p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Koordinator ({coordLabel}) telah menyetujui. Menunggu persetujuan <span className="font-semibold text-emerald-600 dark:text-emerald-400">Branch Manager</span> cabang {incident.branch}.
+                  Koordinator ({coordLabel}) telah menyetujui. Menunggu persetujuan <span className="font-semibold text-emerald-600 dark:text-emerald-400">Building & Maintenance Manager (BMM)</span> cabang {incident.branch}.
                 </p>
               </div>
 
-              {isSysAdmin ? (
-                <span className="text-xs text-slate-400 flex items-center gap-1">
-                  <Lock className="w-3.5 h-3.5" /> Read-Only (System Administrator)
-                </span>
-              ) : canClose && isSameBranch && userRole?.toLowerCase() === "bm" ? (
+              {canClose && (isSysAdmin || (isSameBranch && userRole?.toLowerCase() === "bm")) ? (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -433,7 +421,7 @@ export function CompletionApprovalCard({
                 </div>
               ) : (
                 <span className="text-xs text-slate-400 flex items-center gap-1" title={closeReason}>
-                  <Lock className="w-3.5 h-3.5" /> Menunggu Approval BM ({incident.branch})
+                  <Lock className="w-3.5 h-3.5" /> Menunggu Approval BMM ({incident.branch})
                 </span>
               )}
             </div>
@@ -501,7 +489,7 @@ export function CompletionApprovalCard({
                 {activeModal === "submit"
                   ? "Ajukan Penyelesaian Pekerjaan"
                   : activeModal === "approve"
-                  ? userRole?.toLowerCase() === "bm"
+                  ? (userRole?.toLowerCase() === "bm" || isSysAdmin)
                     ? "Konfirmasi Final Approval & Case Close"
                     : "Persetujuan Koordinator"
                   : "Minta Revisi Pekerjaan"}
@@ -512,9 +500,9 @@ export function CompletionApprovalCard({
               {activeModal === "submit"
                 ? "Pastikan pekerjaan fisik 100% selesai dan foto serah terima (HANDOVER) telah terlampir."
                 : activeModal === "approve"
-                ? userRole?.toLowerCase() === "bm"
-                  ? "Persetujuan Branch Manager akan mengubah status laporan menjadi RESOLVED dan menutup laporan secara resmi."
-                  : "Persetujuan Koordinator akan meneruskan laporan ke tahap akhir (Branch Manager Approval)."
+                ? (userRole?.toLowerCase() === "bm" || isSysAdmin)
+                  ? "Persetujuan Building & Maintenance Manager / Administrator akan mengubah status laporan menjadi RESOLVED dan menutup laporan secara resmi."
+                  : "Persetujuan Koordinator akan meneruskan laporan ke tahap akhir (Building & Maintenance Manager Approval)."
                 : "Tuliskan alasan atau bagian yang perlu direvisi secara jelas agar PIC dapat memperbaikinya."}
             </p>
 

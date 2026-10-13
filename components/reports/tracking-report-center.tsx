@@ -27,7 +27,7 @@ export function TrackingReportCenter({
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {
-      if (inc.status === "resolved" || inc.status === "archived") return false;
+      if (inc.status === "closed" || inc.status === "resolved" || inc.status === "archived") return false;
       if (filterStatus !== "all" && inc.status !== filterStatus) return false;
 
       if (searchQuery.trim()) {

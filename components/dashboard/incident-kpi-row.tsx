@@ -56,9 +56,9 @@ export function IncidentKpiRow({
     },
     {
       id: "waiting_approval",
-      label: "Persetujuan BM",
+      label: "Persetujuan BMM",
       count: stats.waitingBmApproval || 0,
-      sublabel: "Menunggu Branch Manager",
+      sublabel: "Menunggu BMM",
       icon: ShieldAlert,
       color: "text-indigo-600 dark:text-indigo-400",
       accent: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300",

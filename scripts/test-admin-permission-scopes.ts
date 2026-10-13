@@ -388,9 +388,9 @@ async function testRevokedOverride() {
 }
 
 // -------------------------------------------------------------
-// 5. SYSTEM ADMIN CLASSIFICATION & ZERO OPERATIONAL BYPASS
+// 5. SYSTEM ADMIN FULL ACCESS & HO READ-ONLY ISOLATION
 // -------------------------------------------------------------
-console.log("\n5. Testing System Admin Classification & Zero Operational Bypass...");
+console.log("\n5. Testing System Admin Full Access & HO Read-Only Isolation...");
 
 const sysAdminUser: UserContext = {
   id: "usr_seed_admin",
@@ -398,6 +398,15 @@ const sysAdminUser: UserContext = {
   role: null,
   systemRole: "ADMIN",
   scope: null,
+  branch: null,
+};
+
+const hoViewerUser: UserContext = {
+  id: "usr_ho_monitor",
+  name: "HO Monitor",
+  role: "ho_admin",
+  systemRole: "USER",
+  scope: "HO",
   branch: null,
 };
 
@@ -413,15 +422,15 @@ async function testSystemAdminGuards() {
     "System Admin can view all reports for system monitoring & audit"
   );
 
-  // System Admin CANNOT perform operational actions (Zero Operational Bypass)
+  // System Admin CAN perform operational actions under new policy (Full Super Admin)
   const confirmRes = await checkUserPermission({
     user: sysAdminUser,
     permission: "REPORT_CONFIRM",
     report: incidentCikokol,
   });
   assert(
-    confirmRes.authorized === false && confirmRes.source === "SYSTEM_ADMIN",
-    "System Admin is strictly forbidden from REPORT_CONFIRM"
+    confirmRes.authorized === true && confirmRes.source === "SYSTEM_ADMIN",
+    "System Admin has authorized REPORT_CONFIRM access"
   );
 
   const progressRes = await checkUserPermission({
@@ -430,8 +439,8 @@ async function testSystemAdminGuards() {
     report: incidentCikokol,
   });
   assert(
-    progressRes.authorized === false && progressRes.source === "SYSTEM_ADMIN",
-    "System Admin is strictly forbidden from REPORT_UPDATE_PROGRESS"
+    progressRes.authorized === true && progressRes.source === "SYSTEM_ADMIN",
+    "System Admin has authorized REPORT_UPDATE_PROGRESS access"
   );
 
   const closeRes = await checkUserPermission({
@@ -440,8 +449,39 @@ async function testSystemAdminGuards() {
     report: incidentCikokol,
   });
   assert(
-    closeRes.authorized === false && closeRes.source === "SYSTEM_ADMIN",
-    "System Admin is strictly forbidden from REPORT_CLOSE"
+    closeRes.authorized === true && closeRes.source === "SYSTEM_ADMIN",
+    "System Admin has authorized REPORT_CLOSE access"
+  );
+
+  // HO Viewer is strictly forbidden from operational mutations
+  const hoConfirmRes = await checkUserPermission({
+    user: hoViewerUser,
+    permission: "REPORT_CONFIRM",
+    report: incidentCikokol,
+  });
+  assert(
+    hoConfirmRes.authorized === false,
+    "HO Viewer is strictly forbidden from REPORT_CONFIRM"
+  );
+
+  const hoProgressRes = await checkUserPermission({
+    user: hoViewerUser,
+    permission: "REPORT_UPDATE_PROGRESS",
+    report: incidentCikokol,
+  });
+  assert(
+    hoProgressRes.authorized === false,
+    "HO Viewer is strictly forbidden from REPORT_UPDATE_PROGRESS"
+  );
+
+  const hoCloseRes = await checkUserPermission({
+    user: hoViewerUser,
+    permission: "REPORT_CLOSE",
+    report: incidentCikokol,
+  });
+  assert(
+    hoCloseRes.authorized === false,
+    "HO Viewer is strictly forbidden from REPORT_CLOSE"
   );
 }
 

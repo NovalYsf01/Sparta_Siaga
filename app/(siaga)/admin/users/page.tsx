@@ -67,7 +67,7 @@ export default function UserManagementPage() {
     nik: "",
     email: "",
     systemRole: "USER",
-    businessRole: "tim_toko",
+    businessRole: "bms",
     scope: "BRANCH",
     branch: "",
     status: "ACTIVE",
@@ -831,9 +831,9 @@ export default function UserManagementPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-700 dark:text-slate-400">Business Role *</label>
-                            <select 
-                              value={editForm.businessRole || "tim_toko"} 
-                              onChange={handleBusinessRoleChange} 
+                            <select
+                              value={editForm.businessRole || "bms"}
+                              onChange={handleBusinessRoleChange}
                               className="w-full border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm bg-slate-50 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-slate-900 dark:text-slate-100 font-semibold"
                             >
                               <optgroup label="HEAD OFFICE (Cakupan Nasional)">
@@ -846,6 +846,15 @@ export default function UserManagementPage() {
                                   <option key={r.key} value={r.key}>{r.fullLabel ? `${r.label} \u2014 ${r.fullLabel}` : r.label}</option>
                                 ))}
                               </optgroup>
+                              {!HUMAN_SELECTABLE_BRANCH_ROLES.some(r => r.key === editForm.businessRole) &&
+                               !HUMAN_SELECTABLE_HO_ROLES.some(r => r.key === editForm.businessRole) &&
+                               editForm.businessRole && (
+                                <optgroup label="PERAN NONAKTIF / HISTORIS">
+                                  <option value={editForm.businessRole} disabled>
+                                    {getRoleDisplayLabel(editForm.businessRole)} (Nonaktif)
+                                  </option>
+                                </optgroup>
+                              )}
                             </select>
                           </div>
 

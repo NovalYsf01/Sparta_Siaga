@@ -7,14 +7,14 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: RouteContext) {
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.systemRole === "ADMIN") {
+    if (sessionUser.scope === "HO") {
       return NextResponse.json(
-        { error: "Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional." },
+        { error: "Forbidden: Akun Head Office tidak memiliki izin menutup laporan." },
         { status: 403 }
       );
     }

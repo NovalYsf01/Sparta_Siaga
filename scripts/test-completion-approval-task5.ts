@@ -64,7 +64,7 @@ async function runTask5TestSuite() {
     const bmG002 = { id: "USR-BM-G2", name: "Hasan BM G2", role: "bm" as const, systemRole: "USER" as const, scope: "BRANCH" as const, branch: "G002" };
 
     const hoAdmin = { id: "USR-HO-ADMIN", name: "Indra HO", role: "ho_admin" as const, systemRole: "USER" as const, scope: "HO" as const, branch: null };
-    const sysAdmin = { id: "USR-SYS-ADMIN", name: "Super Admin", role: "admin" as const, systemRole: "ADMIN" as const, scope: "HO" as const, branch: null };
+    const sysAdmin = { id: "USR-SYS-ADMIN", name: "Super Admin", role: "admin" as const, systemRole: "ADMIN" as const, scope: null, branch: null };
 
     // Create a 100x100 sample PNG buffer for mock handover evidence
     const sampleBuffer = await sharp({
@@ -699,52 +699,52 @@ async function runTask5TestSuite() {
     );
 
     // ----------------------------------------------------
-    // SCENARIO T25: System Admin operational actions ditolak
+    // SCENARIO T25: Head Office (HO) operational actions ditolak & Admin authorized
     // ----------------------------------------------------
-    let adminSubmitBlocked = false;
-    let adminCoordApproveBlocked = false;
-    let adminCoordRejectBlocked = false;
-    let adminManagerApproveBlocked = false;
-    let adminManagerRejectBlocked = false;
+    let hoSubmitBlocked = false;
+    let hoCoordApproveBlocked = false;
+    let hoCoordRejectBlocked = false;
+    let hoManagerApproveBlocked = false;
+    let hoManagerRejectBlocked = false;
 
     try {
-      await CompletionApprovalService.submitCompletion({ reportId: reportRekanan.id, actor: sysAdmin });
+      await CompletionApprovalService.submitCompletion({ reportId: reportRekanan.id, actor: hoAdmin });
     } catch (e: any) {
-      if (e.status === 403) adminSubmitBlocked = true;
+      if (e.status === 403) hoSubmitBlocked = true;
     }
 
     try {
-      await CompletionApprovalService.approveByCoordinator({ reportId: reportBes.id, actor: sysAdmin });
+      await CompletionApprovalService.approveByCoordinator({ reportId: reportBes.id, actor: hoAdmin });
     } catch (e: any) {
-      if (e.status === 403) adminCoordApproveBlocked = true;
+      if (e.status === 403) hoCoordApproveBlocked = true;
     }
 
     try {
-      await CompletionApprovalService.rejectByCoordinator({ reportId: reportBes.id, actor: sysAdmin, reason: "Admin test" });
+      await CompletionApprovalService.rejectByCoordinator({ reportId: reportBes.id, actor: hoAdmin, reason: "HO test" });
     } catch (e: any) {
-      if (e.status === 403) adminCoordRejectBlocked = true;
+      if (e.status === 403) hoCoordRejectBlocked = true;
     }
 
     try {
-      await CompletionApprovalService.approveByManager({ reportId: reportBes.id, actor: sysAdmin });
+      await CompletionApprovalService.approveByManager({ reportId: reportBes.id, actor: hoAdmin });
     } catch (e: any) {
-      if (e.status === 403) adminManagerApproveBlocked = true;
+      if (e.status === 403) hoManagerApproveBlocked = true;
     }
 
     try {
-      await CompletionApprovalService.rejectByManager({ reportId: reportBes.id, actor: sysAdmin, reason: "Admin test" });
+      await CompletionApprovalService.rejectByManager({ reportId: reportBes.id, actor: hoAdmin, reason: "HO test" });
     } catch (e: any) {
-      if (e.status === 403) adminManagerRejectBlocked = true;
+      if (e.status === 403) hoManagerRejectBlocked = true;
     }
 
     assert(
-      adminSubmitBlocked &&
-      adminCoordApproveBlocked &&
-      adminCoordRejectBlocked &&
-      adminManagerApproveBlocked &&
-      adminManagerRejectBlocked,
+      hoSubmitBlocked &&
+      hoCoordApproveBlocked &&
+      hoCoordRejectBlocked &&
+      hoManagerApproveBlocked &&
+      hoManagerRejectBlocked,
       "T25",
-      "System Admin operational actions seluruhnya ditolak (Zero Operational Bypass terbukti di seluruh tahap)"
+      "Head Office (HO) operational actions seluruhnya ditolak (Read-Only Viewer terbukti di seluruh tahap)"
     );
 
     console.log("\n==================================================");

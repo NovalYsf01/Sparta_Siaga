@@ -10,6 +10,7 @@ import { SpartaRole, IncidentRecord, SystemRole, Scope } from "@/types/incident"
 export interface UserContext {
   id: string;
   name: string;
+  email?: string | null;
   nik?: string | null;
   avatarUrl?: string | null;
   role: SpartaRole | null; // Business Role
@@ -38,8 +39,8 @@ export function canActOnReport(
   user: UserContext,
   report: IncidentRecord
 ): boolean {
-  if (user.systemRole === "ADMIN") return false; // System Admin has no operational action
-  if (user.scope === "HO") return false;
+  if (user.systemRole === "ADMIN") return true; // Admin SPARTA SIAGA full access
+  if (user.scope === "HO") return false; // HO strictly read-only
 
   const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
   const reportBranch = report.branch ? report.branch.trim().toLowerCase() : "";
@@ -57,7 +58,8 @@ export function canInspectReport(
   user: UserContext,
   report: IncidentRecord
 ): boolean {
-  if (user.systemRole === "ADMIN" || user.scope === "HO") return false;
+  if (user.systemRole === "ADMIN") return true; // Admin can inspect both Toko & DC across branches
+  if (user.scope === "HO") return false;
 
   const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
   const reportBranch = report.branch ? report.branch.trim().toLowerCase() : "";
@@ -74,7 +76,8 @@ export function canApproveAsBm(
   user: UserContext,
   report: IncidentRecord
 ): boolean {
-  if (user.systemRole === "ADMIN" || user.scope === "HO") return false;
+  if (user.systemRole === "ADMIN") return true; // Admin can approve across branches
+  if (user.scope === "HO") return false;
   if (user.role !== "bm") return false;
 
   const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
@@ -85,7 +88,7 @@ export function canApproveAsBm(
 export function canCreateManagementInstruction(
   user: UserContext
 ): boolean {
-  if (user.systemRole === "ADMIN") return false; // System Admin has no operational action
+  if (user.systemRole === "ADMIN") return true; // Admin has full access
   return user.role === "gm_ho" || user.role === "sm_ho";
 }
 
@@ -93,7 +96,7 @@ export function canCreateEstimation(
   user: UserContext,
   report: IncidentRecord
 ): boolean {
-  if (user.systemRole === "ADMIN") return false;
+  if (user.systemRole === "ADMIN") return true;
   if (user.role === "bms") {
     const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
     const reportBranch = report.branch ? report.branch.trim().toLowerCase() : "";

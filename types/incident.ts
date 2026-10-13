@@ -71,7 +71,8 @@ export type SpartaRole =
   | "tim_maintenance"
   | "sparta_maintenance" // Sparta Maintenance
   | "tim_office"
-  | "tim_warehouse";
+  | "tim_warehouse"
+  | "rekanan";
 
 export type SystemRole = "ADMIN" | "USER";
 export type Scope = "HO" | "BRANCH";

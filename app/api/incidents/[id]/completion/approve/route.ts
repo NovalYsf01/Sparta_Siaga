@@ -11,9 +11,9 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.systemRole === "ADMIN") {
+    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
       return NextResponse.json(
-        { error: "Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional." },
+        { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
         { status: 403 }
       );
     }
@@ -32,8 +32,9 @@ export async function POST(request: Request, { params }: RouteContext) {
     };
 
     const role = (sessionUser.role || "").toLowerCase();
+    const isSysAdmin = sessionUser.systemRole === "ADMIN";
 
-    if (role === "bm") {
+    if (isSysAdmin || role === "bm") {
       const result = await CompletionApprovalService.approveByManager({
         reportId: id,
         actor,
@@ -41,7 +42,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
 
       return NextResponse.json({
-        message: "Laporan berhasil disetujui final oleh Branch Manager dan resmi ditutup.",
+        message: "Laporan berhasil disetujui final oleh Building & Maintenance Manager / Administrator dan resmi ditutup.",
         data: result,
       });
     }
@@ -54,7 +55,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
 
       return NextResponse.json({
-        message: "Laporan berhasil disetujui oleh Koordinator dan diteruskan ke Branch Manager.",
+        message: "Laporan berhasil disetujui oleh Koordinator dan diteruskan ke Building & Maintenance Manager.",
         data: result,
       });
     }

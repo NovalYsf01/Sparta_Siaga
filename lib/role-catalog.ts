@@ -54,12 +54,12 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
   // --- BRANCH ---
   {
     key: "bm",
-    label: "Manager Branch",
-    fullLabel: "Branch Manager",
+    label: "Building & Maintenance Manager",
+    fullLabel: "Building & Maintenance Manager",
     scope: "BRANCH",
     category: "BRANCH",
     selectable: true,
-    description: "Pimpinan cabang, pemegang wewenang approval final penyelesaian pekerjaan dan Case Close cabang sendiri.",
+    description: "Pimpinan cabang Building & Maintenance Manager (BMM), pemegang wewenang approval awal, approval final penyelesaian pekerjaan dan Case Close cabang sendiri.",
   },
   {
     key: "tim_toko",
@@ -67,8 +67,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Tim Personil Gerai / Toko",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: true,
-    description: "Personil lapangan gerai ritel, pelapor awal dan verifikator kondisi darurat toko.",
+    selectable: false,
+    description: "Personil lapangan gerai ritel (NONAKTIF — dinonaktifkan sesuai kebijakan restrukturisasi, data historis dipertahankan).",
   },
   {
     key: "bms",
@@ -85,8 +85,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Maintenance Coordinator",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: true,
-    description: "Koordinator pemeliharaan cabang, validator dan pemberi approval koordinator atas pekerjaan BMS.",
+    selectable: false,
+    description: "Koordinator pemeliharaan cabang (NONAKTIF — dinonaktifkan sesuai kebijakan restrukturisasi, data historis dipertahankan).",
   },
   {
     key: "bes",
@@ -103,8 +103,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Engineering Coordinator",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: true,
-    description: "Koordinator Engineering cabang, validator dan pemberi approval koordinator atas pekerjaan BES.",
+    selectable: false,
+    description: "Koordinator Engineering cabang (NONAKTIF — dinonaktifkan sesuai kebijakan restrukturisasi, data historis dipertahankan).",
   },
   {
     key: "bbs",
@@ -112,8 +112,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Building Support",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: true,
-    description: "PIC teknis lapangan Sipil / Building, updater progress Building, dan pengaju penyelesaian pekerjaan Building.",
+    selectable: false,
+    description: "Branch Building Support (NONAKTIF — disembunyikan dari UI operasional, struktur backend & histori dipertahankan).",
   },
   {
     key: "bbc",
@@ -121,8 +121,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Building Coordinator",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: true,
-    description: "Koordinator Sipil / Building cabang, validator dan pemberi approval koordinator atas pekerjaan BBS.",
+    selectable: false,
+    description: "Branch Building Coordinator (NONAKTIF — disembunyikan dari UI operasional, struktur backend & histori dipertahankan).",
   },
 ] as const;
 
@@ -132,6 +132,15 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
  * TIDAK BOLEH muncul pada dropdown pembuatan user baru (selectable = false).
  */
 export const SPECIAL_LEGACY_ROLES: readonly BusinessRoleDefinition[] = [
+  {
+    key: "rekanan",
+    label: "Rekanan Eksternal",
+    fullLabel: "Vendor / Rekanan Eksternal",
+    scope: "BRANCH",
+    category: "LEGACY",
+    selectable: false,
+    description: "Struktur entitas rekanan / kontraktor eksternal (NONAKTIF — tanpa hak akses login maupun operasional langsung di aplikasi).",
+  },
   {
     key: "sparta_maintenance",
     label: "Sparta Maintenance",
@@ -187,14 +196,16 @@ export const ALL_BUSINESS_ROLES: readonly BusinessRoleDefinition[] = [
 /**
  * Subset: Hanya human roles yang selectable untuk User Management UI & APIs
  */
-export const HUMAN_SELECTABLE_ROLES = CANONICAL_HUMAN_ROLES;
+export const HUMAN_SELECTABLE_ROLES = CANONICAL_HUMAN_ROLES.filter(
+  (r) => r.selectable
+);
 
 export const HUMAN_SELECTABLE_HO_ROLES = CANONICAL_HUMAN_ROLES.filter(
-  (r) => r.scope === "HO"
+  (r) => r.scope === "HO" && r.selectable
 );
 
 export const HUMAN_SELECTABLE_BRANCH_ROLES = CANONICAL_HUMAN_ROLES.filter(
-  (r) => r.scope === "BRANCH"
+  (r) => r.scope === "BRANCH" && r.selectable
 );
 
 /**
@@ -241,7 +252,12 @@ export function getRoleDisplayLabel(role?: string | null): string {
 
   // Khusus System Admin
   if (r === "admin" || r === "sys_admin" || r === "system_admin") {
-    return "System Admin";
+    return "Admin SPARTA SIAGA";
+  }
+
+  // Building & Maintenance Manager
+  if (r === "bm") {
+    return "Building & Maintenance Manager";
   }
 
   const def = getBusinessRoleDefinition(r);
@@ -251,4 +267,16 @@ export function getRoleDisplayLabel(role?: string | null): string {
 
   // Fallback prettified text
   return role.replace(/_/g, " ").toUpperCase();
+}
+
+/**
+ * Short label / singkatan resolver (misal: BMM, ADMIN, BMS, BES)
+ */
+export function getRoleShortLabel(role?: string | null): string {
+  if (!role) return "User";
+  const r = role.toLowerCase();
+  if (r === "bm") return "BMM";
+  if (r === "admin" || r === "sys_admin" || r === "system_admin") return "ADMIN";
+  const def = getBusinessRoleDefinition(r);
+  return def ? def.label : role.toUpperCase();
 }

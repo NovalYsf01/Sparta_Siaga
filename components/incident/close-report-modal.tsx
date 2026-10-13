@@ -208,7 +208,7 @@ export function CloseReportModal({
                   value={closingNotes}
                   onChange={(e) => setClosingNotes(e.target.value)}
                   rows={2}
-                  placeholder="Contoh: Pekerjaan fisik telah diverifikasi bersama Branch Manager, toko kembali beroperasi normal."
+                  placeholder="Contoh: Pekerjaan fisik telah diverifikasi bersama Building & Maintenance Manager, toko kembali beroperasi normal."
                   className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
                 />
               </div>

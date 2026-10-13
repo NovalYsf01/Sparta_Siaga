@@ -52,10 +52,10 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. System Admin tidak boleh operational action
-    if (sessionUser.systemRole === "ADMIN") {
+    // 2. Pengguna HO hanya read-only
+    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
       return NextResponse.json(
-        { error: "Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional." },
+        { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
         { status: 403 }
       );
     }
@@ -96,25 +96,28 @@ export async function POST(request: Request, { params }: RouteContext) {
     const isTkpDc = tkp === "dc";
     const autoHandler: HandlerType = isTkpDc ? "BES" : "BMS";
 
-    // Validasi kesesuaian role dengan jenis lokasi
+    // Validasi kesesuaian role dengan jenis lokasi (hanya berlaku jika bukan Admin)
     const actorRole = (sessionUser.role || "").toLowerCase();
-    if (isTkpDc && actorRole === "bms") {
-      return NextResponse.json(
-        {
-          error: "Laporan DC/Warehouse ditangani oleh petugas BES, bukan BMS.",
-          code: "ROLE_LOCATION_MISMATCH",
-        },
-        { status: 403 }
-      );
-    }
-    if (!isTkpDc && actorRole === "bes") {
-      return NextResponse.json(
-        {
-          error: "Laporan Toko ditangani oleh petugas BMS, bukan BES.",
-          code: "ROLE_LOCATION_MISMATCH",
-        },
-        { status: 403 }
-      );
+    const isSysAdmin = sessionUser.systemRole === "ADMIN";
+    if (!isSysAdmin) {
+      if (isTkpDc && actorRole === "bms") {
+        return NextResponse.json(
+          {
+            error: "Laporan DC/Warehouse ditangani oleh petugas BES, bukan BMS.",
+            code: "ROLE_LOCATION_MISMATCH",
+          },
+          { status: 403 }
+        );
+      }
+      if (!isTkpDc && actorRole === "bes") {
+        return NextResponse.json(
+          {
+            error: "Laporan Toko ditangani oleh petugas BMS, bukan BES.",
+            code: "ROLE_LOCATION_MISMATCH",
+          },
+          { status: 403 }
+        );
+      }
     }
 
     // 6. Cek server-side permission ESTIMATION_TRIGGER

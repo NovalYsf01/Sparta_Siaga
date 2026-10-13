@@ -54,10 +54,10 @@ export async function GET(request: Request) {
       values.push(reportOrigin);
     }
 
-    // ENFORCE HISTORY STATUSES
+    // ENFORCE HISTORY STATUSES (closed, resolved, archived)
     if (status && status !== "all") {
       // If user passes a specific status, ensure it's a history status
-      if (status === "resolved" || status === "archived") {
+      if (status === "closed" || status === "resolved" || status === "archived") {
         conditions.push(`status = $${paramIndex++}`);
         values.push(status);
       } else {
@@ -66,9 +66,9 @@ export async function GET(request: Request) {
         values.push("invalid_status_for_history");
       }
     } else {
-      // Default: only show resolved and archived
-      conditions.push(`status IN ($${paramIndex++}, $${paramIndex++})`);
-      values.push("resolved", "archived");
+      // Default: only show closed, resolved, and archived
+      conditions.push(`status IN ($${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+      values.push("closed", "resolved", "archived");
     }
 
     if (search && search.trim() !== "") {

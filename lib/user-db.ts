@@ -66,11 +66,15 @@ export async function dbUpsertUser(user: Partial<UserModel> & { id: string }): P
   const systemRole = user.systemRole ?? existing?.systemRole ?? "USER";
   const isSystemAdmin = systemRole === "ADMIN";
 
-  const businessRole = user.businessRole
-    ? user.businessRole
-    : (isSystemAdmin ? "ho_admin" : (existing?.businessRole ?? "ho_admin"));
-  const scope = user.scope !== undefined ? user.scope : (isSystemAdmin ? "HO" : (existing?.scope ?? null));
-  const branch = scope === "HO" ? null : (user.branch !== undefined ? user.branch : (existing?.branch ?? null));
+  const businessRole = isSystemAdmin
+    ? null
+    : (user.businessRole !== undefined ? user.businessRole : (existing?.businessRole ?? null));
+  const scope = isSystemAdmin
+    ? null
+    : (user.scope !== undefined ? user.scope : (existing?.scope ?? null));
+  const branch = isSystemAdmin || scope === "HO"
+    ? null
+    : (user.branch !== undefined ? user.branch : (existing?.branch ?? null));
   const name = user.name ?? existing?.name ?? "User";
   const avatarUrl = user.avatarUrl !== undefined ? user.avatarUrl : (existing?.avatarUrl ?? null);
 
@@ -109,8 +113,8 @@ export async function dbUpsertUser(user: Partial<UserModel> & { id: string }): P
 export async function dbCreateUser(user: Partial<UserModel> & { id: string, name: string, businessRole: SpartaRole | null }): Promise<UserModel> {
   const pool = getDbPool();
   const isSystemAdmin = user.systemRole === "ADMIN";
-  const businessRole = isSystemAdmin ? null : user.businessRole;
-  const scope = isSystemAdmin ? null : user.scope;
+  const businessRole = isSystemAdmin ? null : (user.businessRole || null);
+  const scope = isSystemAdmin ? null : (user.scope || null);
   const branch = isSystemAdmin || scope === "HO" ? null : (user.branch || null);
 
   const { rows } = await pool.query(

@@ -219,7 +219,7 @@ async function runSuite() {
       });
       recordTest(1, "Laporan belum disetujui BM tidak dapat memulai progres", "FAIL", "Submit diterima padahal belum disetujui BM!");
     } catch (err: any) {
-      if (err.message.includes("belum disetujui awal oleh Branch Manager")) {
+      if (err.message.includes("belum disetujui awal oleh")) {
         test1Passed = true;
         recordTest(1, "Laporan belum disetujui BM tidak dapat memulai progres", "PASS", `Ditolak dengan pesan: "${err.message}"`);
       } else {
@@ -514,48 +514,29 @@ async function runSuite() {
   }
 
   // ===========================================================================
-  // TEST 8: Validasi Approve Proxy tidak dapat dipalsukan
+  // TEST 8: Approve Proxy 30% bukti eksternal mengizinkan SPK 50% berurutan
   // ===========================================================================
   try {
-    let holdSpkSuccess = false;
-    let allowedWithSimulationFlag = false;
-
-    // Without official validation or simulation flag, SPK must be held
-    try {
-      await submitMilestoneDocument({
-        reportId: testIdToko,
-        stageKey: "SPK",
-        actor: bmsBandung,
-        fileBuffer: createSamplePdfBuffer(),
-        originalFilename: "spk_asli.pdf",
-        isTestSimulation: false, // Normal operational attempt
-      });
-    } catch (err: any) {
-      if (err.message.includes("Penerbitan SPK tertahan: Menunggu klarifikasi kebijakan bisnis")) {
-        holdSpkSuccess = true;
-      }
-    }
-
-    // Now submit with explicit simulation flag for QA suite
-    const simRes = await submitMilestoneDocument({
+    // Normal submission of SPK 50% succeeds because Approve Proxy 30% proof has been submitted
+    const spkRes = await submitMilestoneDocument({
       reportId: testIdToko,
       stageKey: "SPK",
       actor: bmsBandung,
       fileBuffer: createSamplePdfBuffer(),
-      originalFilename: "spk_simulasi.pdf",
-      isTestSimulation: true,
+      originalFilename: "spk_resmi.pdf",
+      isTestSimulation: false,
     });
-    if (simRes.incident.progress === 50) {
-      allowedWithSimulationFlag = true;
-    }
 
-    if (holdSpkSuccess && allowedWithSimulationFlag) {
-      recordTest(8, "Validasi Approve Proxy tidak dapat dipalsukan", "PASS", "SPK normal ditolak tertahan klarifikasi bisnis, hanya bypass jika isTestSimulation: true.");
+    const isSpkSubmitted = spkRes.milestone.status === "SUBMITTED";
+    const progressIs50 = spkRes.incident.progress === 50;
+
+    if (isSpkSubmitted && progressIs50) {
+      recordTest(8, "Approve Proxy 30% bukti eksternal mengizinkan SPK 50% berurutan", "PASS", "Bukti eksternal 30% memvalidasi tahapan dan SPK 50% berhasil diproses.");
     } else {
-      recordTest(8, "Validasi Approve Proxy tidak dapat dipalsukan", "FAIL", `Hold SPK: ${holdSpkSuccess}, Sim allowed: ${allowedWithSimulationFlag}`);
+      recordTest(8, "Approve Proxy 30% bukti eksternal mengizinkan SPK 50% berurutan", "FAIL", `SPK status: ${spkRes.milestone.status}, progress: ${spkRes.incident.progress}`);
     }
   } catch (e: any) {
-    recordTest(8, "Validasi Approve Proxy tidak dapat dipalsukan", "FAIL", e.message);
+    recordTest(8, "Approve Proxy 30% bukti eksternal mengizinkan SPK 50% berurutan", "FAIL", e.message);
   }
 
   // ===========================================================================
@@ -603,7 +584,7 @@ async function runSuite() {
         notes: "BMS approve sendiri",
       });
     } catch (err: any) {
-      if (err.message.includes("hanya dapat dilakukan oleh Branch Manager (BM)")) {
+      if (err.message.includes("Building & Maintenance Manager") || err.message.includes("Branch Manager")) {
         bmsSelfApprovalBlocked = true;
       }
     }
@@ -738,7 +719,16 @@ async function runSuite() {
   // ===========================================================================
   try {
     let hoBlockedFromOperationalApproval = false;
-    let sysAdminBlockedFromOperationalApproval = false;
+    let crossBranchBmBlocked = false;
+
+    const bmCirebon: UserContext = {
+      id: "usr_bm_crb",
+      name: "BMM Cirebon",
+      role: "bm",
+      systemRole: "USER",
+      scope: "BRANCH",
+      branch: "CIREBON",
+    };
 
     try {
       await CompletionApprovalService.approveByManager({
@@ -747,7 +737,7 @@ async function runSuite() {
         notes: "HO mencoba approve",
       });
     } catch (err: any) {
-      if (err.message.includes("Head Office (HO) tidak dapat menggantikan kewenangan Branch Manager")) {
+      if (err.message.includes("Head Office (HO) tidak dapat menggantikan kewenangan")) {
         hoBlockedFromOperationalApproval = true;
       }
     }
@@ -755,19 +745,19 @@ async function runSuite() {
     try {
       await CompletionApprovalService.approveByManager({
         reportId: testIdToko,
-        actor: sysAdmin as any,
-        notes: "Admin mencoba approve",
+        actor: bmCirebon as any,
+        notes: "BM Cirebon mencoba approve laporan Bandung",
       });
     } catch (err: any) {
-      if (err.message.includes("Akun System Administrator tidak memiliki izin")) {
-        sysAdminBlockedFromOperationalApproval = true;
+      if (err.message.includes("hanya berlaku untuk cabang sendiri")) {
+        crossBranchBmBlocked = true;
       }
     }
 
-    if (hoBlockedFromOperationalApproval && sysAdminBlockedFromOperationalApproval) {
-      recordTest(15, "Pembatasan akses cabang dan HO tetap benar", "PASS", "HO dan System Admin diblokir dari tindakan operasional persetujuan cabang.");
+    if (hoBlockedFromOperationalApproval && crossBranchBmBlocked) {
+      recordTest(15, "Pembatasan akses cabang dan HO tetap benar", "PASS", "HO diblokir dari persetujuan operasional, dan cross-branch BMM diblokir antar cabang.");
     } else {
-      recordTest(15, "Pembatasan akses cabang dan HO tetap benar", "FAIL", `HO Blocked: ${hoBlockedFromOperationalApproval}, SysAdmin Blocked: ${sysAdminBlockedFromOperationalApproval}`);
+      recordTest(15, "Pembatasan akses cabang dan HO tetap benar", "FAIL", `HO Blocked: ${hoBlockedFromOperationalApproval}, Cross-Branch BMM Blocked: ${crossBranchBmBlocked}`);
     }
   } catch (e: any) {
     recordTest(15, "Pembatasan akses cabang dan HO tetap benar", "FAIL", e.message);

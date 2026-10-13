@@ -148,13 +148,13 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     return calculateIncidentStats(filteredIncidentsByRole);
   }, [filteredIncidentsByRole]);
 
-  // Active vs History partition
+  // Active vs History partition: CLOSED, RESOLVED, and ARCHIVED automatically go to history
   const activeIncidents = useMemo(() => {
-    return filteredIncidentsByRole.filter((i) => i.status !== "resolved" && i.status !== "archived");
+    return filteredIncidentsByRole.filter((i) => i.status !== "closed" && i.status !== "resolved" && i.status !== "archived");
   }, [filteredIncidentsByRole]);
 
   const archivedIncidents = useMemo(() => {
-    return filteredIncidentsByRole.filter((i) => i.status === "resolved" || i.status === "archived");
+    return filteredIncidentsByRole.filter((i) => i.status === "closed" || i.status === "resolved" || i.status === "archived");
   }, [filteredIncidentsByRole]);
 
   // Initialize theme from localStorage & apply to document.documentElement
@@ -621,11 +621,11 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
 
       const isBmApproved = Boolean(
         report?.bmApproval?.decision === "approved" ||
-        (report?.confirmedBy?.includes("Branch Manager") && isDamaged)
+        ((report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && isDamaged)
       );
       const isBmSafe = Boolean(
         report?.bmApproval?.decision === "safe" ||
-        (report?.confirmedBy?.includes("Branch Manager") && !isDamaged)
+        ((report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && !isDamaged)
       );
       const isBmRejected = report?.bmApproval?.decision === "rejected";
       const isBmClarification = report?.bmApproval?.decision === "clarification_requested";
@@ -636,18 +636,18 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           status: "confirmed_safe" as const,
           progress: 100,
           verification: {
-            confirmedBy: report?.confirmedBy || "Manager Branch",
+            confirmedBy: report?.confirmedBy || "Building & Maintenance Manager",
             confirmedAt: timestamp,
             isDamaged: false,
-            notes: report?.notes || "Kondisi dinyatakan aman oleh Manager Branch.",
+            notes: report?.notes || "Kondisi dinyatakan aman oleh Building & Maintenance Manager.",
           },
           timeline: [
             ...inc.timeline,
             {
-              stage: "Keputusan Manager Branch",
-              label: "Kondisi Dinyatakan Aman oleh Manager Branch",
+              stage: "Keputusan Building & Maintenance Manager",
+              label: "Kondisi Dinyatakan Aman oleh Building & Maintenance Manager",
               timestamp,
-              actor: report?.confirmedBy || "Manager Branch",
+              actor: report?.confirmedBy || "Building & Maintenance Manager",
               notes: report?.notes,
             },
           ],
@@ -661,10 +661,10 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           timeline: [
             ...inc.timeline,
             {
-              stage: "Keputusan Manager Branch",
-              label: "Laporan Ditolak Manager Branch (Tidak Valid)",
+              stage: "Keputusan Building & Maintenance Manager",
+              label: "Laporan Ditolak Building & Maintenance Manager (Tidak Valid)",
               timestamp,
-              actor: report?.confirmedBy || "Manager Branch",
+              actor: report?.confirmedBy || "Building & Maintenance Manager",
               notes: report?.notes,
             },
           ],
@@ -677,23 +677,23 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           timeline: [
             ...inc.timeline,
             {
-              stage: "Keputusan Manager Branch",
+              stage: "Keputusan Building & Maintenance Manager",
               label: "Permintaan Klarifikasi Hasil Pemeriksaan",
               timestamp,
-              actor: report?.confirmedBy || "Manager Branch",
+              actor: report?.confirmedBy || "Building & Maintenance Manager",
               notes: report?.notes,
             },
           ],
           updatedAt: new Date().toISOString(),
         };
       } else if (isBmApproved) {
-        // BM approves damage: allows downstream work readiness and estimation, progress stays 0%
+        // BMM approves damage: allows downstream work readiness and estimation, progress stays 0%
         return {
           ...inc,
           status: "confirmed_affected" as const,
           progress: inc.progress ?? 0,
           verification: {
-            confirmedBy: report?.confirmedBy || "Manager Branch",
+            confirmedBy: report?.confirmedBy || "Building & Maintenance Manager",
             confirmedAt: timestamp,
             isDamaged: true,
             categories: report?.categories || ["Rak Barang"],
@@ -705,10 +705,10 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           timeline: [
             ...inc.timeline,
             {
-              stage: "Persetujuan Manager Branch",
+              stage: "Persetujuan Building & Maintenance Manager",
               label: `Kerusakan Disetujui (${report?.severity || "Sedang"}) — Siap Penanganan Teknis`,
               timestamp,
-              actor: report?.confirmedBy || "Manager Branch",
+              actor: report?.confirmedBy || "Building & Maintenance Manager",
               notes: report?.notes,
             },
           ],

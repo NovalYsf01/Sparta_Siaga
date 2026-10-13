@@ -89,10 +89,10 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2. System Admin tidak boleh operational action
-    if (sessionUser.systemRole === "ADMIN") {
+    // 2. HO tidak boleh tindakan operasional progress
+    if (sessionUser.scope === "HO") {
       return NextResponse.json(
-        { error: "Forbidden: Akun System Administrator tidak memiliki izin melakukan tindakan operasional." },
+        { error: "Forbidden: Akun Head Office tidak memiliki izin memperbarui progress." },
         { status: 403 }
       );
     }

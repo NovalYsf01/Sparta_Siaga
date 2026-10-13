@@ -141,17 +141,19 @@ export async function submitMilestoneDocument({
   fileBuffer,
   originalFilename,
   notes,
-  isTestSimulation = false,
+  isTestSimulation: _isTestSimulation = false,
 }: SubmitMilestoneParams): Promise<{
   milestone: MilestoneRecord;
   incident: IncidentRecord;
 }> {
   await ensureMilestoneTables();
 
-  // 1. Operational security: System Administrator cannot execute operational milestones
-  if (actor.systemRole === "ADMIN") {
-    throw new Error("System Administrator tidak memiliki wewenang untuk melakukan submit milestone operasional.");
+  // 1. HO is blocked from operational mutations
+  if (actor.scope === "HO") {
+    throw new Error("Forbidden: User dengan scope Head Office tidak memiliki izin melakukan submit milestone operasional.");
   }
+
+  const isSystemAdmin = actor.systemRole === "ADMIN";
 
   // 2. Fetch incident report
   const incident = await dbGetIncidentById(reportId);
@@ -167,26 +169,28 @@ export async function submitMilestoneDocument({
     throw new Error("Laporan berstatus Ditolak (rejected_invalid) tidak dapat diproses dalam penanganan pekerjaan.");
   }
   if (incident.status === "pending_confirmation" || incident.status === "pending_bm_approval") {
-    throw new Error("Laporan belum disetujui awal oleh Branch Manager (status wajib confirmed_affected).");
+    throw new Error("Laporan belum disetujui awal oleh Building & Maintenance Manager (status wajib confirmed_affected).");
   }
 
-  // 4. Branch & Role isolation
-  const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
-  if (!actor.branch || clean(actor.branch) !== clean(incident.branch)) {
-    throw new Error(`Aksi hanya berlaku untuk cabang sendiri (${actor.branch || "N/A"}), bukan ${incident.branch}.`);
-  }
+  // 4. Branch & Role isolation (Admin is not restricted to single branch or single tkp type)
+  if (!isSystemAdmin) {
+    const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
+    if (!actor.branch || clean(actor.branch) !== clean(incident.branch)) {
+      throw new Error(`Aksi hanya berlaku untuk cabang sendiri (${actor.branch || "N/A"}), bukan ${incident.branch}.`);
+    }
 
-  const tkp = incident.tkpType || "toko";
-  if (tkp === "dc") {
-    if (actor.role !== "bes") {
-      throw new Error("Laporan Warehouse/DC hanya dapat ditangani oleh petugas BES cabang terkait.");
-    }
-  } else {
-    if (actor.role === "bes") {
-      throw new Error("Petugas BES tidak berwenang menangani laporan gerai Toko. Laporan Toko ditangani oleh BMS.");
-    }
-    if (actor.role !== "bms") {
-      throw new Error("Laporan gerai Toko hanya dapat ditangani oleh petugas BMS cabang terkait.");
+    const tkp = incident.tkpType || "toko";
+    if (tkp === "dc") {
+      if (actor.role !== "bes") {
+        throw new Error("Laporan Warehouse/DC hanya dapat ditangani oleh petugas BES cabang terkait.");
+      }
+    } else {
+      if (actor.role === "bes") {
+        throw new Error("Petugas BES tidak berwenang menangani laporan gerai Toko. Laporan Toko ditangani oleh BMS.");
+      }
+      if (actor.role !== "bms") {
+        throw new Error("Laporan gerai Toko hanya dapat ditangani oleh petugas BMS cabang terkait.");
+      }
     }
   }
 
@@ -222,20 +226,12 @@ export async function submitMilestoneDocument({
     }
   }
 
-  // Special Business Policy Constraint for SPK (Milestone 4):
-  // Approve Proxy (Milestone 3) must be officially validated before SPK can proceed,
-  // unless explicitly flagged for automated simulation testing.
+  // Syarat Milestone SPK (Milestone 4 - 50%):
+  // Approve Proxy (Milestone 3 - 30%) wajib telah diunggah bukti persetujuan eksternalnya
   if (stageKey === "SPK") {
     const proxyMilestone = milestones.find((m) => m.stageKey === "APPROVE_PROXY");
     if (!proxyMilestone || proxyMilestone.status !== "SUBMITTED") {
-      throw new Error("Tahap Approve Proxy wajib diselesaikan sebelum pengajuan SPK.");
-    }
-
-    const isProxyValid = proxyMilestone.proxyApprovalStatus === "VALIDATED" || isTestSimulation;
-    if (!isProxyValid) {
-      throw new Error(
-        "Penerbitan SPK tertahan: Menunggu klarifikasi kebijakan bisnis terkait pengesahan resmi Approve Proxy."
-      );
+      throw new Error("Tahap Approve Proxy (30%) wajib diselesaikan dengan mengunggah bukti persetujuan eksternal sebelum pengajuan SPK.");
     }
   }
 
@@ -257,7 +253,7 @@ export async function submitMilestoneDocument({
       submittedAt: currentRecord.submittedAt || new Date().toISOString(),
       actorId: currentRecord.actorId || actor.id,
       actorName: currentRecord.actorName || actor.name,
-      actorRole: currentRecord.actorRole || actor.role,
+      actorRole: currentRecord.actorRole || (actor.systemRole === "ADMIN" ? "ADMIN" : (actor.role || "UNKNOWN")),
       documentUrl: currentRecord.documentUrl || "",
       documentStorageKey: currentRecord.documentStorageKey,
       documentOriginalName: currentRecord.documentOriginalName || currentRecord.documentStorageKey,
@@ -270,10 +266,10 @@ export async function submitMilestoneDocument({
   const nowIso = new Date().toISOString();
   const nowWib = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB";
 
-  // For Approve Proxy (30%): differentiate evidence submitted vs validated policy
+  // Untuk Approve Proxy (30%): bukti persetujuan eksternal tersimpan resmi
   let proxyStatus: string | null = null;
   if (stageKey === "APPROVE_PROXY") {
-    proxyStatus = isTestSimulation ? "VALIDATED" : "EVIDENCE_SUBMITTED_AWAITING_POLICY";
+    proxyStatus = "VALIDATED";
   }
 
   const pool = getDbPool();
@@ -302,8 +298,8 @@ export async function submitMilestoneDocument({
       mimeType,
       savedDoc.fileSize,
       actor.id,
-      actor.name,
-      actor.role,
+      isSystemAdmin ? `${actor.name} (ADMIN)` : actor.name,
+      isSystemAdmin ? "ADMIN" : (actor.role || "BMS"),
       nowIso,
       notes || null,
       proxyStatus,
@@ -315,11 +311,12 @@ export async function submitMilestoneDocument({
 
   // 9. Update incident progress to EXACT fixed target progress
   const targetProgress = targetConfig.progress;
+  const actorRoleLabel = isSystemAdmin ? "ADMIN" : (actor.role?.toUpperCase() || "BMS");
   const timelineEntry = {
     stage: `Milestone ${targetConfig.label}`,
     label: `Milestone ${targetConfig.label} (${targetProgress}%) Selesai Disubmit`,
     timestamp: nowWib,
-    actor: `${actor.name} (${actor.role.toUpperCase()})`,
+    actor: `${actor.name} (${actorRoleLabel})`,
     notes: notes || `Dokumen ${savedDoc.fileName} berhasil diverifikasi.`,
   };
 

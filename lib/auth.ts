@@ -48,6 +48,13 @@ export async function getSessionUser(req?: Request): Promise<UserContext | null>
     return null;
   }
 
+  // Deactivated roles: bmc, bec, tim_toko, bbs, bbc, rekanan are denied from operational / application access
+  const DEACTIVATED_BUSINESS_ROLES = ["bmc", "bec", "tim_toko", "bbs", "bbc", "rekanan"];
+  if (dbUser.businessRole && DEACTIVATED_BUSINESS_ROLES.includes(dbUser.businessRole.toLowerCase())) {
+    console.warn(`[Auth] User ${dbUser.id} belongs to deactivated role '${dbUser.businessRole}'. Access denied.`);
+    return null;
+  }
+
   const isSystemAdmin = dbUser.systemRole === "ADMIN";
 
   return {

@@ -73,7 +73,7 @@ export function IncidentAppShell({
     ho_admin: "HO Admin",
     gm_ho: "GM HO",
     sm_ho: "SM HO",
-    bm: "Branch Manager",
+    bm: "Building & Maintenance Manager",
     bnm: "BnM",
     bbc: "BBC",
     bmc: "BMC",

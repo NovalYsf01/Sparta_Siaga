@@ -110,6 +110,7 @@ export function MilestoneProgressionCard({
 
     try {
       const formData = new FormData();
+      formData.append("stage_key", activeMilestone.stageKey);
       formData.append("stageKey", activeMilestone.stageKey);
       formData.append("file", selectedFile);
       if (submitNotes.trim()) {
@@ -172,7 +173,7 @@ export function MilestoneProgressionCard({
         await loadMilestones();
         if (onMilestoneUpdated) onMilestoneUpdated();
       } else {
-        setErrorMessage(json.error || "Gagal memproses keputusan final Branch Manager.");
+        setErrorMessage(json.error || "Gagal memproses keputusan final Building & Maintenance Manager.");
       }
     } catch (err) {
       console.error(err);
@@ -192,17 +193,17 @@ export function MilestoneProgressionCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "SUBMIT_COMPLETION",
-          notes: "Pekerjaan fisik telah 100% selesai (Serah Terima) dan diajukan ke Branch Manager.",
+          notes: "Pekerjaan fisik telah 100% selesai (Serah Terima) dan diajukan ke Building & Maintenance Manager.",
         }),
       });
 
       const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        setSuccessMessage("Penyelesaian pekerjaan berhasil diajukan kepada Branch Manager.");
+        setSuccessMessage("Penyelesaian pekerjaan berhasil diajukan kepada Building & Maintenance Manager.");
         await loadMilestones();
         if (onMilestoneUpdated) onMilestoneUpdated();
       } else {
-        setErrorMessage(json.error || "Gagal mengajukan penyelesaian ke Branch Manager.");
+        setErrorMessage(json.error || "Gagal mengajukan penyelesaian ke Building & Maintenance Manager.");
       }
     } catch (err) {
       console.error(err);
@@ -327,13 +328,13 @@ export function MilestoneProgressionCard({
           </div>
 
           {activeMilestone.stageKey === "APPROVE_PROXY" && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1">
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-xl text-xs text-blue-900 dark:text-blue-200 space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
-                <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Pemberitahuan Kebijakan Approve Proxy (30%):</span>
+                <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Unggah Bukti Persetujuan Eksternal (Approve Proxy 30%):</span>
               </div>
-              <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-                Unggah dokumen pendukung untuk mencatat bukti di sistem. Perpindahan operasional ke tahap SPK (50%) akan tertahan sampai aturan pengesahan resmi terkonfirmasi.
+              <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
+                Tahap ini mencatat bukti persetujuan dari pihak eksternal (bukan approval internal SPARTA SIAGA). Unggah dokumen bukti (PDF/JPEG/PNG) untuk melanjutkan ke penerbitan SPK.
               </p>
             </div>
           )}
@@ -404,7 +405,7 @@ export function MilestoneProgressionCard({
             </h4>
           </div>
           <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
-            Tahap Serah Terima telah diverifikasi. Silakan ajukan penyelesaian pekerjaan kepada Branch Manager untuk mendapatkan peninjauan dan persetujuan resmi (CLOSED).
+            Tahap Serah Terima telah diverifikasi. Silakan ajukan penyelesaian pekerjaan kepada Building & Maintenance Manager untuk mendapatkan peninjauan dan persetujuan resmi (CLOSED).
           </p>
           <div className="pt-1">
             <button
@@ -417,7 +418,7 @@ export function MilestoneProgressionCard({
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Ajukan Penyelesaian ke Manager Branch</span>
+                  <span>Ajukan Penyelesaian ke Building & Maintenance Manager</span>
                 </>
               )}
             </button>
@@ -425,7 +426,7 @@ export function MilestoneProgressionCard({
         </div>
       )}
 
-      {/* Branch Manager Final Review Card */}
+      {/* Building & Maintenance Manager Final Review Card */}
       {isAwaitingFinalBm && isBmUser && (
         <div className="bg-white dark:bg-slate-900 border-2 border-purple-200 dark:border-purple-900/60 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -433,7 +434,7 @@ export function MilestoneProgressionCard({
               <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Persetujuan Final Manager Branch (Penutupan Laporan)
+                  Persetujuan Final Building & Maintenance Manager (Penutupan Laporan)
                 </h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Periksa seluruh 5 bukti fisik milestone sebelum memutuskan penyelesaian.

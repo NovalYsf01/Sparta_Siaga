@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
     }
 
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized: Sesi login diperlukan." }, { status: 401 });
     }
@@ -61,22 +61,25 @@ export async function POST(request: Request, { params }: RouteContext) {
     let newStatus: typeof report.status;
     let timelineLabel: string;
 
+    const actorRoleTitle = sessionUser.systemRole === "ADMIN" ? "Admin SPARTA SIAGA" : "Building & Maintenance Manager";
+    const actorRoleTag = sessionUser.systemRole === "ADMIN" ? "ADMIN" : "BMM";
+
     switch (decision) {
       case "approved":
         newStatus = "confirmed_affected";
-        timelineLabel = `Pemeriksaan Disetujui Branch Manager: Laporan dinyatakan terkena dampak dan siap ditindaklanjuti. Catatan: ${notes || "Disetujui untuk perbaikan."}`;
+        timelineLabel = `Pemeriksaan Disetujui ${actorRoleTitle}: Laporan dinyatakan terkena dampak dan siap ditindaklanjuti. Catatan: ${notes || "Disetujui untuk perbaikan."}`;
         break;
       case "safe":
         newStatus = "confirmed_safe";
-        timelineLabel = `Kondisi Dinyatakan Aman oleh Branch Manager: Tidak ditemukan kerusakan operasional yang memerlukan tindakan. Catatan: ${notes || "Aman."}`;
+        timelineLabel = `Kondisi Dinyatakan Aman oleh ${actorRoleTitle}: Tidak ditemukan kerusakan operasional yang memerlukan tindakan. Catatan: ${notes || "Aman."}`;
         break;
       case "rejected":
         newStatus = "rejected_invalid";
-        timelineLabel = `Laporan Ditolak oleh Branch Manager (Tidak Valid / Hoax): ${reason}`;
+        timelineLabel = `Laporan Ditolak oleh ${actorRoleTitle} (Tidak Valid / Hoax): ${reason}`;
         break;
       case "clarification_requested":
         newStatus = "clarification_requested";
-        timelineLabel = `Branch Manager Meminta Klarifikasi Hasil Pemeriksaan: ${reason}`;
+        timelineLabel = `${actorRoleTitle} Meminta Klarifikasi Hasil Pemeriksaan: ${reason}`;
         break;
     }
 
@@ -90,7 +93,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       isDamaged: decision === "approved",
       bmApproval: {
         decision,
-        decidedBy: `${sessionUser.name} (Branch Manager)`,
+        decidedBy: `${sessionUser.name} (${actorRoleTag})`,
         decidedAt: nowWib,
         decisionNotes: notes,
         rejectionReason: decision === "rejected" ? reason : undefined,
@@ -99,10 +102,10 @@ export async function POST(request: Request, { params }: RouteContext) {
     };
 
     const timelineEntry = {
-      stage: "Keputusan Branch Manager",
+      stage: `Keputusan ${actorRoleTitle}`,
       label: timelineLabel,
       timestamp: nowWib,
-      actor: `${sessionUser.name} (Branch Manager)`,
+      actor: `${sessionUser.name} (${actorRoleTag})`,
       notes: reason || notes,
     };
 

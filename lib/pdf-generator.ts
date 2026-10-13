@@ -5,7 +5,12 @@
  * Mendukung Laporan Awal (Initial) dan Laporan Akhir (Final - CLOSED).
  */
 
-import { IncidentRecord, MilestoneRecord } from "@/types/incident";
+import {
+  IncidentRecord,
+  MilestoneRecord,
+  MILESTONE_ORDER,
+  MILESTONE_CONFIG,
+} from "@/types/incident";
 
 function escapePdfString(str: string): string {
   if (!str) return "";
@@ -14,7 +19,6 @@ function escapePdfString(str: string): string {
     .replace(/\(/g, "\\(")
     .replace(/\)/g, "\\)")
     .replace(/[^\x20-\x7E]/g, (char) => {
-      // Convert common unicode characters to plain ASCII
       if (char === "•") return "-";
       if (char === "–" || char === "—") return "-";
       if (char === "“" || char === "”") return '"';
@@ -22,6 +26,12 @@ function escapePdfString(str: string): string {
       if (char === "°") return " deg";
       return " ";
     });
+}
+
+function truncate(str: string | undefined | null, maxLen: number): string {
+  if (!str) return "-";
+  const clean = str.trim();
+  return clean.length > maxLen ? clean.substring(0, maxLen - 1) + "…" : clean;
 }
 
 interface PdfDrawCommand {
@@ -156,25 +166,24 @@ export class SimplePdfDocument {
     const offsets: number[] = [0];
 
     let currentOffset = 0;
-    // Calculate offsets for objects 1..6
     currentOffset += Buffer.byteLength(header, "utf-8");
 
-    offsets.push(currentOffset); // obj 1
+    offsets.push(currentOffset);
     currentOffset += Buffer.byteLength(obj1, "utf-8");
 
-    offsets.push(currentOffset); // obj 2
+    offsets.push(currentOffset);
     currentOffset += Buffer.byteLength(obj2, "utf-8");
 
-    offsets.push(currentOffset); // obj 3
+    offsets.push(currentOffset);
     currentOffset += Buffer.byteLength(obj3, "utf-8");
 
-    offsets.push(currentOffset); // obj 4
+    offsets.push(currentOffset);
     currentOffset += Buffer.byteLength(obj4, "utf-8");
 
-    offsets.push(currentOffset); // obj 5
+    offsets.push(currentOffset);
     currentOffset += Buffer.byteLength(obj5, "utf-8");
 
-    offsets.push(currentOffset); // obj 6
+    offsets.push(currentOffset);
     currentOffset += Buffer.byteLength(obj6, "utf-8");
 
     const xrefOffset = currentOffset;
@@ -205,7 +214,7 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
   });
   doc.addText("LAPORAN AWAL PEMERIKSAAN KONDISI LAPANGAN", 48, 777, {
     font: "regular",
-    size: 10,
+    size: 9.5,
     color: [0.85, 0.92, 1],
   });
 
@@ -213,23 +222,23 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
   doc.addRect(35, 735, 525, 22, { fillColor: [0.93, 0.95, 0.98], strokeColor: [0.8, 0.86, 0.94] });
   doc.addText(`No. Laporan: ${report.id}`, 45, 742, { font: "bold", size: 9, color: [0.1, 0.25, 0.5] });
   const originLabel = report.reportOrigin === "automatic_earthquake" ? "OTOMATIS BMKG" : "MANUAL LAPANGAN";
-  doc.addText(`Asal: ${originLabel} | Tanggal Cetak: ${printDate}`, 300, 742, {
+  doc.addText(`Asal: ${originLabel} | Dicetak: ${printDate}`, 295, 742, {
     font: "regular",
-    size: 8.5,
+    size: 8,
     color: [0.3, 0.35, 0.45],
   });
 
   // 3. Section I: Identitas Lokasi & Bencana
-  doc.addRect(35, 615, 525, 110, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
+  doc.addRect(35, 620, 525, 105, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
   doc.addRect(35, 703, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
   doc.addText("I. IDENTITAS KEJADIAN & LOKASI", 45, 710, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const isToko = (report.tkpType || "toko").toLowerCase() === "toko";
   const rowsSection1 = [
-    ["Jenis Bencana", (report.disasterType || "-").toUpperCase(), "Jenis TKP", isToko ? "Gerai Toko" : "Warehouse / DC"],
-    ["Nama Lokasi", report.storeName || "-", "Kode Toko / DC", report.storeId || "-"],
-    ["Cabang / Kota", `${report.branch || "-"} ${report.locationCity ? `(${report.locationCity})` : ""}`, "Tanggal Kejadian", report.date || report.createdAt || "-"],
-    ["Status Laporan", (report.status || "-").toUpperCase(), "Tingkat Kerusakan", report.verification?.severity || (report.verification?.isDamaged ? "RUSAK" : "DALAM PEMERIKSAAN")],
+    ["Jenis Bencana", truncate((report.disasterType || "-").toUpperCase(), 24), "Jenis TKP", isToko ? "Gerai Toko" : "Warehouse / DC"],
+    ["Nama Lokasi", truncate(report.storeName || "-", 26), "Kode Toko / DC", report.storeId || "-"],
+    ["Cabang / Kota", truncate(`${report.branch || "-"} ${report.locationCity ? `(${report.locationCity})` : ""}`, 26), "Tanggal Kejadian", truncate(report.date || report.createdAt || "-", 22)],
+    ["Status Laporan", (report.status || "-").toUpperCase(), "Tingkat Kerusakan", truncate(report.verification?.severity || (report.verification?.isDamaged ? "RUSAK" : "PEMERIKSAAN AWAL"), 22)],
   ];
 
   let yPos = 684;
@@ -242,20 +251,20 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
     yPos -= 17;
   }
 
-  // 4. Section II: Data Gempa BMKG (jika ada) atau Parameter Bencana
-  doc.addRect(35, 495, 525, 110, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
-  doc.addRect(35, 583, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
-  doc.addText("II. PARAMETER BENCANA & SUMBER INFORMASI", 45, 590, { font: "bold", size: 9.5, color: [1, 1, 1] });
+  // 4. Section II: Parameter Bencana / Sumber Data
+  doc.addRect(35, 505, 525, 105, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
+  doc.addRect(35, 588, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
+  doc.addText("II. PARAMETER BENCANA & SUMBER INFORMASI", 45, 595, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const eq = report.disasterMetadata;
   if (eq) {
     const rowsSection2 = [
       ["Magnitude", `${eq.magnitude || "-"} SR`, "Kedalaman", `${eq.depth || "-"} km`],
-      ["Pusat Gempa", eq.place || "-", "Waktu Gempa", eq.time || "-"],
+      ["Pusat Gempa", truncate(eq.place || "-", 28), "Waktu Gempa", truncate(eq.time || "-", 24)],
       ["Potensi Tsunami", "Tidak berpotensi tsunami", "Jarak ke TKP", eq.distanceKm ? `${eq.distanceKm} km` : "-"],
       ["Sumber Data", "BMKG Real-time Alert", "ID Event BMKG", report.earthquakeEventId || "-"],
     ];
-    let yPos2 = 564;
+    let yPos2 = 569;
     for (const row of rowsSection2) {
       doc.addText(row[0] + ":", 45, yPos2, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
       doc.addText(row[1], 135, yPos2, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
@@ -265,57 +274,59 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
       yPos2 -= 17;
     }
   } else {
-    doc.addText("Laporan insiden dicatat secara manual oleh tim lapangan.", 45, 555, { font: "regular", size: 9, color: [0.3, 0.3, 0.3] });
-    doc.addText(`Keterangan: ${report.verification?.notes || "Tidak ada catatan khusus."}`, 45, 535, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
-    doc.addText(`Pelapor: ${report.reporter?.name || "-"} (${report.reporter?.role || "Petugas Lapangan"})`, 45, 515, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
+    doc.addText("Laporan insiden dicatat secara manual oleh tim lapangan.", 45, 565, { font: "regular", size: 8.5, color: [0.3, 0.3, 0.3] });
+    const notesSummary = truncate(report.verification?.notes || "Tidak ada catatan khusus.", 75);
+    doc.addText(`Keterangan: ${notesSummary}`, 45, 545, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
+    doc.addText(`Pelapor: ${report.reporter?.name || "-"} (${report.reporter?.role || "Petugas Lapangan"})`, 45, 525, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
   }
 
   // 5. Section III: Hasil Pemeriksaan Kondisi Lapangan (BMS / BES)
-  doc.addRect(35, 345, 525, 140, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
-  doc.addRect(35, 463, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
-  doc.addText("III. HASIL PEMERIKSAAN KONDISI LAPANGAN (BMS / BES)", 45, 470, { font: "bold", size: 9.5, color: [1, 1, 1] });
+  doc.addRect(35, 365, 525, 130, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
+  doc.addRect(35, 473, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
+  doc.addText("III. HASIL PEMERIKSAAN KONDISI LAPANGAN (BMS / BES)", 45, 480, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const ver = report.verification;
-  const inspector = ver?.confirmedBy || "Belum Diverifikasi";
-  const inspectTime = ver?.confirmedAt || "-";
+  const inspector = truncate(ver?.confirmedBy || "Belum Diverifikasi", 24);
+  const inspectTime = truncate(ver?.confirmedAt || "-", 24);
   const condText = ver?.condition || (ver?.isDamaged === false ? "AMAN" : ver?.isDamaged === true ? "RUSAK / TERDAMPAK" : "MENUNGGU PEMERIKSAAN");
 
-  doc.addText("Petugas Pemeriksa:", 45, 444, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(inspector, 155, 444, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
-  doc.addText("Waktu Pemeriksaan:", 310, 444, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(inspectTime, 410, 444, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText("Petugas Pemeriksa:", 45, 452, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(inspector, 155, 452, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText("Waktu Pemeriksaan:", 310, 452, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(inspectTime, 415, 452, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
-  doc.addText("Status Kondisi Fisik:", 45, 425, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(condText, 155, 425, { font: "bold", size: 8.5, color: ver?.isDamaged === false ? [0.1, 0.55, 0.25] : [0.75, 0.15, 0.15] });
+  doc.addText("Status Kondisi Fisik:", 45, 432, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(condText, 155, 432, { font: "bold", size: 8.5, color: ver?.isDamaged === false ? [0.1, 0.55, 0.25] : [0.75, 0.15, 0.15] });
 
-  doc.addText("Jumlah Bukti Foto:", 310, 425, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(`${ver?.evidenceDetails?.length || ver?.photos?.length || 0} berkas terverifikasi`, 410, 425, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText("Jumlah Bukti Foto:", 310, 432, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(`${ver?.evidenceDetails?.length || ver?.photos?.length || 0} berkas terverifikasi`, 415, 432, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
-  doc.addText("Catatan Pemeriksaan:", 45, 404, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  const inspectNotes = ver?.notes || "Tidak ada catatan tambahan.";
-  doc.addText(inspectNotes.substring(0, 85), 45, 390, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
+  doc.addText("Catatan Pemeriksaan:", 45, 410, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  const inspectNotes = truncate(ver?.notes || "Tidak ada catatan tambahan.", 80);
+  doc.addText(inspectNotes, 45, 395, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
 
-  // 6. Section IV: Status Persetujuan Awal Manager Branch
-  doc.addRect(35, 230, 525, 105, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
-  doc.addRect(35, 313, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
-  doc.addText("IV. PERSETUJUAN AWAL BRANCH MANAGER", 45, 320, { font: "bold", size: 9.5, color: [1, 1, 1] });
+  // 6. Section IV: Status Persetujuan Awal Building & Maintenance Manager
+  doc.addRect(35, 235, 525, 120, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
+  doc.addRect(35, 333, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
+  doc.addText("IV. PERSETUJUAN AWAL BUILDING & MAINTENANCE MANAGER (BMM)", 45, 340, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const bmDec = ver?.bmApproval;
-  doc.addText("Pemberi Persetujuan:", 45, 294, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(bmDec?.decidedBy || "Branch Manager Cabang", 160, 294, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
-  doc.addText("Waktu Keputusan:", 310, 294, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(bmDec?.decidedAt || "-", 410, 294, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText("Pemberi Persetujuan:", 45, 312, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(truncate(bmDec?.decidedBy || "Building & Maintenance Manager Cabang", 24), 160, 312, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText("Waktu Keputusan:", 310, 312, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(truncate(bmDec?.decidedAt || "-", 24), 415, 312, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
-  doc.addText("Keputusan:", 45, 275, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText((bmDec?.decision || report.status || "-").toUpperCase(), 160, 275, { font: "bold", size: 8.5, color: [0.1, 0.4, 0.7] });
+  doc.addText("Keputusan:", 45, 292, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText((bmDec?.decision || report.status || "-").toUpperCase(), 160, 292, { font: "bold", size: 8.5, color: [0.1, 0.4, 0.7] });
 
-  doc.addText("Catatan Manager:", 45, 256, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(bmDec?.decisionNotes || bmDec?.rejectionReason || "Pemeriksaan disetujui untuk penanganan.", 160, 256, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
+  doc.addText("Catatan Manager:", 45, 272, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  const managerNotes = truncate(bmDec?.decisionNotes || bmDec?.rejectionReason || "Pemeriksaan disetujui untuk penanganan.", 70);
+  doc.addText(managerNotes, 160, 272, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
 
-  // 7. Footer & Disclaimer
-  doc.addLine(35, 110, 560, 110, { strokeColor: [0.8, 0.8, 0.8], lineWidth: 0.5 });
-  doc.addText("Dokumen ini merupakan Laporan Awal Kejadian yang sah dan diterbitkan dari sistem SPARTA SIAGA.", 45, 96, { font: "regular", size: 7.5, color: [0.4, 0.4, 0.4] });
-  doc.addText("BUKAN BUKTI PENYELESAIAN PEKERJAAN (Pekerjaan fisik dan penutupan kasus membutuhkan Laporan Final CLOSED).", 45, 84, { font: "bold", size: 7.5, color: [0.5, 0.2, 0.2] });
+  // 7. Footer & Pagination
+  doc.addLine(35, 95, 560, 95, { strokeColor: [0.8, 0.8, 0.8], lineWidth: 0.5 });
+  doc.addText("Halaman 1 dari 1 • Dokumen Resmi SPARTA SIAGA • Berkas Terverifikasi Sistem", 45, 82, { font: "regular", size: 7.5, color: [0.4, 0.4, 0.4] });
+  doc.addText("CATATAN: BUKAN BUKTI PENYELESAIAN PEKERJAAN (Penutupan kasus membutuhkan Laporan Final CLOSED)", 45, 70, { font: "bold", size: 7.5, color: [0.55, 0.2, 0.2] });
 
   return doc.build();
 }
@@ -323,9 +334,35 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
 /**
  * Generate PDF Laporan Final (Final Closed Report)
  */
-export function generateFinalReportPdf(report: IncidentRecord, milestones: MilestoneRecord[]): Buffer {
+export function generateFinalReportPdf(report: IncidentRecord, milestones: MilestoneRecord[] = []): Buffer {
   const doc = new SimplePdfDocument();
   const printDate = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB";
+
+  const safeMilestones: MilestoneRecord[] = (milestones && Array.isArray(milestones) && milestones.length > 0)
+    ? milestones
+    : MILESTONE_ORDER.map((k) => ({
+        id: `ms_${k}`,
+        reportId: report.id,
+        stageOrder: MILESTONE_CONFIG[k].order,
+        stageKey: k,
+        stageName: MILESTONE_CONFIG[k].label,
+        targetProgress: MILESTONE_CONFIG[k].progress,
+        status: "SUBMITTED" as const,
+        documentUrl: undefined,
+        documentStorageKey: undefined,
+        documentOriginalName: undefined,
+        documentMimeType: undefined,
+        documentFileSize: undefined,
+        actorId: undefined,
+        actorName: undefined,
+        actorRole: undefined,
+        submittedAt: undefined,
+        notes: undefined,
+        proxyApprovalStatus: undefined,
+        revisions: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
 
   // 1. Header Bar: Emerald Green for Official CLOSED Document
   doc.addRect(35, 765, 525, 48, { fillColor: [0.06, 0.32, 0.2] });
@@ -334,83 +371,84 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
     size: 13,
     color: [1, 1, 1],
   });
-  doc.addText("LAPORAN FINAL PEKERJAAN FISIK DAN PERSETUJUAN BRANCH MANAGER", 48, 777, {
+  doc.addText("LAPORAN FINAL PEKERJAAN FISIK DAN PERSETUJUAN BUILDING & MAINTENANCE MANAGER", 48, 777, {
     font: "regular",
-    size: 10,
-    color: [0.85, 0.98, 0.9] });
+    size: 9.5,
+    color: [0.85, 0.98, 0.9],
+  });
 
   // 2. Official Badge Banner
   doc.addRect(35, 735, 525, 22, { fillColor: [0.92, 0.98, 0.94], strokeColor: [0.75, 0.9, 0.8] });
-  doc.addText(`No. Laporan: ${report.id} [STATUS: CLOSED - SELESAI]`, 45, 742, {
+  doc.addText(`No. Laporan: ${report.id} [STATUS: CLOSED - RESMI SELESAI]`, 45, 742, {
     font: "bold",
     size: 9,
     color: [0.06, 0.45, 0.25],
   });
-  doc.addText(`Dicetak: ${printDate}`, 430, 742, {
+  doc.addText(`Dicetak: ${printDate}`, 380, 742, {
     font: "regular",
-    size: 8.5,
+    size: 8,
     color: [0.3, 0.4, 0.35],
   });
 
   // 3. Section I: Data Identitas
-  doc.addRect(35, 625, 525, 100, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
+  doc.addRect(35, 630, 525, 95, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
   doc.addRect(35, 703, 525, 22, { fillColor: [0.08, 0.42, 0.26] });
   doc.addText("I. IDENTITAS KEJADIAN & LOKASI", 45, 710, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const isToko = (report.tkpType || "toko").toLowerCase() === "toko";
   const rowsSection1 = [
-    ["Jenis Bencana", (report.disasterType || "-").toUpperCase(), "Lokasi / Unit", `${report.storeName} (${isToko ? "Toko" : "DC"})`],
-    ["Kode Unit", report.storeId || "-", "Cabang / Kota", `${report.branch || "-"} ${report.locationCity ? `• ${report.locationCity}` : ""}`],
-    ["Tanggal Kejadian", report.date || report.createdAt || "-", "Tanggal Ditutup (CLOSED)", report.closedAt || report.updatedAt || "-"],
+    ["Jenis Bencana", truncate((report.disasterType || "-").toUpperCase(), 24), "Lokasi / Unit", truncate(`${report.storeName} (${isToko ? "Toko" : "DC"})`, 26)],
+    ["Kode Unit", report.storeId || "-", "Cabang / Kota", truncate(`${report.branch || "-"} ${report.locationCity ? `• ${report.locationCity}` : ""}`, 26)],
+    ["Tanggal Kejadian", truncate(report.date || report.createdAt || "-", 24), "Waktu Selesai (CLOSED)", truncate(report.closedAt || report.updatedAt || "-", 24)],
   ];
 
   let yPos = 684;
   for (const row of rowsSection1) {
     doc.addText(row[0] + ":", 45, yPos, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-    doc.addText(row[1], 145, yPos, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+    doc.addText(row[1], 140, yPos, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
     doc.addText(row[2] + ":", 310, yPos, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-    doc.addText(row[3], 420, yPos, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+    doc.addText(row[3], 415, yPos, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
     yPos -= 17;
   }
 
   // 4. Section II: 5 Tahapan Milestone Penanganan
-  doc.addRect(35, 425, 525, 190, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
-  doc.addRect(35, 593, 525, 22, { fillColor: [0.08, 0.42, 0.26] });
-  doc.addText("II. BUKTI FISIK 5 TAHAPAN MILESTONE PENANGANAN (10% - 100%)", 45, 600, {
+  doc.addRect(35, 430, 525, 190, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
+  doc.addRect(35, 598, 525, 22, { fillColor: [0.08, 0.42, 0.26] });
+  doc.addText("II. BUKTI FISIK 5 TAHAPAN MILESTONE PENANGANAN (10% - 100%)", 45, 605, {
     font: "bold",
     size: 9.5,
     color: [1, 1, 1],
   });
 
   // Table header for milestones
-  doc.addRect(45, 570, 505, 18, { fillColor: [0.93, 0.95, 0.94] });
-  doc.addText("Tahap", 50, 575, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
-  doc.addText("Progres", 145, 575, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
-  doc.addText("Dokumen Bukti", 200, 575, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
-  doc.addText("Pengunggah / Pelaksana", 345, 575, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
-  doc.addText("Waktu Submit", 460, 575, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
+  doc.addRect(45, 574, 505, 18, { fillColor: [0.93, 0.95, 0.94] });
+  doc.addText("Tahap", 50, 579, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
+  doc.addText("Target", 135, 579, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
+  doc.addText("Dokumen Bukti", 185, 579, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
+  doc.addText("Pengunggah / Pelaksana", 335, 579, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
+  doc.addText("Waktu Submit", 455, 579, { font: "bold", size: 8, color: [0.2, 0.3, 0.25] });
 
-  let mY = 550;
-  for (const ms of milestones) {
-    const docName = ms.documentOriginalName || (ms.documentStorageKey ? "Berkas Terverifikasi" : "Belum Ada");
-    const actor = ms.actorName ? `${ms.actorName} (${(ms.actorRole || "").toUpperCase()})` : "-";
-    const subTime = ms.submittedAt ? ms.submittedAt.substring(0, 16).replace("T", " ") : "-";
+  let mY = 554;
+  for (const ms of safeMilestones) {
+    const docName = truncate(ms.documentOriginalName || (ms.documentStorageKey ? "Berkas Terverifikasi" : "Belum Ada"), 24);
+    const actor = truncate(ms.actorName ? `${ms.actorName} (${(ms.actorRole || "").toUpperCase()})` : "-", 20);
+    const subTime = truncate(ms.submittedAt ? ms.submittedAt.substring(0, 16).replace("T", " ") : "-", 18);
 
-    doc.addText(ms.stageName, 50, mY, { font: "bold", size: 8, color: [0.15, 0.2, 0.2] });
-    doc.addText(`${ms.targetProgress}%`, 145, mY, { font: "regular", size: 8, color: [0.1, 0.5, 0.25] });
-    doc.addText(docName.substring(0, 24), 200, mY, { font: "regular", size: 7.5, color: [0.1, 0.1, 0.1] });
-    doc.addText(actor.substring(0, 20), 345, mY, { font: "regular", size: 7.5, color: [0.2, 0.2, 0.2] });
-    doc.addText(subTime, 460, mY, { font: "regular", size: 7.5, color: [0.3, 0.3, 0.3] });
+    doc.addText(truncate(ms.stageName, 18), 50, mY, { font: "bold", size: 8, color: [0.15, 0.2, 0.2] });
+    doc.addText(`${ms.targetProgress}%`, 135, mY, { font: "regular", size: 8, color: [0.1, 0.5, 0.25] });
+    doc.addText(docName, 185, mY, { font: "regular", size: 7.5, color: [0.1, 0.1, 0.1] });
+    doc.addText(actor, 335, mY, { font: "regular", size: 7.5, color: [0.2, 0.2, 0.2] });
+    doc.addText(subTime, 455, mY, { font: "regular", size: 7.5, color: [0.3, 0.3, 0.3] });
 
     doc.addLine(45, mY - 4, 550, mY - 4, { strokeColor: [0.9, 0.92, 0.9] });
     mY -= 22;
   }
 
-  // 5. Section III: Keputusan Persetujuan Final Branch Manager
-  doc.addRect(35, 275, 525, 140, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
-  doc.addRect(35, 393, 525, 22, { fillColor: [0.08, 0.42, 0.26] });
-  doc.addText("III. KEPUTUSAN PERSETUJUAN FINAL BRANCH MANAGER", 45, 400, {
+  // 5. Section III: Keputusan Persetujuan Final Building & Maintenance Manager
+  doc.addRect(35, 280, 525, 140, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
+  doc.addRect(35, 398, 525, 22, { fillColor: [0.08, 0.42, 0.26] });
+  doc.addText("III. KEPUTUSAN PERSETUJUAN FINAL BUILDING & MAINTENANCE MANAGER (BMM)", 45, 405, {
     font: "bold",
     size: 9.5,
     color: [1, 1, 1],
@@ -419,49 +457,50 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
   const timeline = report.timeline || [];
   const bmFinal = timeline.slice().reverse().find((t) => t.stage === "Laporan Ditutup" || t.label?.includes("CLOSED"));
 
-  doc.addText("Branch Manager:", 45, 374, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(bmFinal?.actor || `Branch Manager (${report.branch || "-"})`, 160, 374, { font: "bold", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText("Pemberi Persetujuan:", 45, 377, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(truncate(bmFinal?.actor || `Building & Maintenance Manager (${report.branch || "-"})`, 26), 160, 377, { font: "bold", size: 8.5, color: [0.1, 0.1, 0.1] });
 
-  doc.addText("Keputusan Akhir:", 310, 374, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText("DISETUJUI & DITUTUP (CLOSED)", 410, 374, { font: "bold", size: 8.5, color: [0.08, 0.5, 0.25] });
+  doc.addText("Keputusan Akhir:", 310, 377, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText("DISETUJUI & DITUTUP (CLOSED)", 415, 377, { font: "bold", size: 8.5, color: [0.08, 0.5, 0.25] });
 
-  doc.addText("Waktu Persetujuan:", 45, 354, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(bmFinal?.timestamp || report.closedAt || "-", 160, 354, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
+  doc.addText("Waktu Persetujuan:", 45, 357, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText(truncate(bmFinal?.timestamp || report.closedAt || "-", 26), 160, 357, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
 
-  doc.addText("Progres Pekerjaan:", 310, 354, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText("100% (Serah Terima Selesai)", 410, 354, { font: "bold", size: 8.5, color: [0.08, 0.5, 0.25] });
+  doc.addText("Progres Pekerjaan:", 310, 357, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText("100% (Serah Terima Selesai)", 415, 357, { font: "bold", size: 8.5, color: [0.08, 0.5, 0.25] });
 
-  doc.addText("Catatan Penutupan:", 45, 332, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(bmFinal?.notes || "Pekerjaan fisik diverifikasi selesai 100% dan disetujui untuk ditutup secara resmi.", 45, 318, {
+  doc.addText("Catatan Penutupan:", 45, 335, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  const closingNotes = truncate(bmFinal?.notes || "Pekerjaan fisik diverifikasi selesai 100% dan disetujui untuk ditutup secara resmi.", 75);
+  doc.addText(closingNotes, 45, 320, {
     font: "regular",
     size: 8.5,
     color: [0.2, 0.2, 0.2],
   });
 
   // 6. Signatures Area
-  doc.addRect(45, 140, 505, 120, { fillColor: [0.97, 0.99, 0.98], strokeColor: [0.85, 0.9, 0.88] });
-  doc.addText("PENGESAHAN DOKUMEN PENYELESAIAN:", 55, 245, { font: "bold", size: 8.5, color: [0.2, 0.35, 0.25] });
+  doc.addRect(45, 145, 505, 120, { fillColor: [0.97, 0.99, 0.98], strokeColor: [0.85, 0.9, 0.88] });
+  doc.addText("PENGESAHAN DOKUMEN PENYELESAIAN:", 55, 248, { font: "bold", size: 8.5, color: [0.2, 0.35, 0.25] });
 
   // Column 1: PIC Pelaksana (BMS / BES)
-  doc.addText("Petugas Lapangan (BMS / BES):", 75, 225, { font: "bold", size: 8, color: [0.3, 0.3, 0.3] });
-  doc.addText("( Tanda tangan digital )", 85, 180, { font: "regular", size: 7.5, color: [0.5, 0.5, 0.5] });
-  const picName = report.verification?.confirmedBy || "Pelaksana Pekerjaan";
-  doc.addText(picName, 75, 155, { font: "bold", size: 8, color: [0.1, 0.1, 0.1] });
+  doc.addText("Petugas Lapangan (BMS / BES):", 75, 227, { font: "bold", size: 8, color: [0.3, 0.3, 0.3] });
+  doc.addText("( Tanda tangan digital terverifikasi )", 75, 185, { font: "regular", size: 7.5, color: [0.45, 0.45, 0.45] });
+  const picName = truncate(report.verification?.confirmedBy || "Pelaksana Pekerjaan", 26);
+  doc.addText(picName, 75, 160, { font: "bold", size: 8, color: [0.1, 0.1, 0.1] });
 
-  // Column 2: Branch Manager
-  doc.addText("Manager Branch (BM):", 350, 225, { font: "bold", size: 8, color: [0.3, 0.3, 0.3] });
-  doc.addText("( Tanda tangan digital )", 360, 180, { font: "regular", size: 7.5, color: [0.5, 0.5, 0.5] });
-  const bmSignName = bmFinal?.actor?.replace(/\s*\(.*\)/, "") || `Branch Manager ${report.branch || ""}`;
-  doc.addText(bmSignName, 350, 155, { font: "bold", size: 8, color: [0.1, 0.1, 0.1] });
+  // Column 2: Building & Maintenance Manager
+  doc.addText("Building & Maintenance Manager (BMM):", 340, 227, { font: "bold", size: 8, color: [0.3, 0.3, 0.3] });
+  doc.addText("( Tanda tangan digital terverifikasi )", 340, 185, { font: "regular", size: 7.5, color: [0.45, 0.45, 0.45] });
+  const bmSignName = truncate(bmFinal?.actor?.replace(/\s*\(.*\)/, "") || `Building & Maintenance Manager ${report.branch || ""}`, 26);
+  doc.addText(bmSignName, 340, 160, { font: "bold", size: 8, color: [0.1, 0.1, 0.1] });
 
-  // 7. Footer Notice
-  doc.addLine(35, 105, 560, 105, { strokeColor: [0.8, 0.85, 0.82], lineWidth: 0.5 });
-  doc.addText("Dokumen ini diterbitkan secara sah melalui sistem SPARTA SIAGA berdasarkan persetujuan resmi Branch Manager.", 45, 92, {
+  // 7. Footer & Pagination
+  doc.addLine(35, 95, 560, 95, { strokeColor: [0.8, 0.85, 0.82], lineWidth: 0.5 });
+  doc.addText("Halaman 1 dari 1 • Dokumen Resmi SPARTA SIAGA • Berkas Terverifikasi Sistem", 45, 82, {
     font: "bold",
     size: 7.5,
     color: [0.1, 0.45, 0.25],
   });
-  doc.addText("Seluruh bukti milestone tersimpan secara permanen dalam sistem dan terlindungi integritasnya.", 45, 80, {
+  doc.addText("Seluruh bukti milestone tersimpan secara permanen dalam sistem dan terlindungi integritasnya.", 45, 70, {
     font: "regular",
     size: 7.5,
     color: [0.4, 0.45, 0.4],

@@ -6,9 +6,9 @@ import { generateFinalReportPdf } from "@/lib/pdf-generator";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized: Sesi login diperlukan." }, { status: 401 });
     }
@@ -35,7 +35,7 @@ export async function GET(_: Request, { params }: RouteContext) {
     if (!isClosed) {
       return NextResponse.json(
         {
-          error: "Dokumen final hanya dapat diunduh setelah laporan resmi disetujui Branch Manager (CLOSED).",
+          error: "Dokumen final hanya dapat diunduh setelah laporan resmi disetujui Building & Maintenance Manager / Administrator (CLOSED).",
           code: "REPORT_NOT_CLOSED",
         },
         { status: 422 }

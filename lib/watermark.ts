@@ -58,10 +58,6 @@ export function validateImageMagicBytes(buffer: Buffer): { valid: boolean; mimeT
   return { valid: false, mimeType: "unknown" };
 }
 
-/**
- * Format server timestamp in Indonesian format (WIB)
- * Example: 06 Oktober 2026 • 14:35 WIB
- */
 export function formatServerTimestampWib(date: Date = new Date()): string {
   const fullMonths = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",

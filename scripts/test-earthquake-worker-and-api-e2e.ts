@@ -152,8 +152,8 @@ async function run() {
     const hoAdminUser = {
       id: "usr_ho_admin_e2e",
       nik: "HOADM01",
-      name: "Super Admin HO",
-      systemRole: "ADMIN" as const,
+      name: "HO Monitor Nasional",
+      systemRole: "USER" as const,
       businessRole: "ho_admin" as const,
       scope: "HO" as const,
       branch: null,
@@ -518,7 +518,7 @@ async function run() {
     const hoContext: UserContext = {
       id: hoAdminUser.id,
       name: hoAdminUser.name,
-      systemRole: "ADMIN",
+      systemRole: "USER",
       role: "ho_admin",
       scope: "HO",
       branch: null,

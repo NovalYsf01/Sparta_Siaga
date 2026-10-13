@@ -39,9 +39,10 @@ export async function GET() {
         const catalog = ROLE_PERMISSION_CATALOG[role.key] || [];
         return {
           key: role.key,
-          label: role.label,
+          label: role.selectable ? role.label : `${role.label} (Nonaktif)`,
           fullLabel: role.fullLabel,
           scope: role.scope,
+          selectable: role.selectable,
           userCount: counts[role.key] || 0,
           catalog,
           permissions,

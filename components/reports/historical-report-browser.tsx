@@ -90,7 +90,7 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
       case "pending_confirmation": return { label: "Perlu Konfirmasi", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
       case "verifying": return { label: "Verifikasi", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" };
       case "investigating": return { label: "Investigasi", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
-      case "in_maintenance": return { label: "Penanganan", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
+      case "closed": return { label: "Ditutup (CLOSED)", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800" };
       case "resolved": return { label: "Selesai", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
       case "archived": return { label: "Arsip", color: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
       default: return { label: "Unknown", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
@@ -156,8 +156,9 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
             onChange={(e) => { setStatus(e.target.value); setPage(1); }}
             className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none text-slate-700 dark:text-slate-300"
           >
-            <option value="all">Semua Status (Selesai)</option>
-            <option value="resolved">Selesai (Arsip)</option>
+            <option value="all">Semua Status Riwayat</option>
+            <option value="closed">Ditutup (CLOSED)</option>
+            <option value="resolved">Selesai (Resolved)</option>
             <option value="archived">Diarsipkan</option>
           </select>
           <select
@@ -235,7 +236,7 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] ${stat.color}`}>
-                          {inc.status === "resolved" && <CheckCircle2 className="w-3 h-3" />}
+                          {(inc.status === "closed" || inc.status === "resolved") && <CheckCircle2 className="w-3 h-3" />}
                           {stat.label}
                         </span>
                       </td>

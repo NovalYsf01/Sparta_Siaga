@@ -487,7 +487,7 @@ async function runTestSuite() {
         bmsTryBm.authorized === false &&
         besTryBm.authorized === false &&
         bmOtherBranch.authorized === false &&
-        (bmsTryBm.reason || "").includes("Hanya Branch Manager cabang terkait");
+        ((bmsTryBm.reason || "").includes("Building & Maintenance Manager") || (bmsTryBm.reason || "").includes("Branch Manager"));
 
       recordResult(
         9,

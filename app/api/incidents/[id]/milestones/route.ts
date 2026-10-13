@@ -10,9 +10,9 @@ import { MilestoneKey, MILESTONE_CONFIG } from "@/types/incident";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(_: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -56,7 +56,7 @@ export async function GET(_: Request, { params }: RouteContext) {
 
 export async function POST(request: Request, { params }: RouteContext) {
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -71,9 +71,21 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
 
     const formData = await request.formData();
-    const stageKey = (formData.get("stage_key") as string)?.toUpperCase() as MilestoneKey;
+    const rawStage = (formData.get("stage_key") || formData.get("stageKey") || formData.get("stage")) as string;
+    const stageKey = rawStage ? (rawStage.trim().toUpperCase() as MilestoneKey) : ("" as MilestoneKey);
     const notes = (formData.get("notes") as string)?.trim() || "";
-    const isSimulation = formData.get("is_simulation") === "true";
+
+    // Audit Keamanan: isTestSimulation TIDAK DAPAT diaktifkan oleh request pengguna / API produksi umum.
+    // Di lingkungan produksi, jalur simulasi sepenuhnya dinonaktifkan.
+    const isProduction = process.env.NODE_ENV === "production" && process.env.SPARTA_ALLOW_TEST_SIMULATION !== "true";
+    const internalTestHeader = request.headers.get("x-sparta-internal-test");
+    const isSimulation = Boolean(
+      !isProduction &&
+      internalTestHeader &&
+      process.env.SPARTA_INTERNAL_WORKER_SECRET &&
+      internalTestHeader === process.env.SPARTA_INTERNAL_WORKER_SECRET &&
+      formData.get("is_simulation") === "true"
+    );
 
     if (!stageKey || !MILESTONE_CONFIG[stageKey]) {
       return NextResponse.json(

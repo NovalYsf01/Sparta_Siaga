@@ -25,9 +25,27 @@ export async function GET(request?: Request) {
       hasGlobalView = permCheck.authorized;
     }
 
-    const filteredIncidents = incidents.filter(
+    let url: URL | null = null;
+    if (request?.url) {
+      try {
+        url = new URL(request.url);
+      } catch {}
+    }
+    const statusParam = url?.searchParams.get("status");
+
+    let filteredIncidents = incidents.filter(
       (inc) => !inc.id.startsWith("INC-TEST-") && (hasGlobalView || canViewReport(sessionUser, inc))
     );
+
+    if (statusParam === "active") {
+      filteredIncidents = filteredIncidents.filter(
+        (inc) => inc.status !== "closed" && inc.status !== "resolved" && inc.status !== "archived"
+      );
+    } else if (statusParam === "history" || statusParam === "closed") {
+      filteredIncidents = filteredIncidents.filter(
+        (inc) => inc.status === "closed" || inc.status === "resolved" || inc.status === "archived"
+      );
+    }
 
     return NextResponse.json({ data: filteredIncidents });
   } catch (err) {
@@ -41,14 +59,14 @@ export async function GET(request?: Request) {
 
 export async function POST(request: Request) {
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.systemRole === "ADMIN") {
+    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
       return NextResponse.json(
-        { error: "Forbidden: Akun System Administrator tidak memiliki izin membuat laporan operasional." },
+        { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
         { status: 403 }
       );
     }
