@@ -155,3 +155,35 @@
   min-width: 44px;
 }
 
+/* Shared operational surfaces, aligned with the SPARTA Maintenance reference. */
+.sparta-page { width: 100%; padding: 24px; color: #0f172a; }
+.sparta-page-header { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.sparta-page-header h1 { font-size: 24px; line-height: 1.25; font-weight: 750; letter-spacing: -.025em; }
+.sparta-page-header p { margin-top: 5px; color: #64748b; font-size: 14px; }
+.sparta-count, .sparta-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 9px; background: #eaf2fb; color: #1d5aa6; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.sparta-badge.warning { background: #fff7df; color: #9a6700; }
+.sparta-table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
+.sparta-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sparta-table th { padding: 11px 14px; background: #f8fafc; color: #475569; text-align: left; font-size: 12px; font-weight: 700; }
+.sparta-table td { padding: 13px 14px; border-top: 1px solid #e2e8f0; vertical-align: top; }
+.sparta-table small { display: block; margin-top: 4px; color: #64748b; line-height: 1.45; }
+.sparta-button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; gap: 7px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 12px; background: white; color: #334155; font-size: 12px; font-weight: 700; }
+.sparta-button.primary { border-color: #1d5aa6; background: #1d5aa6; color: white; }
+.sparta-button svg { width: 15px; height: 15px; }
+.sparta-button:disabled { cursor: not-allowed; opacity: .5; }
+.sparta-empty { display: flex; min-height: 220px; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; color: #64748b; font-size: 13px; }
+.sparta-empty svg { width: 24px; height: 24px; }
+.sparta-empty strong { color: #0f172a; }
+
+@media (max-width: 639px) {
+  .sparta-page { padding: 16px; }
+  .sparta-page-header { align-items: flex-start; }
+  .sparta-page-header h1 { font-size: 20px; }
+  .sparta-table-wrap { border: 0; background: transparent; overflow: visible; }
+  .sparta-table, .sparta-table tbody { display: block; }
+  .sparta-table thead { display: none; }
+  .sparta-table tr { display: grid; gap: 10px; margin-bottom: 12px; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
+  .sparta-table td { display: block; padding: 0; border: 0; }
+  .sparta-table td:last-child .flex { display: grid; grid-template-columns: 1fr 1fr; }
+  .sparta-button { min-height: 44px; }
+}

@@ -13,6 +13,9 @@ export interface DispatchNotificationParams {
   message: string;
   affectedStores: AffectedStoreSummary[];
   ticketNumber?: string;
+  canonicalEventId?: string;
+  recipientGroup?: "BMS" | "BES" | "BMM" | "HO";
+  category?: "INFORMATION" | "ASSIGNMENT" | "APPROVAL";
 }
 
 /**
@@ -235,9 +238,19 @@ export async function recordNotificationLog(params: DispatchNotificationParams):
       id, disaster_id, disaster_type, channel, branch, 
       recipient_role, recipient_contact, title, message, 
       affected_stores_count, affected_stores_sample, ticket_number, 
-      status, sent_at, delivery_status
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-    ON CONFLICT (id) DO NOTHING
+      status, sent_at, delivery_status, canonical_event_id,
+      recipient_group, notification_category
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+    ON CONFLICT (canonical_event_id, branch, recipient_group, notification_category)
+      WHERE canonical_event_id IS NOT NULL
+        AND recipient_group IS NOT NULL
+        AND notification_category IS NOT NULL
+    DO UPDATE SET
+      title = EXCLUDED.title,
+      message = EXCLUDED.message,
+      affected_stores_count = EXCLUDED.affected_stores_count,
+      affected_stores_sample = EXCLUDED.affected_stores_sample,
+      sent_at = EXCLUDED.sent_at
     RETURNING *;
   `;
 
@@ -257,6 +270,9 @@ export async function recordNotificationLog(params: DispatchNotificationParams):
     deliveryStatus,
     now,
     honestDeliveryStatus,
+    params.canonicalEventId ?? params.disasterId,
+    params.recipientGroup ?? 'BMS',
+    params.category ?? 'INFORMATION',
   ];
 
   const res = await pool.query(query, values);

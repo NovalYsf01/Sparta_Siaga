@@ -39,6 +39,7 @@ import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { WorkReadinessCard } from "./work-readiness-card";
 import { StoreVerificationModal } from "./store-verification-modal";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
+import { RepairLinksCard } from "./repair-links-card";
 
 interface MaintenanceTrackingModalProps {
   incident: IncidentRecord | null;
@@ -1064,6 +1065,7 @@ export function MaintenanceTrackingModal({
             {/* TAB CONTENT 0: 5 MILESTONE PROGRESSION */}
             {activeTab === "milestones" && (
               <div className="animate-in fade-in">
+                <RepairLinksCard incidentId={incident.id} readOnly={isReadOnly} />
                 <MilestoneProgressionCard
                   incident={incident}
                   identity={identity}

@@ -157,7 +157,7 @@ async function runAudit() {
 
   for (const ic of iconList) {
     const res = await fetchHttp(ic.path);
-    let meta: sharp.Metadata | null = null;
+    let meta: { width?: number; height?: number; format?: string } | null = null;
     try {
       meta = await sharp(res.buffer).metadata();
     } catch {}

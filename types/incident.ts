@@ -251,6 +251,12 @@ export interface IncidentRecord {
   storeName: string;
   branch: string;
   locationCity: string;
+  locationKind?: "STORE" | "FACILITY";
+  locationId?: string;
+  locationCodeSnapshot?: string;
+  locationNameSnapshot?: string;
+  primaryPicUserId?: string;
+  primaryPicClaimedAt?: string;
 
   // === Status & Progress ===
   status: IncidentStatus;

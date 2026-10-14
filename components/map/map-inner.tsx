@@ -37,6 +37,7 @@ interface MapInnerProps {
   activeLayer?: "all" | "earthquake" | "stores" | "weather" | "flood";
   floodReports?: any[];
   theme?: "dark" | "light";
+  onViewportChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
 // Controller component to smoothly fly to coordinates when requested
@@ -87,6 +88,7 @@ function ViewportTracker({
 
 // Function to generate dynamic Alfamart store markers using L.divIcon
 function createStoreIcon(store: Store, isSelected: boolean = false) {
+  const isFacility = store.id.startsWith("FACILITY:");
   const visualStatus = store.visualStatus || (
     store.status === "PRIORITY_MONITOR" ? "TERDAMPAK" :
     store.status === "MONITOR" ? "PERLU_PERHATIAN" : "NORMAL"
@@ -138,7 +140,7 @@ function createStoreIcon(store: Store, isSelected: boolean = false) {
       }
       <div class="w-8 h-8 rounded-full bg-slate-900 border-2 ${ringColor} ${pulseClass} flex items-center justify-center shadow-lg transition-transform hover:scale-125 z-20">
         <div class="w-5 h-5 rounded-full ${innerColor} flex items-center justify-center text-[9px] font-black text-white tracking-tighter">
-          A
+          ${isFacility ? "F" : "A"}
         </div>
       </div>
       <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${badgeColor} border border-slate-900 z-30"></div>
@@ -289,6 +291,7 @@ export default function MapInner({
   activeLayer = "all",
   floodReports = [],
   theme = "dark",
+  onViewportChange,
 }: MapInnerProps) {
   const isDark = theme === "dark";
   const [currentZoom, setCurrentZoom] = useState(5);
@@ -499,7 +502,10 @@ export default function MapInner({
 
         <ZoomControl position="bottomright" />
         <MapFlyController target={flyToTarget} />
-        <ViewportTracker onZoomChange={setCurrentZoom} onBoundsChange={setMapBounds} />
+        <ViewportTracker onZoomChange={setCurrentZoom} onBoundsChange={(bounds) => {
+          setMapBounds(bounds);
+          onViewportChange?.({ north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() });
+        }} />
 
         {/* 1. DISASTER EPICENTERS & SPARTA MONITORING ZONES (Requirement 30) */}
         {showEarthquakes &&

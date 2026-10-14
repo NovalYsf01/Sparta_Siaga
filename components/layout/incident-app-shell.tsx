@@ -107,8 +107,11 @@ export function IncidentAppShell({
     if (currentPath.startsWith("/alerts")) return "Event & Deteksi Bencana";
     if (currentPath.startsWith("/reports/tracking")) return "Tracking Alur Penanganan";
     if (currentPath.startsWith("/reports/history")) return "Riwayat Laporan Historis";
+    if (currentPath.startsWith("/reports/shared-queue")) return "Shared Queue";
     if (currentPath.startsWith("/reports")) return "Pusat Laporan Kejadian";
     if (currentPath.startsWith("/settings")) return "Pengaturan Sistem";
+    if (currentPath.startsWith("/admin/facilities")) return "Master Fasilitas";
+    if (currentPath.startsWith("/admin/reconciliation")) return "Rekonsiliasi Gempa";
     if (currentPath.startsWith("/admin")) return "Manajemen User & Hak Akses";
     return "Sistem Mitigasi";
   };
@@ -204,6 +207,7 @@ export function IncidentAppShell({
       title: "Pelaporan",
       items: [
         { id: "history", href: "/reports", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
+        { id: "shared-queue", href: "/reports/shared-queue", label: "Shared Queue", icon: UserCog },
         { id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity },
         { id: "history-browse", href: "/reports/history", label: "Riwayat Laporan", icon: History },
       ],
@@ -221,6 +225,8 @@ export function IncidentAppShell({
       title: "Administrasi",
       items: [
         { id: "user-management", href: "/admin/users", label: "Manajemen User & Role", icon: ShieldAlert },
+        { id: "facility-management", href: "/admin/facilities", label: "Master Fasilitas", icon: MapPin },
+        { id: "reconciliation", href: "/admin/reconciliation", label: "Rekonsiliasi Gempa", icon: Activity },
       ],
     });
   }
@@ -573,8 +579,22 @@ export function IncidentAppShell({
           </Link>
 
           <Link
-            href="/monitoring"
+            href="/reports"
             className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
+              pathname.startsWith("/reports")
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
+                : isDark
+                ? "text-slate-400 hover:text-white"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <ClipboardList className="w-5 h-5" />
+            <span>Laporan</span>
+          </Link>
+
+          <Link
+            href="/monitoring"
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors relative min-h-[44px] min-w-[52px] ${
               pathname.startsWith("/monitoring")
                 ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
@@ -584,20 +604,6 @@ export function IncidentAppShell({
           >
             <MapPin className="w-5 h-5" />
             <span>Peta</span>
-          </Link>
-
-          <Link
-            href="/reports"
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors relative min-h-[44px] min-w-[52px] ${
-              pathname === "/reports" || pathname.startsWith("/reports/tracking") || pathname.startsWith("/reports/history")
-                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
-                : isDark
-                ? "text-slate-400 hover:text-white"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <ClipboardList className="w-5 h-5" />
-            <span>Laporan</span>
             {(activeIncidentCount ?? 0) > 0 && (
               <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-500" />
             )}
@@ -614,7 +620,7 @@ export function IncidentAppShell({
             }`}
           >
             <Bell className="w-5 h-5" />
-            <span>Event</span>
+            <span>Notifikasi</span>
           </Link>
 
           <button
@@ -739,16 +745,28 @@ export function IncidentAppShell({
                   </Link>
 
                   {identity?.systemRole === "ADMIN" && (
-                    <Link
-                      href="/admin/users"
-                      onClick={() => setIsMoreSheetOpen(false)}
-                      className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span>Manajemen User & Hak Akses</span>
-                      </div>
-                    </Link>
+                    <div className="space-y-1.5">
+                      <Link
+                        href="/admin/users"
+                        onClick={() => setIsMoreSheetOpen(false)}
+                        className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span>Manajemen User & Hak Akses</span>
+                        </div>
+                      </Link>
+                      <Link
+                        href="/admin/facilities"
+                        onClick={() => setIsMoreSheetOpen(false)}
+                        className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                          <span>Master Fasilitas</span>
+                        </div>
+                      </Link>
+                    </div>
                   )}
                 </div>
               </div>

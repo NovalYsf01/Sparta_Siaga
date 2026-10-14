@@ -32,6 +32,7 @@ interface MapViewProps {
   radarTileUrl?: string;
   activeLayer?: "all" | "earthquake" | "stores" | "weather" | "flood";
   theme?: "dark" | "light";
+  onViewportChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
 export function MapView(props: MapViewProps) {

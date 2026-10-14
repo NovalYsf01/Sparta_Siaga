@@ -13,9 +13,15 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     earthquakeProvenance: (row.earthquake_provenance as string) ?? undefined,
     tkpType: (row.tkp_type as IncidentRecord["tkpType"]) ?? undefined,
     storeId: row.store_id as string,
-    storeName: row.store_name as string,
+    storeName: (row.location_name_snapshot ?? row.store_name ?? "Lokasi tanpa nama") as string,
     branch: row.branch as string,
     locationCity: row.location_city as string,
+    locationKind: (row.location_kind as IncidentRecord["locationKind"]) ?? undefined,
+    locationId: (row.location_id as string) ?? undefined,
+    locationCodeSnapshot: (row.location_code_snapshot as string) ?? undefined,
+    locationNameSnapshot: (row.location_name_snapshot as string) ?? undefined,
+    primaryPicUserId: (row.primary_pic_user_id as string) ?? undefined,
+    primaryPicClaimedAt: row.primary_pic_claimed_at ? String(row.primary_pic_claimed_at) : undefined,
     status: row.status as IncidentRecord["status"],
     progress: row.progress as number,
     disasterMetadata: (row.disaster_metadata as IncidentRecord["disasterMetadata"]) ?? undefined,
@@ -186,8 +192,9 @@ export async function dbCreateIncident(
       status, progress,
       disaster_metadata, affected_stores, affected_store_count, danger_store_count,
       verification, maintenance_ticket, field_photos,
-      timeline, created_at, updated_at, closed_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+      timeline, created_at, updated_at, closed_at,
+      canonical_event_id, location_kind, location_id
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
     ON CONFLICT (id) DO UPDATE SET
       status                   = EXCLUDED.status,
       progress                 = EXCLUDED.progress,
@@ -229,6 +236,9 @@ export async function dbCreateIncident(
       inc.createdAt ?? new Date().toISOString(),
       inc.updatedAt ?? new Date().toISOString(),
       inc.closedAt ?? null,
+      inc.disasterType === "earthquake" ? inc.earthquakeEventId ?? null : null,
+      inc.disasterType === "earthquake" && inc.storeId ? "STORE" : null,
+      inc.disasterType === "earthquake" ? inc.storeId ?? null : null,
     ]
   );
   return rowToIncident(rows[0]);
@@ -238,6 +248,7 @@ export async function dbCreateIncident(
       'idx_incidents_unique_auto_eq_store',
       'idx_incidents_unique_auto_eq_branch',
       'uq_incident_event_store_v1',
+      'idx_incidents_unique_earthquake_location',
     ];
     if (pgError.code === '23505' && autoConstraints.includes(pgError.constraint || '')) {
       console.warn(`[SPARTA SIAGA] Race condition caught: event ${inc.earthquakeEventId} at store ${inc.storeId}. Returning existing record.`);

@@ -20,9 +20,9 @@ export const CANONICAL_CORRELATION_THRESHOLDS = {
   bmkgMaxCoordDiffDeg: 0.15,
 
   // USGS vs BMKG matching (Requirement 6):
-  usgsMaxTimeDeltaMinutes: 15, // Max 15 minutes occurred_at delta
-  usgsMaxDistanceKm: 100, // Max 100 km epicenter delta
-  usgsMaxMagnitudeDiff: 0.6, // Max 0.6 magnitude scale discrepancy
+  usgsMaxTimeDeltaMinutes: 1.5,
+  usgsMaxDistanceKm: 25,
+  usgsMaxMagnitudeDiff: 0.3,
 };
 
 /**
@@ -48,20 +48,12 @@ export function correlateEarthquakes(rawList: Earthquake[]): Earthquake[] {
       if (eq.canonicalEventKey && existing.canonicalEventKey && eq.canonicalEventKey === existing.canonicalEventKey) {
         return true;
       }
-      // 2. BMKG vs BMKG matching
-      if (eq.source === "BMKG" && existing.source === "BMKG") {
-        const timeDiff = Math.abs(eq.timestamp - existing.timestamp);
-        const latDiff = Math.abs(eq.latitude - existing.latitude);
-        const lngDiff = Math.abs(eq.longitude - existing.longitude);
-        if (
-          timeDiff <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxTimeDeltaMs &&
-          latDiff <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxCoordDiffDeg &&
-          lngDiff <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxCoordDiffDeg
-        ) {
-          return true;
-        }
-      }
-      // 3. USGS vs BMKG matching
+      // Provider-specific IDs are authoritative within one provider. Nearby
+      // same-provider events may be aftershocks and must remain independent.
+      if (eq.source === existing.source) return false;
+
+      // Cross-provider matching is deliberately narrow. A wider operational
+      // window is useful for review, but is not sufficient evidence to merge.
       const isCrossProvider =
         (eq.source === "USGS" && existing.source === "BMKG") ||
         (eq.source === "BMKG" && existing.source === "USGS");

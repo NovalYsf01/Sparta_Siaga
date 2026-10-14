@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Activity } from "lucide-react";
+import { Activity, Building2, Clock3, Store, UserRoundX } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 import { IncidentKpiRow } from "@/components/dashboard/incident-kpi-row";
 import { ActiveIncidentsTable } from "@/components/dashboard/active-incidents-table";
@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [queue, setQueue] = React.useState<Array<{ id: string; waiting_seconds: string; primary_pic_user_id: string | null }>>([]);
   const {
     incidentStats,
     selectedCategory,
@@ -23,10 +24,28 @@ export default function DashboardPage() {
     theme
   } = useSiaga();
 
+  React.useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/incidents/shared-queue", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => response.ok ? response.json() : { data: [] })
+      .then((payload) => setQueue(payload.data || []))
+      .catch((error) => { if (error instanceof Error && error.name !== "AbortError") setQueue([]); });
+    return () => controller.abort();
+  }, []);
+
+  const storeReports = activeIncidents.filter((incident) => incident.locationKind !== "FACILITY").length;
+  const facilityReports = activeIncidents.filter((incident) => incident.locationKind === "FACILITY").length;
+  const unassigned = queue.filter((item) => !item.primary_pic_user_id).length;
+  const oldestWaiting = queue.length ? Math.max(...queue.map((item) => Number(item.waiting_seconds))) : 0;
+  const oldestLabel = oldestWaiting >= 86400 ? `${Math.floor(oldestWaiting / 86400)} hari` : oldestWaiting >= 3600 ? `${Math.floor(oldestWaiting / 3600)} jam` : `${Math.floor(oldestWaiting / 60)} menit`;
+
   return (
     <div className="w-full">
       {/* Mobile view only on small screens */}
       <div className="block lg:hidden">
+        <section className="grid grid-cols-2 gap-2 px-4 pt-4" aria-label="Ringkasan operasional mobile">
+          {[{ label: "Toko", value: storeReports }, { label: "Fasilitas", value: facilityReports }, { label: "Shared Queue", value: queue.length }, { label: "Tanpa PIC", value: unassigned }].map((item) => <article key={item.label} className="rounded-lg border border-slate-200 bg-white p-3"><p className="text-[11px] font-semibold text-slate-500">{item.label}</p><p className="mt-1 text-xl font-bold text-slate-950">{item.value}</p></article>)}
+        </section>
         <MobileIncidentHome
           incidents={activeIncidents}
           onSelectIncident={handleSelectIncidentForDetail}
@@ -57,6 +76,10 @@ export default function DashboardPage() {
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
         />
+
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-5" aria-label="Ringkasan lokasi dan PIC">
+          {[{ label: "Laporan Toko", value: storeReports, icon: Store }, { label: "Laporan Fasilitas", value: facilityReports, icon: Building2 }, { label: "Shared Queue", value: queue.length, icon: Activity }, { label: "PIC belum ditetapkan", value: unassigned, icon: UserRoundX }, { label: "Tertua menunggu", value: oldestLabel, icon: Clock3 }].map((item) => <article key={item.label} className="rounded-lg border border-slate-200 bg-white p-4"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-slate-500">{item.label}</p><item.icon className="h-4 w-4 text-[#1D5AA6]" /></div><p className="mt-3 text-2xl font-bold tracking-tight text-slate-950">{item.value}</p></article>)}
+        </section>
 
         {/* MAIN HERO: ACTIVE SITUATION PANEL (No Map) */}
         <div className="flex flex-col lg:flex-row gap-6">

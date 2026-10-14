@@ -13,7 +13,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "SPARTA Siaga — Monitoring & Mitigasi Bencana Alfamart",
   description: "Pusat Intelijen Mitigasi Bencana & Pemantauan Operasional Cabang PT Sumber Alfaria Trijaya Tbk",
-  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -38,6 +37,7 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <link
           rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"

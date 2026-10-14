@@ -5,6 +5,8 @@ import { calculateHaversineDistance, calculateSpartaMonitoringZone } from '@/lib
 import { getDbPool } from '@/lib/db';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
+import { dbUpsertEarthquakeEvent } from '@/lib/earthquake-db';
+import { ensureEarthquakeReport } from '@/lib/earthquake-report-service';
 import { 
   hasEventAlreadyBeenProcessed,
   isNotificationCooldownActive,
@@ -75,6 +77,14 @@ export async function POST(request: Request) {
        FROM stores LIMIT 25000`
     );
     const stores: Store[] = storeRes.rows;
+    const facilityRes = await pool.query(
+      `SELECT id::text, code, name, facility_type, branch_id, latitude, longitude
+         FROM facilities
+        WHERE operational_status = 'ACTIVE'
+          AND auto_report_enabled = TRUE
+          AND branch_id IS NOT NULL
+          AND mapping_verified_at IS NOT NULL`
+    );
 
     if (stores.length === 0) {
       return NextResponse.json({
@@ -102,11 +112,13 @@ export async function POST(request: Request) {
 
     if (isEligibleForAlert && disasterFeed.activeEarthquakes && disasterFeed.activeEarthquakes.length > 0) {
       for (const eq of disasterFeed.activeEarthquakes) {
+        await dbUpsertEarthquakeEvent(eq);
         // Calculate SPARTA zones
         const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(eq.magnitude, eq.depthKm);
 
       // Collect affected stores
       const affectedByBranch = new Map<string, AffectedStoreSummary[]>();
+      const affectedFacilitiesByBranch = new Map<string, AffectedStoreSummary[]>();
 
       for (const st of stores) {
         const dist = calculateHaversineDistance(eq.latitude, eq.longitude, st.latitude, st.longitude);
@@ -127,6 +139,68 @@ export async function POST(request: Request) {
           }
           affectedByBranch.get(st.cabang)!.push(summary);
         }
+      }
+
+      for (const facility of facilityRes.rows) {
+        const distanceKm = calculateHaversineDistance(
+          eq.latitude,
+          eq.longitude,
+          Number(facility.latitude),
+          Number(facility.longitude)
+        );
+        if (distanceKm > monitoringRadiusKm) continue;
+        const facilitySummary: AffectedStoreSummary = {
+          kode_toko: facility.code,
+          nama_toko: facility.name,
+          cabang: facility.branch_id,
+          distance_km: Math.round(distanceKm * 10) / 10,
+          status: distanceKm <= priorityRadiusKm ? 'PRIORITY_MONITOR' : 'MONITOR',
+          fr_type: facility.facility_type,
+        };
+        const branchFacilities = affectedFacilitiesByBranch.get(facility.branch_id) ?? [];
+        branchFacilities.push(facilitySummary);
+        affectedFacilitiesByBranch.set(facility.branch_id, branchFacilities);
+        const reportHash = crypto
+          .createHash('sha256')
+          .update(`${eq.id}:FACILITY:${facility.id}`)
+          .digest('hex')
+          .slice(0, 16)
+          .toUpperCase();
+        await ensureEarthquakeReport({
+          reportId: `LAP-EQ-FAC-${reportHash}`,
+          canonicalEventId: eq.id,
+          eventOccurredAt: new Date(eq.timestamp),
+          source: eq.source,
+          location: {
+            kind: 'FACILITY',
+            id: facility.id,
+            code: facility.code,
+            name: facility.name,
+            type: facility.facility_type,
+            branch: facility.branch_id,
+            latitude: Number(facility.latitude),
+            longitude: Number(facility.longitude),
+          },
+        });
+      }
+
+      for (const [branch, facilities] of affectedFacilitiesByBranch) {
+        facilities.sort((a, b) => a.distance_km - b.distance_km);
+        const priorityCount = facilities.filter((item) => item.status === 'PRIORITY_MONITOR').length;
+        const log = await recordNotificationLog({
+          disasterId: eq.id,
+          canonicalEventId: eq.id,
+          disasterType: 'earthquake',
+          channel: 'pwa_only',
+          branch,
+          recipientGroup: 'BES',
+          category: 'ASSIGNMENT',
+          recipientContact: `in-app://bes/${branch.toLowerCase().replace(/\s+/g, '-')}`,
+          title: `Pemeriksaan fasilitas · Gempa M ${eq.magnitude}`,
+          message: `${facilities.length} fasilitas perlu diperiksa; ${priorityCount} berada di Zona Prioritas Pantau. Buka Shared Queue untuk mengambil PIC.`,
+          affectedStores: facilities,
+        });
+        dispatchedLogs.push(log);
       }
 
       // If simulated or actually has affected stores in priority monitor
