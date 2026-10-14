@@ -6,7 +6,6 @@ import { getDbPool } from "@/lib/db";
 export async function GET(request: Request) {
   const user = await getSessionUser(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role === "bms") return NextResponse.json({ data: [] });
 
   const url = new URL(request.url);
   const values: unknown[] = [];

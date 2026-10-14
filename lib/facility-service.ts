@@ -93,21 +93,24 @@ export async function listSharedQueue(user: {
   branch: string | null;
 }) {
   const values: unknown[] = [];
-  const where = ["closed_at IS NULL", "status NOT IN ('closed', 'resolved', 'archived')"];
+  const where = ["i.closed_at IS NULL", "i.status NOT IN ('closed', 'resolved', 'archived')"];
   if (user.systemRole !== "ADMIN" && user.scope !== "HO") {
     values.push(user.branch);
-    where.push(`branch = $${values.length}`);
+    where.push(`i.branch = $${values.length}`);
   }
-  if (user.role === "bms") where.push("COALESCE(location_kind, 'STORE') = 'STORE'");
-  if (user.role === "bes") where.push("location_kind = 'FACILITY'");
+  if (user.role === "bms") where.push("COALESCE(i.location_kind, 'STORE') = 'STORE'");
+  if (user.role === "bes") where.push("i.location_kind = 'FACILITY'");
   const { rows } = await getDbPool().query(
-    `SELECT id, canonical_event_id, location_kind, location_id,
-            COALESCE(location_name_snapshot, store_name) AS location_name,
-            COALESCE(branch_snapshot, branch) AS branch,
-            status, progress, primary_pic_user_id, primary_pic_claimed_at, created_at,
-            EXTRACT(EPOCH FROM (NOW() - created_at))::bigint AS waiting_seconds
-       FROM incidents WHERE ${where.join(" AND ")}
-      ORDER BY created_at ASC`,
+    `SELECT i.id, i.canonical_event_id, i.location_kind, i.location_id,
+            COALESCE(i.location_name_snapshot, i.store_name) AS location_name,
+            COALESCE(i.branch_snapshot, i.branch) AS branch,
+            i.status, i.progress, i.primary_pic_user_id, i.primary_pic_claimed_at, i.created_at,
+            EXTRACT(EPOCH FROM (NOW() - i.created_at))::bigint AS waiting_seconds,
+            u.name AS primary_pic_name
+       FROM incidents i
+       LEFT JOIN users u ON u.id = i.primary_pic_user_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY i.created_at ASC`,
     values
   );
   return rows;

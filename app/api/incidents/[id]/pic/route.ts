@@ -4,7 +4,7 @@ import { getSessionUser } from "@/lib/auth";
 import { changeIncidentPic, claimIncidentPic, getIncidentPicDetails } from "@/lib/incident-assignment";
 
 function canManage(user: Awaited<ReturnType<typeof getSessionUser>>) {
-  return user?.systemRole === "ADMIN" || user?.role === "bm";
+  return user?.systemRole === "ADMIN" || user?.role === "bm" || (user as { businessRole?: string })?.businessRole === "bm";
 }
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {

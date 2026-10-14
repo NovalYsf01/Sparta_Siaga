@@ -66,7 +66,10 @@ export async function POST(request: Request) {
 
     if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
       return NextResponse.json(
-        { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
+        {
+          error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only).",
+          code: "HO_READ_ONLY",
+        },
         { status: 403 }
       );
     }
@@ -89,6 +92,39 @@ export async function POST(request: Request) {
       );
     }
 
+    const isAdmin = sessionUser.systemRole === "ADMIN";
+    const isHO = sessionUser.scope === "HO" && !isAdmin;
+    const r = (sessionUser.role || "").toLowerCase();
+    const isBMM = !isAdmin && !isHO && r === "bm";
+    const isBES = !isAdmin && !isHO && r === "bes";
+    const isBMS = !isAdmin && !isHO && !isBMM && !isBES;
+
+    const isFacilityReport =
+      body.locationKind === "FACILITY" ||
+      body.tkpType === "dc" ||
+      (body.tkpType as string) === "DC" ||
+      (body.storeId && (body.storeId.startsWith("FACILITY:") || body.storeId.startsWith("FAC-")));
+
+    if (isBMS && isFacilityReport) {
+      return NextResponse.json(
+        {
+          error: "Akses ditolak: Petugas BMS tidak berwenang membuat laporan untuk Fasilitas/DC.",
+          code: "BMS_FACILITY_REPORT_FORBIDDEN",
+        },
+        { status: 403 }
+      );
+    }
+
+    if (isBES && !isFacilityReport) {
+      return NextResponse.json(
+        {
+          error: "Akses ditolak: Petugas BES tidak berwenang membuat laporan untuk Toko.",
+          code: "BES_STORE_REPORT_FORBIDDEN",
+        },
+        { status: 403 }
+      );
+    }
+
     if (body.disasterType === "strong_wind") {
       return NextResponse.json(
         {
@@ -99,13 +135,18 @@ export async function POST(request: Request) {
       );
     }
 
-    if (sessionUser.scope !== "HO") {
+    if (sessionUser.scope !== "HO" && !isAdmin) {
       if (body.branch.trim().toLowerCase() !== (sessionUser.branch || "").trim().toLowerCase()) {
         return NextResponse.json(
           { error: "Unauthorized: Tidak dapat membuat laporan untuk cabang lain" },
           { status: 403 }
         );
       }
+    }
+
+    // Default dates if omitted
+    if (!body.date) {
+      body.date = body.createdAt || new Date().toISOString();
     }
 
     const created = await dbCreateIncident(body);

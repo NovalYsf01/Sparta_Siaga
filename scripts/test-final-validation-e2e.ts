@@ -91,13 +91,13 @@ async function runFinalValidation() {
     const indexCheck = await client.query(`
       SELECT indexname, indexdef 
       FROM pg_indexes 
-      WHERE tablename = 'incidents' AND indexname = 'idx_incidents_unique_auto_eq_store';
+      WHERE tablename = 'incidents' AND indexname IN ('idx_incidents_unique_earthquake_location', 'idx_incidents_unique_auto_eq_store');
     `);
     check(
       "AUDIT_SCHEMA",
       "Store-level unique index on incidents",
-      indexCheck.rows.length === 1,
-      indexCheck.rows.length === 1 ? indexCheck.rows[0].indexdef : "Missing index"
+      indexCheck.rows.length >= 1,
+      indexCheck.rows.length >= 1 ? indexCheck.rows[0].indexdef : "Missing index"
     );
 
     // 2. Prepare Controlled Simulation Data

@@ -55,32 +55,36 @@ export function ManualIncidentModal({
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchDiagnostic, setSearchDiagnostic] = useState<string | null>(null);
   const [selectedStoreObj, setSelectedStoreObj] = useState<any>(null);
 
   useEffect(() => {
-    if (!searchQuery.trim() || tkpType === "DC") {
+    if (!searchQuery.trim()) {
       setSearchResults([]);
       setSearchError(null);
+      setSearchDiagnostic(null);
       return;
     }
 
     const delay = setTimeout(async () => {
       setIsSearching(true);
       setSearchError(null);
+      setSearchDiagnostic(null);
       try {
+        const typeParam = tkpType === "DC" ? "FACILITY" : "TOKO";
         const res = await fetch(
-          `/api/stores/search?q=${encodeURIComponent(searchQuery.trim())}&type=TOKO&limit=10`
+          `/api/stores/search?q=${encodeURIComponent(searchQuery.trim())}&type=${typeParam}&limit=10`
         );
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
-          const data = await res.json();
           setSearchResults(data.data || []);
+          setSearchDiagnostic(data.message || null);
         } else {
-          const errData = await res.json().catch(() => ({}));
-          setSearchError(errData.error || "Gagal mencari data toko");
+          setSearchError(data.error || (tkpType === "DC" ? "Gagal mencari data fasilitas" : "Gagal mencari data toko"));
           setSearchResults([]);
         }
       } catch (err) {
-        console.error("Failed to search stores:", err);
+        console.error("Failed to search locations:", err);
         setSearchError("Gagal menghubungi server pencarian");
         setSearchResults([]);
       } finally {
@@ -126,7 +130,15 @@ export function ManualIncidentModal({
 
   useEffect(() => {
     if (isOpen) {
-      if (!isHOScope && identity?.branch) {
+      const userRole = (identity?.businessRole || identity?.role || activeRole || "").toLowerCase();
+      if (userRole === "bes") {
+        setTkpType("DC");
+        setStoreId("");
+        setSelectedStoreObj(null);
+        setSearchQuery("");
+        setSearchResults([]);
+      } else if (!isHOScope && identity?.branch) {
+        setTkpType("Toko");
         const assignedStore = rawStores.find(
           (s) => s.cabang?.toLowerCase() === identity.branch?.toLowerCase()
         );
@@ -140,13 +152,14 @@ export function ManualIncidentModal({
           setSearchQuery("");
         }
       } else if (isHOScope) {
+        setTkpType("Toko");
         setStoreId("");
         setSelectedStoreObj(null);
         setSearchQuery("");
       }
       setStep(1);
     }
-  }, [isOpen, isHOScope, identity, rawStores]);
+  }, [isOpen, isHOScope, identity, rawStores, activeRole]);
 
   const toggleCategory = (cat: string) => {
     setCategories((prev) =>
@@ -156,10 +169,6 @@ export function ManualIncidentModal({
 
   const handleNext = () => {
     if (step === 1) {
-      if (tkpType === "DC") {
-        alert("Master data Gudang / DC belum tersedia di database. Silakan pilih opsi Gerai / Toko.");
-        return;
-      }
       if (!storeId && !selectedStoreObj) {
         alert("Pilih lokasi terlebih dahulu!");
         return;
@@ -201,6 +210,12 @@ export function ManualIncidentModal({
       ? activeEarthquakes.find((e) => (e.canonicalEventKey || e.id) === selectedEarthquakeEventId)
       : undefined;
 
+    const resolvedLocationKind = selectedStoreObj?.locationKind || (tkpType === "DC" ? "FACILITY" : "STORE");
+    const resolvedLocationId = selectedStoreObj?.locationId || (resolvedLocationKind === "FACILITY" ? (selectedStoreObj?.id || storeId).replace(/^FACILITY:/, "") : storeId);
+    const resolvedLocationCode = selectedStoreObj?.kode_toko || storeId;
+    const resolvedLocationName = selectedStoreObj?.nama_toko || (tkpType === "DC" ? "Fasilitas Cabang" : "Lokasi Tidak Diketahui");
+    const resolvedLocationType = selectedStoreObj?.facilityType || (tkpType === "DC" ? "DC" : "STORE");
+
     onConfirm({
       disasterType,
       reportOrigin: "manual",
@@ -219,9 +234,15 @@ export function ManualIncidentModal({
         : undefined,
       tkpType,
       storeId,
-      storeName: store?.nama_toko || (tkpType === "DC" ? "Gudang Utama" : "Lokasi Tidak Diketahui"),
-      branch: store?.cabang || "Unknown",
+      storeName: resolvedLocationName,
+      branch: store?.cabang || identity?.branch || "Unknown",
       locationCity: store?.kab_kota || "Unknown",
+      locationKind: resolvedLocationKind,
+      locationId: resolvedLocationId,
+      locationCodeSnapshot: resolvedLocationCode,
+      locationNameSnapshot: resolvedLocationName,
+      locationTypeSnapshot: resolvedLocationType,
+      facilityType: selectedStoreObj?.facilityType,
       categories,
       severity,
       operationalStatus,
@@ -246,6 +267,12 @@ export function ManualIncidentModal({
   };
 
   if (!isOpen) return null;
+
+  const userRole = (identity?.businessRole || identity?.role || activeRole || "").toLowerCase();
+  const isSystemAdmin = identity?.systemRole === "ADMIN";
+  const isBMMRole = !isSystemAdmin && userRole === "bm";
+  const isBESRole = !isSystemAdmin && userRole === "bes";
+  const isBMSRole = !isSystemAdmin && !isBMMRole && !isBESRole;
 
   const store = selectedStoreObj || rawStores.find(s => s.kode_toko === storeId || s.id === storeId);
 
@@ -337,164 +364,192 @@ export function ManualIncidentModal({
                   <Building className="w-4 h-4" /> 2. Lokasi TKP
                 </h4>
                 
+                {/* Role-locked TKP Selector */}
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   <button 
                     type="button"
+                    disabled={isBESRole}
                     onClick={() => {
+                      if (isBESRole) return;
                       setTkpType("Toko");
+                      setStoreId("");
+                      setSelectedStoreObj(null);
                       setSearchQuery("");
                       setSearchResults([]);
                     }}
-                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${tkpType === "Toko" ? "border-[#1D5AA6] bg-[#1D5AA6]/5 text-[#1D5AA6]" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"}`}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+                      tkpType === "Toko"
+                        ? "border-[#1D5AA6] bg-[#1D5AA6]/5 text-[#1D5AA6]"
+                        : isBESRole
+                        ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed opacity-60"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
                   >
                     <Building className="w-6 h-6 mb-2" />
                     <span className="font-bold text-sm">Gerai / Toko</span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-0.5">
+                      {isBESRole ? "Khusus Petugas BMS" : "Operasional BMS"}
+                    </span>
                   </button>
                   <button 
                     type="button"
+                    disabled={isBMSRole}
                     onClick={() => {
+                      if (isBMSRole) return;
                       setTkpType("DC");
                       setStoreId("");
                       setSelectedStoreObj(null);
                       setSearchQuery("");
                       setSearchResults([]);
                     }}
-                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${tkpType === "DC" ? "border-[#1D5AA6] bg-[#1D5AA6]/5 text-[#1D5AA6]" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"}`}
+                    className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+                      tkpType === "DC"
+                        ? "border-[#1D5AA6] bg-[#1D5AA6]/5 text-[#1D5AA6]"
+                        : isBMSRole
+                        ? "border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed opacity-60"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
                   >
                     <Building className="w-6 h-6 mb-2" />
-                    <span className="font-bold text-sm">Gudang / DC</span>
-                    <span className="text-[10px] text-amber-600 font-semibold mt-0.5">Master Belum Ada</span>
+                    <span className="font-bold text-sm">Fasilitas / DC</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+                      {isBMSRole ? "Khusus Petugas BES" : "DC, Depo, Gudang (BES)"}
+                    </span>
                   </button>
                 </div>
 
-                {tkpType === "DC" ? (
-                  <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2">
-                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
-                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                      <span>Master Data Gudang / DC Belum Tersedia</span>
-                    </div>
-                    <p className="text-[11px] text-amber-800 leading-relaxed">
-                      Database SPARTA SIAGA saat ini hanya memuat master data operasional Gerai / Toko resmi. Master data lokasi Gudang / DC belum tersedia di sistem.
-                    </p>
-                    <div className="pt-1">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 mb-1">
+                    {tkpType === "DC" ? "Cari & Pilih Fasilitas / Gudang / DC:" : "Cari & Pilih Lokasi Gerai / Toko:"}
+                  </label>
+
+                  {selectedStoreObj ? (
+                    <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in">
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs text-blue-950 truncate flex items-center gap-1.5">
+                          <span className="font-mono bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-[11px]">
+                            {selectedStoreObj.kode_toko}
+                          </span>
+                          {selectedStoreObj.locationKind === "FACILITY" && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">
+                              {selectedStoreObj.facilityType || "FASILITAS"}
+                            </span>
+                          )}
+                          <span className="truncate">{selectedStoreObj.nama_toko}</span>
+                        </div>
+                        <div className="text-[11px] text-blue-800 truncate mt-1">
+                          Cabang: <span className="font-semibold">{selectedStoreObj.cabang || "Belum Mapping"}</span> • {selectedStoreObj.alamat}
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
-                          setTkpType("Toko");
+                          setSelectedStoreObj(null);
+                          setStoreId("");
                           setSearchQuery("");
                           setSearchResults([]);
                         }}
-                        className="px-3 py-1.5 bg-[#1D5AA6] text-white rounded-lg text-xs font-bold hover:bg-[#154684] transition-colors"
+                        className="shrink-0 px-3 py-1 text-xs font-bold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors shadow-2xs"
                       >
-                        Beralih ke Pelaporan Gerai / Toko
+                        Ganti {tkpType === "DC" ? "Fasilitas" : "Toko"}
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                      Cari & Pilih Lokasi Gerai / Toko:
-                    </label>
-
-                    {selectedStoreObj ? (
-                      <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between gap-3 animate-in fade-in">
-                        <div className="min-w-0">
-                          <div className="font-bold text-xs text-blue-950 truncate">
-                            <span className="font-mono bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-[11px] mr-1.5">
-                              {selectedStoreObj.kode_toko}
-                            </span>
-                            {selectedStoreObj.nama_toko}
-                          </div>
-                          <div className="text-[11px] text-blue-800 truncate mt-1">
-                            Cabang: <span className="font-semibold">{selectedStoreObj.cabang}</span> • {selectedStoreObj.alamat}
-                          </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        placeholder={tkpType === "DC" ? "Ketik kode atau nama fasilitas / DC / gudang..." : "Ketik kode, nama toko, atau alamat gerai..."}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#1D5AA6] bg-slate-50"
+                      />
+                      {isSearching && (
+                        <div className="absolute right-3 top-2.5 text-xs text-blue-600 font-semibold flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                          <span>Mencari...</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedStoreObj(null);
-                            setStoreId("");
-                            setSearchQuery("");
-                            setSearchResults([]);
-                          }}
-                          className="shrink-0 px-3 py-1 text-xs font-bold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors shadow-2xs"
-                        >
-                          Ganti Toko
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="Ketik kode, nama toko, atau alamat gerai..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#1D5AA6] bg-slate-50"
-                        />
-                        {isSearching && (
-                          <div className="absolute right-3 top-2.5 text-xs text-blue-600 font-semibold flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
-                            <span>Mencari...</span>
-                          </div>
-                        )}
+                      )}
 
-                        {/* Dropdown Results / Feedback States */}
-                        {searchQuery.trim().length >= 1 && (
-                          <div className="absolute z-20 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
-                            {isSearching ? (
-                              <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
-                                <span>Mencari lokasi toko di database...</span>
-                              </div>
-                            ) : searchError ? (
-                              <div className="p-4 text-center text-xs text-red-600 bg-red-50/50">
-                                <p className="font-semibold">{searchError}</p>
-                                <p className="text-[10px] text-red-400 mt-0.5">Silakan periksa kata kunci Anda.</p>
-                              </div>
-                            ) : searchResults.length > 0 ? (
-                              <ul>
-                                {searchResults.map((s) => (
-                                  <li
-                                    key={s.id || s.kode_toko}
-                                    onClick={() => {
-                                      setStoreId(s.id || s.kode_toko);
-                                      setSelectedStoreObj(s);
-                                      setSearchQuery("");
-                                      setSearchResults([]);
-                                    }}
-                                    className="p-3 text-sm text-slate-700 hover:bg-blue-50/60 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
-                                  >
-                                    <div className="font-bold text-xs text-slate-900">
-                                      <span className="font-mono text-blue-600 bg-blue-50 px-1 py-0.5 rounded text-[11px] mr-1.5">
-                                        {s.kode_toko}
+                      {/* Dropdown Results / Feedback States */}
+                      {searchQuery.trim().length >= 1 && (
+                        <div className="absolute z-20 w-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
+                          {isSearching ? (
+                            <div className="p-4 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                              <span>Mencari lokasi di database...</span>
+                            </div>
+                          ) : searchError ? (
+                            <div className="p-4 text-center text-xs text-red-600 bg-red-50/50">
+                              <p className="font-semibold">{searchError}</p>
+                              <p className="text-[10px] text-red-400 mt-0.5">Silakan periksa kata kunci Anda.</p>
+                            </div>
+                          ) : searchResults.length > 0 ? (
+                            <ul>
+                              {searchResults.map((s) => (
+                                <li
+                                  key={s.id || s.kode_toko}
+                                  onClick={() => {
+                                    setStoreId(s.id || s.kode_toko);
+                                    setSelectedStoreObj(s);
+                                    setSearchQuery("");
+                                    setSearchResults([]);
+                                  }}
+                                  className="p-3 text-sm text-slate-700 hover:bg-blue-50/60 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
+                                >
+                                  <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                                    <span className="font-mono text-blue-600 bg-blue-50 px-1 py-0.5 rounded text-[11px]">
+                                      {s.kode_toko}
+                                    </span>
+                                    {s.locationKind === "FACILITY" && (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">
+                                        {s.facilityType || "FASILITAS"}
                                       </span>
-                                      {s.nama_toko}
-                                    </div>
-                                    <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                                      Cabang: <span className="font-medium text-slate-700">{s.cabang}</span> • {s.alamat}
-                                    </div>
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div className="p-4 text-center text-xs text-slate-500">
-                                <p className="font-bold text-slate-700">Tidak ada lokasi ditemukan</p>
-                                <p className="text-[11px] text-slate-400 mt-1">
-                                  Kata kunci: <span className="font-medium text-slate-600">&quot;{searchQuery}&quot;</span>
-                                </p>
-                                {!isHOScope && identity?.branch && (
-                                  <p className="text-[10px] text-amber-700 bg-amber-50 rounded-lg p-1.5 mt-2">
-                                    Pencarian dibatasi pada wilayah cabang Anda: <span className="font-bold">{identity.branch}</span>
+                                    )}
+                                    <span className="truncate">{s.nama_toko}</span>
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                    Cabang: <span className="font-medium text-slate-700">{s.cabang || "Belum Mapping"}</span> • {s.alamat}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="p-4 text-center text-xs">
+                              {tkpType === "DC" ? (
+                                <div className="space-y-2 text-left">
+                                  <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
+                                    <Building className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span>Fasilitas Tidak Ditemukan</span>
+                                  </div>
+                                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs space-y-1">
+                                    <p className="font-semibold">
+                                      {searchDiagnostic || `Belum ada fasilitas yang terhubung dengan cabang Anda (${identity?.branch || "Cabang"}). Hubungi Admin untuk memverifikasi master fasilitas.`}
+                                    </p>
+                                    <p className="text-[11px] text-amber-700/90">
+                                      Kata kunci: &quot;{searchQuery}&quot;. Seluruh 67 fasilitas nasional dikelola dan dipetakan oleh Administrator.
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="font-bold text-slate-700">Tidak ada gerai/toko ditemukan</p>
+                                  <p className="text-[11px] text-slate-400 mt-1">
+                                    Kata kunci: <span className="font-medium text-slate-600">&quot;{searchQuery}&quot;</span>
                                   </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                                  {!isHOScope && identity?.branch && (
+                                    <p className="text-[10px] text-blue-700 bg-blue-50 rounded-lg p-2 mt-2">
+                                      Pencarian dibatasi pada gerai toko cabang: <span className="font-bold">{identity.branch}</span>
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">

@@ -39,8 +39,8 @@ export function canActOnReport(
   user: UserContext,
   report: IncidentRecord
 ): boolean {
-  if (user.systemRole === "ADMIN") return true; // Admin SPARTA SIAGA full access
   if (user.scope === "HO") return false; // HO strictly read-only
+  if (user.systemRole === "ADMIN") return true; // Admin SPARTA SIAGA full access
 
   const userBranch = user.branch ? user.branch.trim().toLowerCase() : "";
   const reportBranch = report.branch ? report.branch.trim().toLowerCase() : "";

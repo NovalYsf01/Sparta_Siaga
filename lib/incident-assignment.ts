@@ -68,7 +68,7 @@ export async function changeIncidentPic(input: {
     );
     if (!locked.rows[0]) throw new Error("INCIDENT_NOT_FOUND");
     const previous = locked.rows[0].primary_pic_user_id;
-    if (!previous) throw new Error("PIC_NOT_ASSIGNED");
+    if (!previous && !input.nextUserId) throw new Error("PIC_NOT_ASSIGNED");
     if (input.nextUserId) {
       const requiredRole = locked.rows[0].location_kind === "FACILITY" ? "bes" : "bms";
       const eligible = await client.query(
@@ -85,11 +85,12 @@ export async function changeIncidentPic(input: {
          updated_at = NOW() WHERE id = $1`,
       [input.incidentId, input.nextUserId]
     );
+    const action = !previous ? "ASSIGN" : input.nextUserId ? "TRANSFER" : "RELEASE";
     await client.query(
       `INSERT INTO incident_pic_history
         (incident_id, action, from_user_id, to_user_id, actor_user_id, reason)
        VALUES ($1, $2, $3, $4, $5, $6)`,
-      [input.incidentId, input.nextUserId ? "TRANSFER" : "RELEASE", previous,
+      [input.incidentId, action, previous,
         input.nextUserId, input.actorUserId, input.reason ?? null]
     );
     await client.query("COMMIT");

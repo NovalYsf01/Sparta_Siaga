@@ -66,36 +66,50 @@ export default function LoginPage() {
           <h2 className="text-lg font-bold text-slate-800 mb-6 text-center">Masuk ke Sistem</h2>
           
           {error && (
-            <div className="mb-6 p-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium border border-red-100 flex items-start gap-2">
-              <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>{error}</span>
+            <div
+              role="alert"
+              aria-live="polite"
+              data-testid="login-error-alert"
+              className="mb-6 p-3.5 bg-red-50 text-red-800 rounded-xl text-xs font-semibold border border-red-200 flex items-start gap-2.5 shadow-xs"
+            >
+              <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-red-600" />
+              <div className="flex-1">
+                <p className="font-bold text-red-900">{error}</p>
+                <p className="text-[11px] text-red-700/90 mt-0.5 font-normal leading-relaxed">
+                  Pastikan NIK atau Username dan Password yang Anda masukkan sudah benar. Hubungi Administrator jika kendala berlanjut.
+                </p>
+              </div>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <label htmlFor="login-identifier" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 NIK / Username
               </label>
               <input
+                id="login-identifier"
                 type="text"
+                autoComplete="username"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D5AA6] focus:bg-white transition-all text-slate-800"
-                placeholder="Masukkan NIK"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#1D5AA6] focus:bg-white transition-all text-slate-900"
+                placeholder="Masukkan NIK atau Username"
                 required
               />
             </div>
             
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              <label htmlFor="login-password" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 Password
               </label>
               <input
+                id="login-password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1D5AA6] focus:bg-white transition-all text-slate-800"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-hidden focus:ring-2 focus:ring-[#1D5AA6] focus:bg-white transition-all text-slate-900"
                 placeholder="••••••••"
                 required
               />
@@ -104,13 +118,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 bg-[#D9272E] hover:bg-[#b91e24] text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center mt-2"
+              className="w-full py-3.5 bg-[#D9272E] hover:bg-[#b91e24] text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center mt-2 focus:outline-hidden focus:ring-2 focus:ring-[#D9272E] focus:ring-offset-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Masuk"}
             </button>
           </form>
 
-          <div className="mt-8 text-center text-xs text-slate-400">
+          <div className="mt-8 text-center text-xs text-slate-600">
             Pastikan Anda menggunakan kredensial internal yang valid.
             <br />
             Untuk bantuan, hubungi IT Helpdesk.

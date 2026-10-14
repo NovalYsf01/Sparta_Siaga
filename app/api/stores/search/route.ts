@@ -36,24 +36,116 @@ export async function GET(request: Request) {
   const limit = Math.min(parseInt(searchParams.get("limit") || "40", 10), 100);
 
   try {
-    const sessionUser = await getSessionUser();
+    const sessionUser = await getSessionUser(request);
     if (!sessionUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // DC MODE: Database currently does not have a dedicated DC master table
-    if (typeParam === "DC") {
+    const isAdmin = sessionUser.systemRole === "ADMIN";
+    const isHO = sessionUser.scope === "HO" && !isAdmin;
+    const r = (sessionUser.role || "").toLowerCase();
+    const isBMM = !isAdmin && !isHO && r === "bm";
+    const isBES = !isAdmin && !isHO && r === "bes";
+    const isBMS = !isAdmin && !isHO && !isBMM && !isBES;
+
+    // DC / FACILITY MODE: Query the PostgreSQL facilities table
+    if (typeParam === "DC" || typeParam === "FACILITY") {
+      // BMS is strictly prohibited from searching facilities
+      if (isBMS) {
+        return NextResponse.json(
+          {
+            error: "Akses ditolak: Petugas BMS hanya berwenang mencari dan melaporkan Toko.",
+            code: "ROLE_NOT_AUTHORIZED_FOR_FACILITIES",
+          },
+          { status: 403 }
+        );
+      }
+
+      const canSearchAllFacilities = isAdmin || isHO;
+      const pool = getDbPool();
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      let paramIndex = 1;
+
+      if (q.trim()) {
+        conditions.push(
+          `(name ILIKE $${paramIndex} OR code ILIKE $${paramIndex} OR facility_type ILIKE $${paramIndex})`
+        );
+        values.push(`%${q.trim()}%`);
+        paramIndex++;
+      }
+
+      // Role and Branch scoping for facilities
+      if (!canSearchAllFacilities) {
+        // Operational branch roles (BES, BMM) can only search facilities mapped to their branch
+        const aliases = resolveBranchAliases(sessionUser.branch);
+        if (aliases.length > 0) {
+          conditions.push(`UPPER(branch_id) = ANY($${paramIndex}::text[])`);
+          values.push(aliases);
+          paramIndex++;
+        } else {
+          conditions.push(`branch_id = $${paramIndex}`);
+          values.push(sessionUser.branch || "");
+          paramIndex++;
+        }
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const query = `
+        SELECT id::text, code, name, facility_type, latitude, longitude,
+               branch_id, operational_status, auto_report_enabled, mapping_verified_at
+        FROM facilities
+        ${whereClause}
+        ORDER BY name ASC
+        LIMIT $${paramIndex};
+      `;
+      values.push(limit);
+
+      const res = await pool.query(query, values);
+      const formatted = res.rows.map((row) => ({
+        id: `FACILITY:${row.id}`,
+        kode_toko: row.code,
+        nama_toko: row.name,
+        cabang: row.branch_id || "Belum dipetakan",
+        alamat: `${row.facility_type.replace(/_/g, " ")} (${row.operational_status === "ACTIVE" ? "Aktif" : "Non-aktif"})`,
+        latitude: Number(row.latitude),
+        longitude: Number(row.longitude),
+        fr_type: `FACILITY_${row.facility_type}`,
+        locationKind: "FACILITY",
+        locationId: row.id,
+        facilityType: row.facility_type,
+        operationalStatus: row.operational_status,
+        mappingVerified: Boolean(row.mapping_verified_at),
+      }));
+
+      let diagnosticMessage: string | null = null;
+      if (formatted.length === 0 && !canSearchAllFacilities) {
+        diagnosticMessage = `Belum ada fasilitas yang terhubung dengan cabang Anda (${sessionUser.branch || "Cabang belum ditentukan"}). Hubungi Admin untuk memverifikasi master fasilitas.`;
+      }
+
       return NextResponse.json({
-        data: [],
-        count: 0,
-        type: "DC",
-        masterAvailable: false,
-        message: "Master data Gudang / DC belum tersedia di database.",
+        data: formatted,
+        count: formatted.length,
+        type: typeParam,
+        masterAvailable: true,
+        source: "aiven-postgresql-facilities",
+        message: diagnosticMessage,
       });
     }
 
     // TOKO MODE
-    const canSearchAllStores = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
+    // BES is strictly prohibited from searching Toko
+    if (isBES) {
+      return NextResponse.json(
+        {
+          error: "Akses ditolak: Petugas BES hanya berwenang mencari dan melaporkan Fasilitas (DC/Warehouse/Depo/Bulky/Hub).",
+          code: "ROLE_NOT_AUTHORIZED_FOR_STORES",
+        },
+        { status: 403 }
+      );
+    }
+
+    const canSearchAllStores = isAdmin || isHO;
     const pool = getDbPool();
     const conditions: string[] = [];
     const values: unknown[] = [];
@@ -75,7 +167,6 @@ export async function GET(request: Request) {
         values.push(aliases);
         paramIndex++;
       } else {
-        // Fallback exact match if branch exists
         conditions.push(`cabang = $${paramIndex}`);
         values.push(sessionUser.branch || "");
         paramIndex++;
@@ -95,10 +186,15 @@ export async function GET(request: Request) {
     values.push(limit);
 
     const res = await pool.query(query, values);
+    const formattedStores = res.rows.map((row) => ({
+      ...row,
+      locationKind: "STORE",
+      locationId: row.kode_toko,
+    }));
 
     return NextResponse.json({
-      data: res.rows,
-      count: res.rowCount,
+      data: formattedStores,
+      count: formattedStores.length,
       type: "TOKO",
       masterAvailable: true,
       source: "aiven-postgresql",

@@ -157,6 +157,9 @@ function getDatabaseSslMode(
     }
     return value;
   }
+  if (databaseUrl && /sslmode=verify-full/i.test(databaseUrl)) {
+    return getEnvValue(env, "DATABASE_SSL_CA_BASE64", nodeEnv) ? "verify-full" : "require";
+  }
   if (databaseUrl && /sslmode=require/i.test(databaseUrl)) {
     return "require";
   }

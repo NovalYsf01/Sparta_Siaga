@@ -848,19 +848,28 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             branch: currentUser?.branch || data.branch,
             storeId: data.storeId,
           };
+          const isFacility = data.locationKind === "FACILITY"
+            || data.tkpType === "dc"
+            || data.tkpType === "DC"
+            || (data.storeId && (String(data.storeId).startsWith("FACILITY:") || String(data.storeId).startsWith("FAC-")));
           const newIncident: IncidentRecord = {
             id: `INC-MAN-${Date.now()}`,
             storeId: data.storeId,
             storeName: data.storeName,
             branch: data.branch,
             locationCity: data.locationCity,
+            locationKind: isFacility ? "FACILITY" : "STORE",
+            locationId: data.locationId || (data.storeId ? String(data.storeId).replace(/^FACILITY:/, "") : undefined),
+            locationCodeSnapshot: data.locationCodeSnapshot || data.storeId,
+            locationNameSnapshot: data.locationNameSnapshot || data.storeName,
+            locationTypeSnapshot: data.locationTypeSnapshot || (isFacility ? (data.facilityType || "DC") : "STORE"),
             disasterType: data.disasterType,
             reportOrigin: "manual",
             reporter: reporterInfo,
             earthquakeEventId: data.earthquakeEventId || undefined,
             earthquakeSource: data.earthquakeSource || (data.earthquakeEventId ? "BMKG" : undefined),
             earthquakeProvenance: data.earthquakeEventId ? `Ditautkan secara manual oleh pelapor ke kejadian ${data.earthquakeEventId}` : undefined,
-            tkpType: data.tkpType || "Toko",
+            tkpType: isFacility ? "dc" : "toko",
             date: new Date().toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

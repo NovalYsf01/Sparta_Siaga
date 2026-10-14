@@ -107,7 +107,7 @@ export function IncidentAppShell({
     if (currentPath.startsWith("/alerts")) return "Event & Deteksi Bencana";
     if (currentPath.startsWith("/reports/tracking")) return "Tracking Alur Penanganan";
     if (currentPath.startsWith("/reports/history")) return "Riwayat Laporan Historis";
-    if (currentPath.startsWith("/reports/shared-queue")) return "Shared Queue";
+    if (currentPath.startsWith("/reports/shared-queue")) return "Penugasan";
     if (currentPath.startsWith("/reports")) return "Pusat Laporan Kejadian";
     if (currentPath.startsWith("/settings")) return "Pengaturan Sistem";
     if (currentPath.startsWith("/admin/facilities")) return "Master Fasilitas";
@@ -207,7 +207,7 @@ export function IncidentAppShell({
       title: "Pelaporan",
       items: [
         { id: "history", href: "/reports", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
-        { id: "shared-queue", href: "/reports/shared-queue", label: "Shared Queue", icon: UserCog },
+        { id: "shared-queue", href: "/reports/shared-queue", label: "Penugasan", icon: UserCog },
         { id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity },
         { id: "history-browse", href: "/reports/history", label: "Riwayat Laporan", icon: History },
       ],
@@ -579,9 +579,23 @@ export function IncidentAppShell({
           </Link>
 
           <Link
+            href="/reports/shared-queue"
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
+              pathname.startsWith("/reports/shared-queue")
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
+                : isDark
+                ? "text-slate-400 hover:text-white"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <UserCog className="w-5 h-5" />
+            <span>Penugasan</span>
+          </Link>
+
+          <Link
             href="/reports"
             className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
-              pathname.startsWith("/reports")
+              pathname === "/reports"
                 ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -609,25 +623,11 @@ export function IncidentAppShell({
             )}
           </Link>
 
-          <Link
-            href="/alerts"
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
-              pathname.startsWith("/alerts")
-                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
-                : isDark
-                ? "text-slate-400 hover:text-white"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <Bell className="w-5 h-5" />
-            <span>Notifikasi</span>
-          </Link>
-
           <button
             type="button"
             onClick={() => setIsMoreSheetOpen(true)}
             className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
-              isMoreSheetOpen || pathname.startsWith("/reports/tracking") || pathname.startsWith("/reports/history") || pathname.startsWith("/settings") || pathname.startsWith("/admin")
+              isMoreSheetOpen || pathname.startsWith("/alerts") || pathname.startsWith("/reports/tracking") || pathname.startsWith("/reports/history") || pathname.startsWith("/settings") || pathname.startsWith("/admin")
                 ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -708,6 +708,18 @@ export function IncidentAppShell({
                   Alur Laporan & Penanganan
                 </span>
                 <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/alerts"
+                    onClick={() => setIsMoreSheetOpen(false)}
+                    className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all text-xs font-semibold col-span-2"
+                  >
+                    <Bell className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div className="min-w-0">
+                      <div>Event Bencana & Deteksi</div>
+                      <div className="text-[10px] text-slate-400 font-normal">Notifikasi gempa BMKG & cuaca ekstrem</div>
+                    </div>
+                  </Link>
+
                   <Link
                     href="/reports/tracking"
                     onClick={() => setIsMoreSheetOpen(false)}

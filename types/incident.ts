@@ -255,6 +255,8 @@ export interface IncidentRecord {
   locationId?: string;
   locationCodeSnapshot?: string;
   locationNameSnapshot?: string;
+  locationTypeSnapshot?: string;
+  branchSnapshot?: string;
   primaryPicUserId?: string;
   primaryPicClaimedAt?: string;
 

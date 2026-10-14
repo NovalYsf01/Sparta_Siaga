@@ -46,6 +46,29 @@ export async function dbGetUserByNik(nik: string): Promise<UserModel | null> {
   return rowToUser(rows[0]);
 }
 
+export async function dbGetUserByIdentifier(identifier: string): Promise<UserModel | null> {
+  const pool = getDbPool();
+  const trimmed = identifier.trim();
+  if (!trimmed) return null;
+  const { rows } = await pool.query(
+    `SELECT * FROM users 
+     WHERE LOWER(nik) = LOWER($1)
+        OR LOWER(id) = LOWER($1)
+        OR (external_user_id IS NOT NULL AND LOWER(external_user_id) = LOWER($1))
+        OR (email IS NOT NULL AND LOWER(email) = LOWER($1))
+     ORDER BY CASE 
+       WHEN LOWER(nik) = LOWER($1) THEN 1 
+       WHEN LOWER(external_user_id) = LOWER($1) THEN 2
+       WHEN LOWER(id) = LOWER($1) THEN 3 
+       ELSE 4 
+     END
+     LIMIT 1`,
+    [trimmed]
+  );
+  if (rows.length === 0) return null;
+  return rowToUser(rows[0]);
+}
+
 export async function dbGetUserById(id: string): Promise<UserModel | null> {
   const pool = getDbPool();
   const { rows } = await pool.query(`SELECT * FROM users WHERE id = $1`, [id]);

@@ -183,6 +183,16 @@ export async function dbCreateIncident(
 ): Promise<IncidentRecord> {
   const pool = getDbPool();
   await ensureReporterColumn(pool);
+  const isFacility = inc.locationKind === "FACILITY"
+    || inc.tkpType === "dc"
+    || (inc.tkpType as string) === "DC"
+    || (inc.storeId && (inc.storeId.startsWith("FACILITY:") || inc.storeId.startsWith("FAC-")));
+  const resolvedLocationKind = inc.locationKind
+    ? inc.locationKind
+    : (isFacility ? "FACILITY" : inc.storeId ? "STORE" : null);
+  const resolvedLocationId = inc.locationId
+    ? inc.locationId
+    : (inc.storeId ? inc.storeId.replace(/^FACILITY:/, "") : null);
   try {
     const { rows } = await pool.query(
     `INSERT INTO incidents (
@@ -211,7 +221,7 @@ export async function dbCreateIncident(
     RETURNING *`,
     [
       inc.id,
-      inc.date,
+      inc.date ?? inc.createdAt ?? new Date().toISOString(),
       inc.disasterType,
       inc.reportOrigin ?? "manual",
       inc.reporter ? JSON.stringify(inc.reporter) : null,
@@ -237,8 +247,8 @@ export async function dbCreateIncident(
       inc.updatedAt ?? new Date().toISOString(),
       inc.closedAt ?? null,
       inc.disasterType === "earthquake" ? inc.earthquakeEventId ?? null : null,
-      inc.disasterType === "earthquake" && inc.storeId ? "STORE" : null,
-      inc.disasterType === "earthquake" ? inc.storeId ?? null : null,
+      resolvedLocationKind,
+      resolvedLocationKind ? resolvedLocationId : null,
     ]
   );
   return rowToIncident(rows[0]);
@@ -279,6 +289,14 @@ export async function dbUpdateIncident(
     date: "date",
     storeId: "store_id",
     tkpType: "tkp_type",
+    locationKind: "location_kind",
+    locationId: "location_id",
+    locationCodeSnapshot: "location_code_snapshot",
+    locationNameSnapshot: "location_name_snapshot",
+    locationTypeSnapshot: "location_type_snapshot",
+    branchSnapshot: "branch_snapshot",
+    primaryPicUserId: "primary_pic_user_id",
+    primaryPicClaimedAt: "primary_pic_claimed_at",
     earthquakeEventId: "earthquake_event_id",
     earthquakeSource: "earthquake_source",
     earthquakeProvenance: "earthquake_provenance",

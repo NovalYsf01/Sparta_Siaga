@@ -56,10 +56,10 @@ export function AffectedStoresSheet({
       <div className={`p-5 flex items-start justify-between gap-3 ${isLight ? "bg-white" : "bg-slate-900"}`}>
         <div>
           <h2 className={`text-base font-bold tracking-tight ${isLight ? "text-slate-900" : "text-white"}`}>
-            Toko Potensi Terdampak
+            Lokasi dalam Radius Evaluasi
           </h2>
           <p className={`text-[11px] font-medium mt-1 ${isLight ? "text-slate-500" : "text-slate-400"}`}>
-            {earthquake ? earthquake.title : "Pemantauan Zona Pantau SPARTA"}
+            {earthquake ? earthquake.title : "Pemantauan Radius Gempa SPARTA"}
           </p>
         </div>
 

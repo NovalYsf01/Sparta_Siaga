@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbGetUserByNik } from "@/lib/user-db";
+import { dbGetUserByIdentifier } from "@/lib/user-db";
 import bcrypt from "bcryptjs";
 import { signSession } from "@/lib/jwt";
 import { cookies } from "next/headers";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await dbGetUserByNik(identifier);
+    const user = await dbGetUserByIdentifier(identifier);
 
     if (!user) {
       return NextResponse.json(
@@ -55,13 +55,23 @@ export async function POST(request: Request) {
       systemRole: user.systemRole
     });
 
-    const cookieStore = await cookies();
-    cookieStore.set("siaga_session", token, {
+    const response = NextResponse.json({ success: true, redirect: "/" });
+    response.cookies.set("siaga_session", token, {
       ...getSessionCookieOptions(),
       maxAge: 60 * 60 * 24, // 24 hours
     });
 
-    return NextResponse.json({ success: true, redirect: "/" });
+    try {
+      const cookieStore = await cookies();
+      cookieStore.set("siaga_session", token, {
+        ...getSessionCookieOptions(),
+        maxAge: 60 * 60 * 24,
+      });
+    } catch {
+      // Handled when called outside Next.js request async storage
+    }
+
+    return response;
   } catch (error) {
     console.error("[POST /api/auth/login]", error);
     return NextResponse.json(

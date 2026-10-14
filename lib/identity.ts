@@ -27,9 +27,9 @@ export interface UserIdentity {
 /**
  * Resolves the current user's identity including effective permissions.
  */
-export async function resolveCurrentUserIdentity(): Promise<UserIdentity | null> {
+export async function resolveCurrentUserIdentity(req?: Request): Promise<UserIdentity | null> {
   try {
-    const session = await getSessionUser();
+    const session = await getSessionUser(req);
     
     if (!session) {
       return null;

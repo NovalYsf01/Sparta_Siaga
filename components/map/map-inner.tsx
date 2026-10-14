@@ -68,20 +68,26 @@ function ViewportTracker({
   onZoomChange: (zoom: number) => void;
   onBoundsChange: (bounds: L.LatLngBounds) => void;
 }) {
+  const onZoomRef = React.useRef(onZoomChange);
+  const onBoundsRef = React.useRef(onBoundsChange);
+  onZoomRef.current = onZoomChange;
+  onBoundsRef.current = onBoundsChange;
+
   const map = useMapEvents({
     zoomend: () => {
-      onZoomChange(map.getZoom());
-      onBoundsChange(map.getBounds());
+      onZoomRef.current(map.getZoom());
+      onBoundsRef.current(map.getBounds());
     },
     moveend: () => {
-      onBoundsChange(map.getBounds());
+      onBoundsRef.current(map.getBounds());
     },
   });
 
   useEffect(() => {
-    onZoomChange(map.getZoom());
-    onBoundsChange(map.getBounds());
-  }, [map, onZoomChange, onBoundsChange]);
+    // Only dispatch on initial mount
+    onZoomRef.current(map.getZoom());
+    onBoundsRef.current(map.getBounds());
+  }, [map]);
 
   return null;
 }
@@ -297,6 +303,16 @@ export default function MapInner({
   const [currentZoom, setCurrentZoom] = useState(5);
   const [mapBounds, setMapBounds] = useState<L.LatLngBounds | null>(null);
 
+  const handleBoundsChange = React.useCallback((bounds: L.LatLngBounds) => {
+    setMapBounds(bounds);
+    onViewportChange?.({
+      north: Number(bounds.getNorth().toFixed(4)),
+      south: Number(bounds.getSouth().toFixed(4)),
+      east: Number(bounds.getEast().toFixed(4)),
+      west: Number(bounds.getWest().toFixed(4)),
+    });
+  }, [onViewportChange]);
+
   const showEarthquakes = activeLayer === "all" || activeLayer === "earthquake";
   const showStoresLayer = activeLayer === "all" || activeLayer === "stores";
 
@@ -502,10 +518,7 @@ export default function MapInner({
 
         <ZoomControl position="bottomright" />
         <MapFlyController target={flyToTarget} />
-        <ViewportTracker onZoomChange={setCurrentZoom} onBoundsChange={(bounds) => {
-          setMapBounds(bounds);
-          onViewportChange?.({ north: bounds.getNorth(), south: bounds.getSouth(), east: bounds.getEast(), west: bounds.getWest() });
-        }} />
+        <ViewportTracker onZoomChange={setCurrentZoom} onBoundsChange={handleBoundsChange} />
 
         {/* 1. DISASTER EPICENTERS & SPARTA MONITORING ZONES (Requirement 30) */}
         {showEarthquakes &&

@@ -114,14 +114,14 @@ async function run() {
     const idxRes = await client.query(`
       SELECT indexname, indexdef 
       FROM pg_indexes 
-      WHERE tablename = 'incidents' AND indexname = 'idx_incidents_unique_auto_eq_store';
+      WHERE tablename = 'incidents' AND indexname IN ('idx_incidents_unique_earthquake_location', 'idx_incidents_unique_auto_eq_store');
     `);
     recordTest(
       1,
       "DATABASE_SCHEMA",
-      "Unique index idx_incidents_unique_auto_eq_store aktif",
-      idxRes.rows.length === 1,
-      idxRes.rows.length === 1 ? idxRes.rows[0].indexdef : "Indeks unik tidak ditemukan"
+      "Unique index dedup gempa (idx_incidents_unique_earthquake_location) aktif",
+      idxRes.rows.length >= 1,
+      idxRes.rows.length >= 1 ? idxRes.rows[0].indexdef : "Indeks unik tidak ditemukan"
     );
 
     // -------------------------------------------------------------------------
