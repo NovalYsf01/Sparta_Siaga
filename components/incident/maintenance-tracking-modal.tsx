@@ -661,10 +661,10 @@ export function MaintenanceTrackingModal({
   const steps = computeSteps();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] sm:max-h-[88dvh] min-h-0 overflow-hidden touch-auto select-text">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/55 animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-xl max-w-5xl w-full shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] sm:max-h-[88dvh] min-h-0 overflow-hidden touch-auto select-text">
         {/* COMPACT SUMMARY HEADER */}
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0">
+        <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-[#1D5AA6] dark:text-blue-400 shrink-0">
@@ -672,14 +672,14 @@ export function MaintenanceTrackingModal({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
                     Detail Tracking Laporan
                   </h3>
                   <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                     {incident.id}
                   </span>
                   <span
-                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${currentStatusInfo.badgeClass}`}
+                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md border ${currentStatusInfo.badgeClass}`}
                   >
                     {isReportClosed && <CheckCircle2 className="w-3 h-3" />}
                     {currentStatusInfo.label}
