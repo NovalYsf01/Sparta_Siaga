@@ -50,6 +50,34 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const patch = await request.json();
 
+    // Protect evidence already accepted by the dedicated inspection endpoint.
+    // Older frontend callbacks may PATCH a partial verification object lacking
+    // photos/evidenceDetails; never erase authenticated inspection evidence.
+    if (patch.verification && typeof patch.verification === "object" && !Array.isArray(patch.verification)) {
+      const existing = incident.verification;
+      if (existing) {
+        const incoming = patch.verification as Record<string, unknown>;
+        patch.verification = {
+          ...existing,
+          ...incoming,
+          photos: Array.isArray(incoming.photos) && incoming.photos.length
+            ? incoming.photos
+            : existing.photos ?? [],
+          evidenceDetails: Array.isArray(incoming.evidenceDetails) && incoming.evidenceDetails.length
+            ? incoming.evidenceDetails
+            : existing.evidenceDetails ?? [],
+          inspectionMethod: incoming.inspectionMethod ?? existing.inspectionMethod,
+          officerSource: incoming.officerSource ?? existing.officerSource,
+          revisions: incoming.revisions ?? existing.revisions,
+          bmApproval: incoming.bmApproval ?? existing.bmApproval,
+        };
+      }
+    }
+    if (incident.fieldPhotos?.length &&
+        (!Array.isArray(patch.fieldPhotos) || patch.fieldPhotos.length === 0)) {
+      delete patch.fieldPhotos;
+    }
+
     // Handling Target Penyelesaian (completedAt) update for BMS/BES
     if (patch.targetCompletionDate !== undefined) {
       const userRoleStr = (sessionUser.role || "").toLowerCase();
