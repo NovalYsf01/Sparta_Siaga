@@ -257,9 +257,9 @@ export default function DashboardPage() {
       </div>
 
       {/* DESKTOP DASHBOARD (>= 1024px) */}
-      <div className="hidden lg:block p-8 space-y-6 max-w-[1600px] mx-auto w-full">
+      <div className="hidden lg:block px-7 py-7 space-y-5 max-w-[1600px] mx-auto w-full">
         {/* Header: Contextual Role Welcome & Quick Actions */}
-        <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center justify-between sparta-ui-panel dark:bg-slate-900 p-5">
           <div>
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-xl bg-[#1D5AA6]/10 text-[#1D5AA6]">
@@ -347,7 +347,7 @@ export default function DashboardPage() {
         {/* 3. BMM SIMPLIFIED 4 KPIS */}
         {roleInfo.isBMM && (
           <section aria-label="Monitoring Cabang 4 Status" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <article className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
                   Belum Ditangani
@@ -362,7 +362,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-400">
                   On Progress
@@ -377,7 +377,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-2xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/60 dark:bg-indigo-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/60 dark:bg-indigo-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-400">
                   Menunggu Approval
@@ -392,7 +392,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
                   Selesai
@@ -412,7 +412,7 @@ export default function DashboardPage() {
         {/* 4. HO NATIONAL SUMMARY KPIS */}
         {roleInfo.isHO && (
           <section aria-label="Ringkasan Laporan Nasional" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <article className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+            <article className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
                   Total Laporan Nasional
@@ -427,7 +427,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
                   On Progress Nasional
@@ -442,7 +442,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-2xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
                   Menunggu Approval
@@ -457,7 +457,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 shadow-xs">
+            <article className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 shadow-xs">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                   Selesai Nasional
@@ -476,7 +476,7 @@ export default function DashboardPage() {
 
         {/* 4. HO DEDICATED MONITORING PER CABANG TABLE */}
         {roleInfo.isHO && (
-          <section aria-label="Monitoring per Cabang" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+          <section aria-label="Monitoring per Cabang" className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -684,7 +684,7 @@ export default function DashboardPage() {
 
         {/* MAIN HERO: ACTIVE SITUATION PANEL */}
         <div className="flex flex-col lg:flex-row gap-6">
-          <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col shadow-xs">
+          <div className="w-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-[#123B6D] dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
                 <Activity className="w-4 h-4" />
