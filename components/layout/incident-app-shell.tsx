@@ -236,32 +236,32 @@ export function IncidentAppShell({
 
   return (
     <div
-      className={`flex h-screen w-full antialiased overflow-hidden font-sans transition-colors duration-200 ${
-        isDark ? "bg-slate-950 text-slate-100" : "bg-slate-100 text-slate-800"
+      className={`sparta-admin-ui flex h-screen w-full antialiased overflow-hidden font-sans transition-colors duration-200 ${
+        isDark ? "bg-slate-950 text-slate-100" : "bg-[#f5f7fb] text-slate-800"
       }`}
     >
       {/* DESKTOP SIDEBAR */}
       <aside 
-        className={`hidden lg:flex flex-col shrink-0 border-r-0 z-30 transition-all duration-300 ${
+        className={`sparta-sidebar hidden lg:flex flex-col shrink-0 border-r border-slate-200 dark:border-slate-800 z-30 transition-all duration-300 ${
           isSidebarCollapsed ? "w-20" : "w-[260px]"
-        } bg-[#123B6D] text-white shadow-lg`}
+        } bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-100`}
       >
         {/* Brand Header */}
-        <div className={`flex flex-col justify-center py-4 shrink-0 border-b border-white/10 ${isSidebarCollapsed ? "items-center px-2" : "px-6"}`}>
+        <div className={`flex flex-col justify-center py-4 shrink-0 border-b border-slate-200 dark:border-slate-800 ${isSidebarCollapsed ? "items-center px-2" : "px-6"}`}>
           {!isSidebarCollapsed ? (
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
                 <Image src="/brand/building_logo.png" alt="SPARTA Logo" width={38} height={38} className="shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-black text-lg tracking-wider text-white leading-none">SPARTA SIAGA</span>
-                  <span className="text-[10px] font-medium text-blue-200 mt-1 tracking-wide leading-tight">
+                  <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white leading-none">SPARTA SIAGA</span>
+                  <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-1 leading-tight">
                     Sistem Integrasi Analisis &<br/>Peringatan Bencana
                   </span>
                 </div>
               </div>
               <div className="flex flex-col gap-1 mt-1">
                 <Image src="/brand/alfamart_logo.png" alt="Alfamart Logo" width={80} height={25} className="opacity-90" />
-                <span className="text-[9px] font-semibold text-blue-300 uppercase tracking-widest">Internal System</span>
+                <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wide">Internal System</span>
               </div>
             </div>
           ) : (
@@ -272,11 +272,11 @@ export function IncidentAppShell({
         </div>
 
         {/* Navigation Items */}
-        <nav className={`flex-1 py-6 space-y-6 overflow-y-auto overflow-x-hidden ${isSidebarCollapsed ? "px-2" : "px-4"}`}>
+        <nav className={`flex-1 py-5 space-y-5 overflow-y-auto overflow-x-hidden ${isSidebarCollapsed ? "px-2" : "px-4"}`}>
           {navGroups.map((group, gIdx) => (
             <div key={gIdx} className="space-y-1.5">
               {!isSidebarCollapsed && (
-                <div className="text-[10px] uppercase font-bold tracking-wider text-[#EAF2FB]/50 mb-2 px-2">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-2">
                   {group.title}
                 </div>
               )}
@@ -288,14 +288,14 @@ export function IncidentAppShell({
                     key={item.id}
                     href={item.href}
                     title={isSidebarCollapsed ? item.label : undefined}
-                    className={`w-full relative flex items-center ${isSidebarCollapsed ? "justify-center px-0 py-3 rounded-xl" : "justify-between px-4 py-2.5 rounded-lg"} text-sm font-medium transition-all ${
+                    className={`w-full relative flex items-center ${isSidebarCollapsed ? "justify-center px-0 py-3 rounded-lg" : "justify-between px-3 py-2.5 rounded-lg"} text-sm font-medium transition-all ${
                       isActive
-                        ? "bg-[#1D5AA6] text-white shadow-sm border border-white/10"
-                        : "text-blue-100 hover:bg-white/10 hover:text-white border border-transparent"
+                        ? "bg-[#eaf2fb] text-[#1754a1] dark:bg-blue-900/30 dark:text-blue-300"
+                        : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                     }`}
                   >
                     <div className={`flex items-center ${isSidebarCollapsed ? "justify-center" : "gap-3"}`}>
-                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-[#F6C800]" : "text-blue-200"}`} />
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-[#1D5AA6] dark:text-blue-300" : "text-slate-400 dark:text-slate-500"}`} />
                       {!isSidebarCollapsed && <span className="whitespace-nowrap font-medium">{item.label}</span>}
                     </div>
                     {!isSidebarCollapsed && item.badge && (
@@ -320,14 +320,14 @@ export function IncidentAppShell({
         </nav>
 
         {/* Sidebar Toggle Button (Moved from Header for better layout) */}
-        <div className="p-4 mt-auto border-t border-white/10">
+        <div className="p-3 mt-auto border-t border-slate-200 dark:border-slate-800">
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start px-4"} py-2 rounded-lg transition-colors text-blue-200 hover:bg-white/10 hover:text-white`}
+            className={`w-full flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start px-4"} py-2.5 rounded-lg transition-colors text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#1D5AA6]`}
             title="Toggle Sidebar"
           >
             <Menu className="w-5 h-5" />
-            {!isSidebarCollapsed && <span className="ml-3 text-sm font-medium">Tutup Sidebar</span>}
+            {!isSidebarCollapsed && <span className="ml-3 text-xs font-medium">Ciutkan menu</span>}
           </button>
         </div>
       </aside>
@@ -336,7 +336,7 @@ export function IncidentAppShell({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* TOP BAR / HEADER */}
         <header
-          className={`h-16 flex items-center justify-between px-6 lg:px-8 shrink-0 z-40 border-b transition-colors duration-200 ${
+          className={`h-16 flex items-center justify-between px-4 sm:px-5 lg:px-7 shrink-0 z-40 border-b transition-colors duration-200 ${
             isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
           }`}
         >
@@ -355,11 +355,11 @@ export function IncidentAppShell({
               </div>
             </div>
 
-            {/* Desktop Breadcrumbs (SPARTA Enterprise Style) */}
+            {/* Contextual page title for desktop; breadcrumbs remain available within pages. */}
             <div className="hidden lg:flex items-center gap-2 text-xs shrink-0">
-              <span className="font-bold text-[#123B6D] dark:text-blue-400">SPARTA SIAGA</span>
+              <span className="font-semibold text-slate-500 dark:text-slate-400">Menu</span>
               <span className="text-slate-300 dark:text-slate-600">/</span>
-              <span className="text-slate-800 dark:text-slate-200 font-semibold">{getPageTitle(pathname)}</span>
+              <span className="text-slate-900 dark:text-slate-200 font-semibold">{getPageTitle(pathname)}</span>
             </div>
 
             {/* Universal Search Bar */}
@@ -372,13 +372,13 @@ export function IncidentAppShell({
               }`}
             >
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="truncate text-xs">Cari toko, lokasi, laporan...</span>
+              <span className="truncate text-xs">Cari laporan, toko, atau lokasi...</span>
               <kbd
                 className={`hidden md:inline-block ml-auto text-[10px] border px-1.5 py-0.5 rounded font-mono ${
                   isDark ? "bg-slate-900 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-400"
                 }`}
               >
-                ⌘K
+                Ctrl K
               </kbd>
             </div>
           </div>
@@ -419,7 +419,7 @@ export function IncidentAppShell({
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center animate-pulse">
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center ">
                   {unreadCount}
                 </span>
               )}
@@ -429,7 +429,7 @@ export function IncidentAppShell({
             <div className="relative">
               <button
                 onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full border transition-all text-left ${
+                className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-lg border transition-all text-left ${
                   isDark
                     ? "border-slate-700 hover:bg-slate-800 bg-slate-900"
                     : "border-slate-200 hover:bg-slate-50 bg-white"
@@ -547,8 +547,8 @@ export function IncidentAppShell({
 
         {/* MAIN BODY VIEW */}
         <main
-          className={`relative flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-6 transition-colors duration-200 flex flex-col ${
-            isDark ? "bg-slate-900" : "bg-[#f5f7fa]"
+          className={`relative flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-8 lg:px-7 transition-colors duration-200 flex flex-col ${
+            isDark ? "bg-slate-950" : "bg-[#f5f7fb]"
           }`}
         >
           <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
