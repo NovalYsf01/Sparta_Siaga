@@ -608,146 +608,33 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     setIsMaintenanceModalOpen(true);
   };
 
-  // Confirmation of store condition
-  const handleConfirmVerification = (
+  // Inspection and BnM approval are persisted by dedicated backend endpoints.
+  // Refresh the authoritative report instead of writing an incomplete local
+  // verification back through PATCH (which could erase inspection photo URLs).
+  const handleConfirmVerification = async (
     incidentId: string,
-    isDamaged: boolean,
-    report?: Partial<DamageReport>
+    _isDamaged: boolean,
+    _report?: Partial<DamageReport>
   ) => {
-    const updated = incidents.map((inc) => {
-      if (inc.id !== incidentId) return inc;
-
-      const timestamp = new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
-
-      const isBmApproved = Boolean(
-        report?.bmApproval?.decision === "approved" ||
-        ((report?.confirmedBy?.includes("BnM Manajer") || report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && isDamaged)
-      );
-      const isBmSafe = Boolean(
-        report?.bmApproval?.decision === "safe" ||
-        ((report?.confirmedBy?.includes("BnM Manajer") || report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && !isDamaged)
-      );
-      const isBmRejected = report?.bmApproval?.decision === "rejected";
-      const isBmClarification = report?.bmApproval?.decision === "clarification_requested";
-
-      if (isBmSafe || (!isDamaged && (report?.confirmedBy?.includes("Manajer") || report?.confirmedBy?.includes("Manager")))) {
-        return {
-          ...inc,
-          status: "confirmed_safe" as const,
-          progress: 100,
-          verification: {
-            confirmedBy: report?.confirmedBy || "BnM Manajer",
-            confirmedAt: timestamp,
-            isDamaged: false,
-            notes: report?.notes || "Kondisi dinyatakan aman oleh BnM Manajer.",
-          },
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Keputusan BnM Manajer",
-              label: "Kondisi Dinyatakan Aman oleh BnM Manajer",
-              timestamp,
-              actor: report?.confirmedBy || "BnM Manajer",
-              notes: report?.notes,
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-          closedAt: new Date().toISOString(),
-        };
-      } else if (isBmRejected) {
-        return {
-          ...inc,
-          status: "rejected_invalid" as const,
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Keputusan BnM Manajer",
-              label: "Laporan Ditolak BnM Manajer (Tidak Valid)",
-              timestamp,
-              actor: report?.confirmedBy || "BnM Manajer",
-              notes: report?.notes,
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-        };
-      } else if (isBmClarification) {
-        return {
-          ...inc,
-          status: "clarification_requested" as const,
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Keputusan BnM Manajer",
-              label: "Permintaan Klarifikasi Hasil Pemeriksaan",
-              timestamp,
-              actor: report?.confirmedBy || "BnM Manajer",
-              notes: report?.notes,
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-        };
-      } else if (isBmApproved) {
-        // BMM approves damage: allows downstream work readiness and estimation, progress stays 0%
-        return {
-          ...inc,
-          status: "confirmed_affected" as const,
-          progress: inc.progress ?? 0,
-          verification: {
-            confirmedBy: report?.confirmedBy || "BnM Manajer",
-            confirmedAt: timestamp,
-            isDamaged: true,
-            categories: report?.categories || ["Rak Barang"],
-            severity: report?.severity || "Sedang",
-            operationalStatus: report?.operationalStatus || "Buka Normal",
-            notes: report?.notes,
-            photos: report?.photos,
-          },
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Persetujuan BnM Manajer",
-              label: `Kerusakan Disetujui (${report?.severity || "Sedang"}) — Siap Penanganan Teknis`,
-              timestamp,
-              actor: report?.confirmedBy || "BnM Manajer",
-              notes: report?.notes,
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-        };
-      } else {
-        // BMS/BES submitted inspection: status transitions to pending_bm_approval, progress stays 0%
-        return {
-          ...inc,
-          status: "pending_bm_approval" as const,
-          progress: inc.progress ?? 0,
-          verification: {
-            confirmedBy: report?.confirmedBy || "Petugas Pemeriksa Lapangan",
-            confirmedAt: timestamp,
-            isDamaged,
-            categories: report?.categories || ["Rak Barang"],
-            severity: report?.severity || "Sedang",
-            operationalStatus: report?.operationalStatus || "Buka Normal",
-            notes: report?.notes,
-            photos: report?.photos,
-          },
-          timeline: [
-            ...inc.timeline,
-            {
-              stage: "Pemeriksaan Lapangan",
-              label: isDamaged
-                ? `Hasil Pemeriksaan Diajukan: Ada Kerusakan (${report?.severity || "Sedang"})`
-                : "Hasil Pemeriksaan Diajukan: Kondisi Aman",
-              timestamp,
-              actor: report?.confirmedBy || "Petugas Pemeriksa",
-              notes: report?.notes,
-            },
-          ],
-          updatedAt: new Date().toISOString(),
-        };
+    try {
+      const response = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error(`Gagal memuat laporan terbaru (HTTP ${response.status})`);
       }
-    });
-
-    handleUpdateIncidents(updated);
+      const payload = await response.json();
+      const saved = payload.data as IncidentRecord | undefined;
+      if (!saved || saved.id !== incidentId) {
+        throw new Error("Data laporan terbaru tidak valid");
+      }
+      setIncidents((prev) => prev.map((inc) => inc.id === incidentId ? saved : inc));
+      setSelectedIncidentForAction((prev) => prev?.id === incidentId ? saved : prev);
+      setSelectedReadOnlyIncident((prev) => prev?.id === incidentId ? saved : prev);
+    } catch (error) {
+      console.error("[SPARTA SIAGA] Gagal memuat laporan setelah konfirmasi:", error);
+      toast.error("Pemeriksaan tersimpan, tetapi tampilan belum diperbarui. Muat ulang halaman.");
+    }
   };
 
   // Progression updater for Maintenance
