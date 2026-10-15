@@ -15,6 +15,7 @@ export interface UserModel {
   source: string;
   passwordHash?: string | null;
   avatarUrl?: string | null;
+  tokenVersion?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +35,7 @@ function rowToUser(row: any): UserModel {
     source: row.source || "LOCAL",
     passwordHash: row.password_hash,
     avatarUrl: row.avatar_url,
+    tokenVersion: row.token_version !== undefined && row.token_version !== null ? Number(row.token_version) : 1,
     createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };
@@ -268,3 +270,16 @@ export async function dbDeleteUser(id: string): Promise<boolean> {
   const { rowCount } = await pool.query(`DELETE FROM users WHERE id = $1 AND source = 'LOCAL'`, [id]);
   return (rowCount ?? 0) > 0;
 }
+
+export async function dbRevokeAllUserSessions(userId: string): Promise<number> {
+  const pool = getDbPool();
+  const { rows } = await pool.query(
+    `UPDATE users 
+     SET token_version = COALESCE(token_version, 1) + 1, updated_at = NOW() 
+     WHERE id = $1 
+     RETURNING token_version`,
+    [userId]
+  );
+  return rows[0]?.token_version ?? 1;
+}
+

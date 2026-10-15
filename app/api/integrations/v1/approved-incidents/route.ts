@@ -84,7 +84,7 @@ export async function GET(request: Request) {
         notes: inc.verification?.notes || "",
       },
       branchManagerApproval: {
-        decidedBy: inc.verification?.bmApproval?.decidedBy || "Branch Manager",
+        decidedBy: inc.verification?.bmApproval?.decidedBy || "BnM Manajer",
         decidedAt: inc.verification?.bmApproval?.decidedAt || "-",
         decisionNotes:
           inc.verification?.bmApproval?.decisionNotes ||

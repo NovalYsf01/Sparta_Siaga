@@ -81,6 +81,55 @@ export function NotificationCenterSheet({
   // Group expansion state for HO canonical events
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  // Current authenticated user and PIC claim state
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    name: string;
+    role?: string;
+    businessRole?: string;
+    systemRole?: string;
+    branch?: string;
+  } | null>(null);
+  const [claimedReports, setClaimedReports] = useState<Record<string, { picUserId: string; picName: string }>>({});
+  const [isClaimingMap, setIsClaimingMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCurrentUser(data.user || data);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleClaimReport = async (reportId: string) => {
+    setIsClaimingMap((prev) => ({ ...prev, [reportId]: true }));
+    try {
+      const res = await fetch(`/api/incidents/${reportId}/pic`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok && data.claimed) {
+        setClaimedReports((prev) => ({
+          ...prev,
+          [reportId]: {
+            picUserId: currentUser?.id || "",
+            picName: currentUser?.name || "Saya",
+          },
+        }));
+        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC otomatis.");
+      } else if (res.status === 409) {
+        toast.error("Laporan sudah diambil oleh petugas lain.");
+      } else {
+        toast.error(data.error || "Gagal mengambil tugas laporan.");
+      }
+    } catch {
+      toast.error("Gagal terhubung ke server.");
+    } finally {
+      setIsClaimingMap((prev) => ({ ...prev, [reportId]: false }));
+    }
+  };
+
   const isDark = theme === "dark";
   const isHoUser = userBranch === "all" || !userRole || userRole.startsWith("ho_");
 
@@ -320,6 +369,16 @@ export function NotificationCenterSheet({
   // Find related report for a notification
   const findRelatedReport = useCallback(
     (log: NotificationLog) => {
+      // 1. Exact match by incident ID (e.g. from terminal trigger or direct incident alert)
+      const directMatch = activeIncidents.find(
+        (inc: any) =>
+          inc.id === log.disaster_id ||
+          inc.id === (log as any).canonical_event_id ||
+          inc.id === log.ticket_number
+      );
+      if (directMatch) return directMatch;
+
+      // 2. Branch & Disaster event match
       return activeIncidents.find((inc: any) => {
         const branchMatch = inc.branch?.toLowerCase() === log.branch?.toLowerCase();
         if (!branchMatch) return false;
@@ -764,6 +823,13 @@ export function NotificationCenterSheet({
       }
     })();
 
+    const claimedInfo = relatedReport ? claimedReports[relatedReport.id] : null;
+    const hasPic = Boolean(claimedInfo || relatedReport?.primaryPicUserId);
+    const picName = claimedInfo?.picName || relatedReport?.primaryPicName || (hasPic ? "Petugas Cabang" : "Belum Ada PIC");
+    const userRoleStr = (currentUser?.businessRole || currentUser?.role || "").toLowerCase();
+    const canClaim = currentUser?.systemRole === "ADMIN" || ["bms", "bes"].includes(userRoleStr);
+    const isOnProgress = hasPic || relatedReport?.status === "in_maintenance" || relatedReport?.status === "investigating";
+
     return (
       <div
         key={log.id}
@@ -789,15 +855,25 @@ export function NotificationCenterSheet({
               {isEarthquake ? "Gempa Bumi" : "Cuaca & Banjir"}
             </span>
 
-            {activeTab === "history" && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                Riwayat (&gt;72 Jam)
+            {/* Nomor Laporan Badge */}
+            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700">
+              {relatedReport?.id || log.ticket_number || "LOG-NOTIF"}
+            </span>
+
+            {/* Status Penanganan */}
+            {relatedReport ? (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                isOnProgress
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                  : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+              }`}>
+                {isOnProgress ? "On Progress" : "Belum Ditangani"}
+              </span>
+            ) : (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${deliveryBadge.class}`}>
+                {deliveryBadge.text}
               </span>
             )}
-
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${deliveryBadge.class}`}>
-              {deliveryBadge.text}
-            </span>
 
             {isUnread && (
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
@@ -819,28 +895,47 @@ export function NotificationCenterSheet({
           {log.message}
         </p>
 
-        {/* Store Zone Summary */}
-        <div className={`p-2 rounded-lg border text-[11px] mb-3 space-y-0.5 ${
+        {/* Store Zone Summary & PIC */}
+        <div className={`p-2.5 rounded-lg border text-[11px] mb-3 space-y-1 ${
           isDark ? "bg-slate-950/70 border-slate-800" : "bg-white border-slate-200"
         }`}>
           <div className="flex justify-between items-center">
-            <span className={isDark ? "text-slate-400" : "text-slate-600"}>Wilayah:</span>
-            <strong className={isDark ? "text-white" : "text-slate-900"}>DC Cabang {log.branch}</strong>
+            <span className={isDark ? "text-slate-400" : "text-slate-600"}>Lokasi:</span>
+            <strong className={isDark ? "text-white" : "text-slate-900"}>
+              {relatedReport?.storeName || `DC Cabang ${log.branch}`}
+            </strong>
           </div>
           <div className="flex justify-between items-center">
-            <span className={isDark ? "text-slate-400" : "text-slate-600"}>Toko di Zona Pantau:</span>
+            <span className={isDark ? "text-slate-400" : "text-slate-600"}>Zona Pantau:</span>
             <strong className={isDark ? "text-white" : "text-slate-900"}>{log.affected_stores_count} Gerai</strong>
           </div>
+          {hasPic && (
+            <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800 text-blue-600 dark:text-blue-400 font-semibold">
+              <span>PIC Otomatis:</span>
+              <span>{picName}</span>
+            </div>
+          )}
           {relatedReport && (
-            <div className="text-[10px] text-blue-500 font-medium pt-1 border-t border-slate-200/50 dark:border-slate-800/50 flex items-center gap-1">
-              <FileText className="w-3 h-3" />
-              <span>Laporan operasional terkait tersedia</span>
+            <div className="text-[10px] text-slate-500 flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+              <span>Target Selesai:</span>
+              <span>{relatedReport?.maintenanceTicket?.completedAt || "Belum Ditentukan"}</span>
             </div>
           )}
         </div>
 
-        {/* Awareness Action Buttons (Requirements 7, 8, 13, 14, 16) */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          {relatedReport && !hasPic && canClaim && (
+            <button
+              type="button"
+              onClick={() => handleClaimReport(relatedReport.id)}
+              disabled={isClaimingMap[relatedReport.id]}
+              className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center gap-1 transition-colors shadow-xs disabled:opacity-50"
+            >
+              <span>{isClaimingMap[relatedReport.id] ? "Memproses..." : "Mulai Menangani"}</span>
+            </button>
+          )}
+
           <button
             onClick={() => {
               markItemAsRead(log.id);
@@ -864,7 +959,7 @@ export function NotificationCenterSheet({
             className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold bg-cyan-600 hover:bg-cyan-500 text-white flex items-center justify-center gap-1 transition-colors shadow-xs"
           >
             <MapPin className="w-3.5 h-3.5" />
-            <span>Lihat di Peta</span>
+            <span>Peta</span>
           </button>
         </div>
 
@@ -879,7 +974,7 @@ export function NotificationCenterSheet({
             className="w-full mt-2 py-1.5 px-3 rounded-lg text-[11px] font-bold bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center gap-1.5 transition-colors shadow-xs"
           >
             <FileText className="w-3.5 h-3.5" />
-            <span>Lihat Laporan Terkait</span>
+            <span>Buka Laporan Lengkap</span>
           </button>
         )}
       </div>

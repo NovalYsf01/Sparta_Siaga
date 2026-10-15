@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     const bmAuth = await canApproveAsBmAsync(sessionUser, report);
     if (!bmAuth.authorized) {
       return NextResponse.json(
-        { error: bmAuth.reason || "Unauthorized: Hanya Branch Manager yang dapat memberikan persetujuan." },
+        { error: bmAuth.reason || "Unauthorized: Hanya BnM Manajer yang dapat memberikan persetujuan." },
         { status: 403 }
       );
     }
@@ -37,7 +37,7 @@ export async function POST(request: Request, { params }: RouteContext) {
     const validDecisions: BmDecision[] = ["approved", "safe", "rejected", "clarification_requested"];
     if (!validDecisions.includes(rawDecision as BmDecision)) {
       return NextResponse.json(
-        { error: "Keputusan Branch Manager tidak valid. Pilihan: approved, safe, rejected, clarification_requested." },
+        { error: "Keputusan BnM Manajer tidak valid. Pilihan: approved, safe, rejected, clarification_requested." },
         { status: 400 }
       );
     }
@@ -61,8 +61,8 @@ export async function POST(request: Request, { params }: RouteContext) {
     let newStatus: typeof report.status;
     let timelineLabel: string;
 
-    const actorRoleTitle = sessionUser.systemRole === "ADMIN" ? "Admin SPARTA SIAGA" : "Building & Maintenance Manager";
-    const actorRoleTag = sessionUser.systemRole === "ADMIN" ? "ADMIN" : "BMM";
+    const actorRoleTitle = sessionUser.systemRole === "ADMIN" ? "Admin SPARTA SIAGA" : "BnM Manajer";
+    const actorRoleTag = sessionUser.systemRole === "ADMIN" ? "ADMIN" : "BnM Manajer";
 
     switch (decision) {
       case "approved":
@@ -126,6 +126,6 @@ export async function POST(request: Request, { params }: RouteContext) {
     });
   } catch (err) {
     console.error("[POST /api/incidents/:id/approval]", err);
-    return NextResponse.json({ error: "Gagal menyimpan keputusan Branch Manager." }, { status: 500 });
+    return NextResponse.json({ error: "Gagal menyimpan keputusan BnM Manajer." }, { status: 500 });
   }
 }

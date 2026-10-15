@@ -49,7 +49,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
 
       return NextResponse.json({
-        message: "Laporan ditolak oleh Building & Maintenance Manager / Administrator dan dikembalikan dengan status revisi.",
+        message: "Laporan ditolak oleh BnM Manajer / Administrator dan dikembalikan dengan status revisi.",
         data: result,
       });
     }

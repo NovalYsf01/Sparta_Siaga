@@ -42,7 +42,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
 
       return NextResponse.json({
-        message: "Laporan berhasil disetujui final oleh Building & Maintenance Manager / Administrator dan resmi ditutup.",
+        message: "Laporan berhasil disetujui final oleh BnM Manajer / Administrator dan resmi ditutup.",
         data: result,
       });
     }
@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
 
       return NextResponse.json({
-        message: "Laporan berhasil disetujui oleh Koordinator dan diteruskan ke Building & Maintenance Manager.",
+        message: "Laporan berhasil disetujui oleh Koordinator dan diteruskan ke BnM Manajer.",
         data: result,
       });
     }

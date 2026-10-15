@@ -466,7 +466,7 @@ export class CompletionApprovalService {
     const nowWib = formatServerTimestampWib();
     const timelineEntry = {
       stage: "Pengajuan Penyelesaian",
-      label: "Penyelesaian Pekerjaan Diajukan ke Manager Branch",
+      label: "Penyelesaian Pekerjaan Diajukan ke BnM Manajer",
       timestamp: nowWib,
       actor: `${params.actor.name} (${actorRole.toUpperCase()})`,
       notes: submissionNotes,
@@ -771,7 +771,7 @@ export class CompletionApprovalService {
     // 1. HO Role Substitution Blocked
     if (params.actor.scope === "HO" || ["ho_admin", "gm_ho", "sm_ho"].includes(params.actor.role || "")) {
       const err: any = new Error(
-        "Forbidden: User dengan role atau scope Head Office (HO) tidak dapat menggantikan kewenangan Building & Maintenance Manager cabang."
+        "Forbidden: User dengan role atau scope Head Office (HO) tidak dapat menggantikan kewenangan BnM Manajer cabang."
       );
       err.status = 403;
       err.code = "HO_MANAGER_SUBSTITUTION_BLOCKED";
@@ -780,11 +780,11 @@ export class CompletionApprovalService {
 
     const isSystemAdmin = params.actor.systemRole === "ADMIN";
 
-    // 2. Role Check: Building & Maintenance Manager ('bm') or Admin
+    // 2. Role Check: BnM Manajer ('bm') or Admin
     const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
     if (!isSystemAdmin && actorRole !== "bm") {
       const err: any = new Error(
-        `Persetujuan final dan penutupan laporan hanya dapat dilakukan oleh Building & Maintenance Manager (BMM), bukan '${actorRole.toUpperCase() || "N/A"}'.`
+        `Persetujuan final dan penutupan laporan hanya dapat dilakukan oleh BnM Manajer, bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
       err.status = 403;
       err.code = "ROLE_MISMATCH";
@@ -797,7 +797,7 @@ export class CompletionApprovalService {
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
         const err: any = new Error(
-          `Aksi persetujuan final Building & Maintenance Manager hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
+          `Aksi persetujuan final BnM Manajer hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
         );
         err.status = 403;
         err.code = "BRANCH_SCOPE_VIOLATION";
@@ -871,10 +871,10 @@ export class CompletionApprovalService {
 
     // 8. Update Incident: status = closed, progress = 100, closedAt
     const nowWib = formatServerTimestampWib();
-    const actorLabel = isSystemAdmin ? `${params.actor.name} (ADMIN)` : `${params.actor.name} (BMM ${report.branch || ""})`;
+    const actorLabel = isSystemAdmin ? `${params.actor.name} (ADMIN)` : `${params.actor.name} (BnM Manajer ${report.branch || ""})`;
     const closeTimelineEntry = {
       stage: "Laporan Ditutup",
-      label: `Pekerjaan Disetujui Final & Laporan Resmi Ditutup (${isSystemAdmin ? "Admin SPARTA SIAGA" : "Building & Maintenance Manager"})`,
+      label: `Pekerjaan Disetujui Final & Laporan Resmi Ditutup (${isSystemAdmin ? "Admin SPARTA SIAGA" : "BnM Manajer"})`,
       timestamp: nowWib,
       actor: actorLabel,
       notes: managerNotes,
@@ -954,10 +954,10 @@ export class CompletionApprovalService {
 
     const isSystemAdmin = params.actor.systemRole === "ADMIN";
 
-    // 2. Role Check: BMM ('bm') or Admin
+    // 2. Role Check: BnM Manajer ('bm') or Admin
     const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
     if (!isSystemAdmin && actorRole !== "bm") {
-      const err: any = new Error(`Hanya Building & Maintenance Manager (BMM) yang dapat meminta revisi pada tahap ini.`);
+      const err: any = new Error(`Hanya BnM Manajer yang dapat meminta revisi pada tahap ini.`);
       err.status = 403;
       throw err;
     }
@@ -968,7 +968,7 @@ export class CompletionApprovalService {
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
         const err: any = new Error(
-          `Aksi penolakan Building & Maintenance Manager hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}).`
+          `Aksi penolakan BnM Manajer hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}).`
         );
         err.status = 403;
         throw err;
@@ -978,7 +978,7 @@ export class CompletionApprovalService {
     // 4. State Check
     if (approval.status !== "WAITING_MANAGER_APPROVAL" && approval.status !== "WAITING_COORDINATOR_APPROVAL") {
       const err: any = new Error(
-        `Penolakan / permintaan revisi Branch Manager ditolak: Status laporan saat ini adalah '${approval.status}'.`
+        `Penolakan / permintaan revisi BnM Manajer ditolak: Status laporan saat ini adalah '${approval.status}'.`
       );
       err.status = 400;
       throw err;
@@ -1032,9 +1032,9 @@ export class CompletionApprovalService {
     const nowWib = formatServerTimestampWib();
     const timelineEntry = {
       stage: "Revisi Pekerjaan Diminta",
-      label: `Revisi Diminta oleh Branch Manager`,
+      label: `Revisi Diminta oleh BnM Manajer`,
       timestamp: nowWib,
-      actor: `${params.actor.name} (BM ${report.branch || ""})`,
+      actor: `${params.actor.name} (BnM Manajer ${report.branch || ""})`,
       notes: reason,
     };
 

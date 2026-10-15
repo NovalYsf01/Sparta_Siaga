@@ -49,6 +49,52 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     const patch = await request.json();
+
+    // Handling Target Penyelesaian (completedAt) update for BMS/BES
+    if (patch.targetCompletionDate !== undefined) {
+      const userRoleStr = (sessionUser.role || "").toLowerCase();
+      const isTechnicalOfficer = sessionUser.systemRole === "ADMIN" || ["bms", "bes"].includes(userRoleStr) || incident.primaryPicUserId === sessionUser.id;
+      if (!isTechnicalOfficer) {
+        return NextResponse.json(
+          { error: "Forbidden: Pengisian target selesai hanya dapat dilakukan oleh petugas teknis (BMS/BES) atau Admin." },
+          { status: 403 }
+        );
+      }
+      const existingTicket = incident.maintenanceTicket || { ticketId: `TCK-${id}` };
+      const updatedTicket = {
+        ...existingTicket,
+        completedAt: patch.targetCompletionDate ? new Date(patch.targetCompletionDate).toISOString() : undefined,
+      };
+      patch.maintenanceTicket = updatedTicket;
+      delete patch.targetCompletionDate;
+
+      // Sync to report_estimation_routes if exists
+      try {
+        const { getDbPool } = await import("@/lib/db");
+        await getDbPool().query(
+          "UPDATE report_estimation_routes SET completed_at = $1 WHERE report_id = $2",
+          [updatedTicket.completedAt || null, id]
+        );
+      } catch (e) {
+        console.warn("[PATCH /api/incidents/:id] Sync estimation completed_at warning:", e);
+      }
+
+      // Record in audit timeline
+      const nowWib = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB";
+      const targetLabel = updatedTicket.completedAt
+        ? new Date(updatedTicket.completedAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+        : "Belum Ditentukan";
+      patch.timeline = [
+        ...(incident.timeline || []),
+        {
+          stage: "Target Selesai",
+          label: `Target penyelesaian disetel ke ${targetLabel} oleh ${sessionUser.name}`,
+          timestamp: nowWib,
+          actor: sessionUser.name,
+        },
+      ];
+    }
+
     const isConfirmation = Boolean(
       patch.verification && (!incident.verification || incident.status === "pending_confirmation" || incident.status === "verifying")
     );

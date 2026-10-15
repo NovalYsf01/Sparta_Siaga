@@ -38,7 +38,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManage(user)) return NextResponse.json({ error: "Hanya BMM/Admin yang dapat memindahkan PIC" }, { status: 403 });
+  if (!canManage(user)) return NextResponse.json({ error: "Hanya BnM Manajer/Admin yang dapat memindahkan PIC" }, { status: 403 });
   const { id } = await context.params;
   const body = await request.json();
   if (!body.nextUserId) return NextResponse.json({ error: "PIC tujuan wajib diisi" }, { status: 400 });
@@ -56,7 +56,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const details = await getIncidentPicDetails(id, user.systemRole === "ADMIN" || user.scope === "HO" ? undefined : user.branch);
   if (!details) return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
   if (!canManage(user) && details.primary_pic_user_id !== user.id) {
-    return NextResponse.json({ error: "Hanya PIC aktif atau BMM/Admin yang dapat melepas PIC" }, { status: 403 });
+    return NextResponse.json({ error: "Hanya PIC aktif atau BnM Manajer/Admin yang dapat melepas PIC" }, { status: 403 });
   }
   try {
     const body = await request.json().catch(() => ({}));

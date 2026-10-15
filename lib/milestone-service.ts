@@ -169,7 +169,7 @@ export async function submitMilestoneDocument({
     throw new Error("Laporan berstatus Ditolak (rejected_invalid) tidak dapat diproses dalam penanganan pekerjaan.");
   }
   if (incident.status === "pending_confirmation" || incident.status === "pending_bm_approval") {
-    throw new Error("Laporan belum disetujui awal oleh Building & Maintenance Manager (status wajib confirmed_affected).");
+    throw new Error("Laporan belum disetujui awal oleh BnM Manajer (status wajib confirmed_affected).");
   }
 
   // 4. Branch & Role isolation (Admin is not restricted to single branch or single tkp type)

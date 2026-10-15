@@ -621,33 +621,33 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
 
       const isBmApproved = Boolean(
         report?.bmApproval?.decision === "approved" ||
-        ((report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && isDamaged)
+        ((report?.confirmedBy?.includes("BnM Manajer") || report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && isDamaged)
       );
       const isBmSafe = Boolean(
         report?.bmApproval?.decision === "safe" ||
-        ((report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && !isDamaged)
+        ((report?.confirmedBy?.includes("BnM Manajer") || report?.confirmedBy?.includes("Branch Manager") || report?.confirmedBy?.includes("BMM") || report?.confirmedBy?.includes("ADMIN")) && !isDamaged)
       );
       const isBmRejected = report?.bmApproval?.decision === "rejected";
       const isBmClarification = report?.bmApproval?.decision === "clarification_requested";
 
-      if (isBmSafe || (!isDamaged && report?.confirmedBy?.includes("Manager"))) {
+      if (isBmSafe || (!isDamaged && (report?.confirmedBy?.includes("Manajer") || report?.confirmedBy?.includes("Manager")))) {
         return {
           ...inc,
           status: "confirmed_safe" as const,
           progress: 100,
           verification: {
-            confirmedBy: report?.confirmedBy || "Building & Maintenance Manager",
+            confirmedBy: report?.confirmedBy || "BnM Manajer",
             confirmedAt: timestamp,
             isDamaged: false,
-            notes: report?.notes || "Kondisi dinyatakan aman oleh Building & Maintenance Manager.",
+            notes: report?.notes || "Kondisi dinyatakan aman oleh BnM Manajer.",
           },
           timeline: [
             ...inc.timeline,
             {
-              stage: "Keputusan Building & Maintenance Manager",
-              label: "Kondisi Dinyatakan Aman oleh Building & Maintenance Manager",
+              stage: "Keputusan BnM Manajer",
+              label: "Kondisi Dinyatakan Aman oleh BnM Manajer",
               timestamp,
-              actor: report?.confirmedBy || "Building & Maintenance Manager",
+              actor: report?.confirmedBy || "BnM Manajer",
               notes: report?.notes,
             },
           ],
@@ -661,10 +661,10 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           timeline: [
             ...inc.timeline,
             {
-              stage: "Keputusan Building & Maintenance Manager",
-              label: "Laporan Ditolak Building & Maintenance Manager (Tidak Valid)",
+              stage: "Keputusan BnM Manajer",
+              label: "Laporan Ditolak BnM Manajer (Tidak Valid)",
               timestamp,
-              actor: report?.confirmedBy || "Building & Maintenance Manager",
+              actor: report?.confirmedBy || "BnM Manajer",
               notes: report?.notes,
             },
           ],
@@ -677,10 +677,10 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           timeline: [
             ...inc.timeline,
             {
-              stage: "Keputusan Building & Maintenance Manager",
+              stage: "Keputusan BnM Manajer",
               label: "Permintaan Klarifikasi Hasil Pemeriksaan",
               timestamp,
-              actor: report?.confirmedBy || "Building & Maintenance Manager",
+              actor: report?.confirmedBy || "BnM Manajer",
               notes: report?.notes,
             },
           ],
@@ -693,7 +693,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           status: "confirmed_affected" as const,
           progress: inc.progress ?? 0,
           verification: {
-            confirmedBy: report?.confirmedBy || "Building & Maintenance Manager",
+            confirmedBy: report?.confirmedBy || "BnM Manajer",
             confirmedAt: timestamp,
             isDamaged: true,
             categories: report?.categories || ["Rak Barang"],
@@ -705,10 +705,10 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           timeline: [
             ...inc.timeline,
             {
-              stage: "Persetujuan Building & Maintenance Manager",
+              stage: "Persetujuan BnM Manajer",
               label: `Kerusakan Disetujui (${report?.severity || "Sedang"}) — Siap Penanganan Teknis`,
               timestamp,
-              actor: report?.confirmedBy || "Building & Maintenance Manager",
+              actor: report?.confirmedBy || "BnM Manajer",
               notes: report?.notes,
             },
           ],

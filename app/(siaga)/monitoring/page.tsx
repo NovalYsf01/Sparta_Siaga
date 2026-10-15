@@ -6,6 +6,7 @@ import { Filter, Loader2, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 import { MapToolbar, type MapMode } from "@/components/map/map-toolbar";
 import { LocationDetailPanel, type FacilityDetail } from "@/components/map/location-detail-panel";
+import { LocationListSheet } from "@/components/map/location-list-sheet";
 import { EarthquakeListModal } from "@/components/disaster/earthquake-list-modal";
 import { assessStoreRisk } from "@/lib/haversine";
 import type { Store } from "@/types/store";
@@ -35,6 +36,7 @@ export default function MonitoringPage() {
   const [facilityMapping, setFacilityMapping] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [isLocationListOpen, setIsLocationListOpen] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<FacilityDetail | null>(null);
   const [isEarthquakeModalOpen, setIsEarthquakeModalOpen] = useState(false);
   const [viewport, setViewport] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
@@ -226,6 +228,39 @@ export default function MonitoringPage() {
     setSelectedFacility(null);
   };
 
+  const handleCloseAllSheets = () => {
+    setFilterOpen(false);
+    setIsLocationListOpen(false);
+    setIsEarthquakeModalOpen(false);
+    setIsAffectedSheetOpen(false);
+    handleCloseDetail();
+  };
+
+  const handleOpenFilter = () => {
+    handleCloseAllSheets();
+    setFilterOpen(true);
+  };
+
+  const handleOpenLocationList = () => {
+    handleCloseAllSheets();
+    setIsLocationListOpen(true);
+  };
+
+  const handleOpenEvaluated = () => {
+    handleCloseAllSheets();
+    setIsAffectedSheetOpen(true);
+  };
+
+  const handleOpenEarthquakes = () => {
+    handleCloseAllSheets();
+    setIsEarthquakeModalOpen(true);
+  };
+
+  const handleModeChange = (m: MapMode) => {
+    setMapMode(m);
+    handleCloseAllSheets();
+  };
+
   const handleResetLocationFilters = () => {
     setSearchQuery("");
     setFacilityType("");
@@ -239,15 +274,12 @@ export default function MonitoringPage() {
       {/* 1. TOP TOOLBAR & CONTEXT BAR (NO OVERLAYS OVER MAP) */}
       <MapToolbar
         mapMode={mapMode}
-        onModeChange={(m) => {
-          setMapMode(m);
-          handleCloseDetail();
-        }}
+        onModeChange={handleModeChange}
         latestEarthquake={latestEq}
         activeEarthquakesCount={activeQuakes.length}
         evaluatedLocationsCount={dangerCount}
-        onOpenEvaluatedSheet={() => setIsAffectedSheetOpen(true)}
-        onOpenEarthquakeListModal={() => setIsEarthquakeModalOpen(true)}
+        onOpenEvaluatedSheet={handleOpenEvaluated}
+        onOpenEarthquakeListModal={handleOpenEarthquakes}
         onFocusEpicenter={() => {
           if (latestEq) handleFocusDisaster(latestEq);
         }}
@@ -274,8 +306,9 @@ export default function MonitoringPage() {
         onToggleRadar={() => setShowRadar((prev) => !prev)}
         onResetView={handleResetView}
         theme={theme}
-        onOpenFilterModal={() => setFilterOpen(true)}
-        isMobileDetailOpen={Boolean(activeDetailStore || activeDetailFacility)}
+        onOpenFilterModal={handleOpenFilter}
+        onOpenLocationListSheet={handleOpenLocationList}
+        isMobileDetailOpen={Boolean(activeDetailStore || activeDetailFacility || filterOpen || isLocationListOpen || isEarthquakeModalOpen)}
       />
 
       {/* 2. MAIN WORKSPACE: MAP (LEFT/MAIN) + CONTEXTUAL SIDE PANEL (RIGHT) */}
@@ -291,6 +324,10 @@ export default function MonitoringPage() {
             statusFilter={statusFilter}
             selectedStore={selectedStore}
             onSelectStore={(store) => {
+              setFilterOpen(false);
+              setIsLocationListOpen(false);
+              setIsEarthquakeModalOpen(false);
+              setIsAffectedSheetOpen(false);
               const fac = facilityByStoreId.get(store.id);
               if (fac) {
                 setSelectedFacility(fac);
@@ -333,7 +370,22 @@ export default function MonitoringPage() {
         </div>
       )}
 
-      {/* 3. EARTHQUAKE LIST MODAL */}
+      {/* 3. LOCATION LIST SHEET (List-First Alternative) */}
+      <LocationListSheet
+        isOpen={isLocationListOpen}
+        onClose={() => setIsLocationListOpen(false)}
+        locations={displayedLocations}
+        onSelectLocation={(loc) => {
+          const fac = facilityByStoreId.get(loc.id);
+          setSelectedFacility(fac || null);
+          handleSelectStore(loc);
+        }}
+        selectedLocationId={selectedStore?.id}
+        mapMode={mapMode}
+        theme={theme}
+      />
+
+      {/* 4. EARTHQUAKE LIST MODAL */}
       <EarthquakeListModal
         isOpen={isEarthquakeModalOpen}
         onClose={() => setIsEarthquakeModalOpen(false)}
@@ -346,10 +398,10 @@ export default function MonitoringPage() {
         theme={theme}
       />
 
-      {/* 4. FACILITY FILTER MODAL (Compatible with test selector) */}
+      {/* 5. FACILITY FILTER MODAL (Compatible with test selector) */}
       {filterOpen && (
         <div
-          className="fixed inset-0 z-[3000] flex items-end sm:items-center sm:justify-center p-3 sm:p-5 bg-slate-950/60 backdrop-blur-xs"
+          className="fixed inset-0 z-[3000] flex items-end sm:items-center sm:justify-center p-0 sm:p-5 bg-slate-950/60 backdrop-blur-xs"
           role="dialog"
           aria-modal="true"
           aria-label="Filter fasilitas"
@@ -357,14 +409,17 @@ export default function MonitoringPage() {
             if (e.target === e.currentTarget) setFilterOpen(false);
           }}
         >
-          <div className="w-full rounded-2xl bg-white dark:bg-slate-900 p-4 sm:p-5 text-slate-900 dark:text-white shadow-2xl sm:max-w-md border border-slate-200 dark:border-slate-800">
+          <div className="w-full rounded-t-3xl sm:rounded-2xl bg-white dark:bg-slate-900 p-4 sm:p-5 text-slate-900 dark:text-white shadow-2xl sm:max-w-md border border-slate-200 dark:border-slate-800 pb-28 sm:pb-5 max-h-[85vh] overflow-y-auto">
+            <div className="sm:hidden w-full flex justify-center pb-2">
+              <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+            </div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <h2 className="font-bold text-sm">Filter Fasilitas & Jaringan</h2>
               <button
                 type="button"
                 onClick={() => setFilterOpen(false)}
                 className="p-1 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 min-h-[44px] min-w-[44px] grid place-items-center"
-                aria-label="Tutup"
+                aria-label="Tutup filter"
               >
                 <X className="h-5 w-5" />
               </button>

@@ -61,9 +61,9 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   },
   {
     key: "REPORT_BM_APPROVAL",
-    label: "Persetujuan Branch Manager",
+    label: "Persetujuan BnM Manajer",
     category: "LAPORAN",
-    description: "Izin memberikan keputusan dan persetujuan awal Branch Manager terhadap hasil pemeriksaan cabang.",
+    description: "Izin memberikan keputusan dan persetujuan awal BnM Manajer terhadap hasil pemeriksaan cabang.",
     isOperational: true,
   },
   {
@@ -256,8 +256,8 @@ export const PERMISSION_SCOPE_RULES: Record<PermissionKey, PermissionScopeRule> 
     policy: "BRANCH_SCOPED",
     allowedScopes: ["SPECIFIC_BRANCH", "OWN_SCOPE"],
     defaultScope: "SPECIFIC_BRANCH",
-    scopeSummary: (u) => `Keputusan Branch Manager (${u?.branch || "Branch"})`,
-    description: "Izin persetujuan awal Branch Manager terhadap hasil pemeriksaan cabang.",
+    scopeSummary: (u) => `Keputusan BnM Manajer (${u?.branch || "Cabang"})`,
+    description: "Izin persetujuan awal BnM Manajer terhadap hasil pemeriksaan cabang.",
   },
   REPORT_FOLLOW_UP: {
     key: "REPORT_FOLLOW_UP",

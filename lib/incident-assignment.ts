@@ -5,7 +5,7 @@ export async function claimIncidentPic(input: {
   userId: string;
   branch: string | null;
   systemRole: string;
-}): Promise<{ claimed: boolean; currentPicUserId: string | null }> {
+}): Promise<{ claimed: boolean; currentPicUserId: string | null; status?: string; claimedAt?: string }> {
   const client = await getDbPool().connect();
   try {
     await client.query("BEGIN");
@@ -15,11 +15,14 @@ export async function claimIncidentPic(input: {
       values.push(input.branch);
       branchClause = ` AND branch = $${values.length}`;
     }
-    const result = await client.query<{ primary_pic_user_id: string }>(
+    const result = await client.query<{ primary_pic_user_id: string; status: string; primary_pic_claimed_at: string }>(
       `UPDATE incidents
-          SET primary_pic_user_id = $2, primary_pic_claimed_at = NOW(), updated_at = NOW()
+          SET primary_pic_user_id = $2,
+              primary_pic_claimed_at = NOW(),
+              status = CASE WHEN status IN ('pending_confirmation', 'verifying', 'confirmed_affected') THEN 'investigating' ELSE status END,
+              updated_at = NOW()
         WHERE id = $1 AND primary_pic_user_id IS NULL${branchClause}
-        RETURNING primary_pic_user_id`,
+        RETURNING primary_pic_user_id, status, primary_pic_claimed_at`,
       values
     );
     if (result.rows[0]) {
@@ -30,14 +33,23 @@ export async function claimIncidentPic(input: {
         [input.incidentId, input.userId]
       );
       await client.query("COMMIT");
-      return { claimed: true, currentPicUserId: input.userId };
+      return {
+        claimed: true,
+        currentPicUserId: input.userId,
+        status: result.rows[0].status,
+        claimedAt: result.rows[0].primary_pic_claimed_at,
+      };
     }
-    const current = await client.query<{ primary_pic_user_id: string | null }>(
-      `SELECT primary_pic_user_id FROM incidents WHERE id = $1${branchClause}`,
+    const current = await client.query<{ primary_pic_user_id: string | null; status: string }>(
+      `SELECT primary_pic_user_id, status FROM incidents WHERE id = $1${branchClause}`,
       input.systemRole === "ADMIN" ? [input.incidentId] : [input.incidentId, input.userId, input.branch]
     );
     await client.query("COMMIT");
-    return { claimed: false, currentPicUserId: current.rows[0]?.primary_pic_user_id ?? null };
+    return {
+      claimed: false,
+      currentPicUserId: current.rows[0]?.primary_pic_user_id ?? null,
+      status: current.rows[0]?.status,
+    };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

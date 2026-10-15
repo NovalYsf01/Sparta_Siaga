@@ -54,12 +54,12 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
   // --- BRANCH ---
   {
     key: "bm",
-    label: "Building & Maintenance Manager",
-    fullLabel: "Building & Maintenance Manager",
+    label: "BnM Manajer",
+    fullLabel: "BnM Manajer",
     scope: "BRANCH",
     category: "BRANCH",
     selectable: true,
-    description: "Pimpinan cabang Building & Maintenance Manager (BMM), pemegang wewenang approval awal, approval final penyelesaian pekerjaan dan Case Close cabang sendiri.",
+    description: "Pimpinan cabang BnM Manajer, pemegang wewenang approval awal, approval final penyelesaian pekerjaan dan Case Close cabang sendiri.",
   },
   {
     key: "tim_toko",
@@ -255,9 +255,9 @@ export function getRoleDisplayLabel(role?: string | null): string {
     return "Admin SPARTA SIAGA";
   }
 
-  // Building & Maintenance Manager
+  // BnM Manajer
   if (r === "bm") {
-    return "Building & Maintenance Manager";
+    return "BnM Manajer";
   }
 
   const def = getBusinessRoleDefinition(r);
@@ -270,12 +270,12 @@ export function getRoleDisplayLabel(role?: string | null): string {
 }
 
 /**
- * Short label / singkatan resolver (misal: BMM, ADMIN, BMS, BES)
+ * Short label / singkatan resolver (misal: BnM Manajer, ADMIN, BMS, BES)
  */
 export function getRoleShortLabel(role?: string | null): string {
   if (!role) return "User";
   const r = role.toLowerCase();
-  if (r === "bm") return "BMM";
+  if (r === "bm") return "BnM Manajer";
   if (r === "admin" || r === "sys_admin" || r === "system_admin") return "ADMIN";
   const def = getBusinessRoleDefinition(r);
   return def ? def.label : role.toUpperCase();

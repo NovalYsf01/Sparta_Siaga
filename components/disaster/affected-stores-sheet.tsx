@@ -46,32 +46,40 @@ export function AffectedStoresSheet({
 
   return (
     <div
-      className={`fixed inset-y-0 left-0 w-full sm:w-[440px] z-[600] shadow-2xl flex flex-col backdrop-blur-xl animate-in slide-in-from-left duration-300 ${
+      role="dialog"
+      aria-label="Lokasi dalam Radius Evaluasi"
+      className={`fixed inset-x-0 bottom-0 max-h-[85vh] rounded-t-3xl border-t pb-24 sm:pb-0 sm:inset-y-0 sm:left-0 sm:right-auto sm:w-[440px] sm:rounded-none sm:border-r sm:max-h-full z-[1500] shadow-2xl flex flex-col backdrop-blur-xl animate-in slide-in-from-bottom sm:slide-in-from-left duration-300 ${
         isLight
-          ? "bg-white/95 border-r border-slate-200 text-slate-800"
-          : "bg-slate-900/95 border-r border-slate-800 text-slate-200"
+          ? "bg-white/95 border-slate-200 text-slate-800"
+          : "bg-slate-900/95 border-slate-800 text-slate-200"
       }`}
     >
+      {/* Mobile drag bar */}
+      <div className="sm:hidden w-full flex justify-center pt-2 pb-1">
+        <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+      </div>
+
       {/* Header */}
-      <div className={`p-5 flex items-start justify-between gap-3 ${isLight ? "bg-white" : "bg-slate-900"}`}>
+      <div className={`p-4 sm:p-5 flex items-start justify-between gap-3 ${isLight ? "bg-white" : "bg-slate-900"}`}>
         <div>
-          <h2 className={`text-base font-bold tracking-tight ${isLight ? "text-slate-900" : "text-white"}`}>
+          <h2 className={`text-sm sm:text-base font-bold tracking-tight ${isLight ? "text-slate-900" : "text-white"}`}>
             Lokasi dalam Radius Evaluasi
           </h2>
-          <p className={`text-[11px] font-medium mt-1 ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+          <p className={`text-[11px] font-medium mt-0.5 ${isLight ? "text-slate-500" : "text-slate-400"}`}>
             {earthquake ? earthquake.title : "Pemantauan Radius Gempa SPARTA"}
           </p>
         </div>
 
         <button
           onClick={onClose}
-          className={`p-1.5 rounded-full transition-colors ${
+          className={`p-2 rounded-xl transition-colors min-h-[44px] min-w-[44px] grid place-items-center ${
             isLight
-              ? "hover:bg-slate-100 text-slate-400 hover:text-slate-700"
-              : "hover:bg-slate-800 text-slate-500 hover:text-white"
+              ? "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+              : "hover:bg-slate-800 text-slate-400 hover:text-white"
           }`}
+          aria-label="Tutup"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
       </div>
 

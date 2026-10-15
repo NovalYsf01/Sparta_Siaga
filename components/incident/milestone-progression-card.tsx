@@ -173,7 +173,7 @@ export function MilestoneProgressionCard({
         await loadMilestones();
         if (onMilestoneUpdated) onMilestoneUpdated();
       } else {
-        setErrorMessage(json.error || "Gagal memproses keputusan final Building & Maintenance Manager.");
+        setErrorMessage(json.error || "Gagal memproses keputusan final BnM Manajer.");
       }
     } catch (err) {
       console.error(err);
@@ -193,17 +193,17 @@ export function MilestoneProgressionCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "SUBMIT_COMPLETION",
-          notes: "Pekerjaan fisik telah 100% selesai (Serah Terima) dan diajukan ke Building & Maintenance Manager.",
+          notes: "Pekerjaan fisik telah 100% selesai (Serah Terima) dan diajukan ke BnM Manajer.",
         }),
       });
 
       const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        setSuccessMessage("Penyelesaian pekerjaan berhasil diajukan kepada Building & Maintenance Manager.");
+        setSuccessMessage("Penyelesaian pekerjaan berhasil diajukan kepada BnM Manajer.");
         await loadMilestones();
         if (onMilestoneUpdated) onMilestoneUpdated();
       } else {
-        setErrorMessage(json.error || "Gagal mengajukan penyelesaian ke Building & Maintenance Manager.");
+        setErrorMessage(json.error || "Gagal mengajukan penyelesaian ke BnM Manajer.");
       }
     } catch (err) {
       console.error(err);
@@ -405,7 +405,7 @@ export function MilestoneProgressionCard({
             </h4>
           </div>
           <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
-            Tahap Serah Terima telah diverifikasi. Silakan ajukan penyelesaian pekerjaan kepada Building & Maintenance Manager untuk mendapatkan peninjauan dan persetujuan resmi (CLOSED).
+            Tahap Serah Terima telah diverifikasi. Silakan ajukan penyelesaian pekerjaan kepada BnM Manajer untuk mendapatkan peninjauan dan persetujuan resmi (CLOSED).
           </p>
           <div className="pt-1">
             <button
@@ -418,7 +418,7 @@ export function MilestoneProgressionCard({
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Ajukan Penyelesaian ke Building & Maintenance Manager</span>
+                  <span>Ajukan Penyelesaian ke BnM Manajer</span>
                 </>
               )}
             </button>
@@ -434,7 +434,7 @@ export function MilestoneProgressionCard({
               <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Persetujuan Final Building & Maintenance Manager (Penutupan Laporan)
+                  Persetujuan Final BnM Manajer (Penutupan Laporan)
                 </h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
                   Periksa seluruh 5 bukti fisik milestone sebelum memutuskan penyelesaian.
@@ -442,7 +442,7 @@ export function MilestoneProgressionCard({
               </div>
             </div>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-              Wewenang BM
+              Wewenang BnM Manajer
             </span>
           </div>
 
@@ -645,7 +645,7 @@ export function MilestoneProgressionCard({
             </a>
           ) : (
             <span
-              title="Tersedia setelah laporan disetujui BM (CLOSED)"
+              title="Tersedia setelah laporan disetujui BnM Manajer (CLOSED)"
               className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-200/60 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed flex items-center gap-1.5"
             >
               <Lock className="w-3.5 h-3.5" />

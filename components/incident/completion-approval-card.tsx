@@ -144,7 +144,7 @@ export function CompletionApprovalCard({
             8. Alur Persetujuan Penyelesaian & Case Close
           </h4>
           <p className="text-[11px] text-slate-400 mt-0.5">
-            Jalur: {route?.flowType || "BMS"} • {picLabel} → {coordLabel} → Building & Maintenance Manager (BMM {incident.branch})
+            Jalur: {route?.flowType || "BMS"} • {picLabel} → {coordLabel} → BnM Manajer ({incident.branch})
           </p>
         </div>
 
@@ -168,7 +168,7 @@ export function CompletionApprovalCard({
           ) : status === "WAITING_MANAGER_APPROVAL" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
               <Clock className="w-3.5 h-3.5 text-amber-600" />
-              Menunggu Approval BMM
+              Menunggu Approval BnM Manajer
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -256,7 +256,7 @@ export function CompletionApprovalCard({
             </span>
           </div>
 
-          {/* Step 4: Branch Manager Close */}
+          {/* Step 4: BnM Manajer Close */}
           <div
             className={`p-2 rounded-lg border ${
               currentStep >= 4
@@ -272,7 +272,7 @@ export function CompletionApprovalCard({
               ) : (
                 <ShieldCheck className="w-3 h-3" />
               )}
-              <span>4. Final BM</span>
+              <span>4. Final BnM Manajer</span>
             </div>
             <span className="text-[9px] font-normal block opacity-80">
               {isResolved ? "Case Closed" : "Menunggu"}
@@ -387,10 +387,10 @@ export function CompletionApprovalCard({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Tahap 3: Persetujuan Final Building & Maintenance Manager & Case Close
+                  Tahap 3: Persetujuan Final BnM Manajer & Case Close
                 </p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Koordinator ({coordLabel}) telah menyetujui. Menunggu persetujuan <span className="font-semibold text-emerald-600 dark:text-emerald-400">Building & Maintenance Manager (BMM)</span> cabang {incident.branch}.
+                  Koordinator ({coordLabel}) telah menyetujui. Menunggu persetujuan <span className="font-semibold text-emerald-600 dark:text-emerald-400">BnM Manajer</span> cabang {incident.branch}.
                 </p>
               </div>
 
@@ -421,7 +421,7 @@ export function CompletionApprovalCard({
                 </div>
               ) : (
                 <span className="text-xs text-slate-400 flex items-center gap-1" title={closeReason}>
-                  <Lock className="w-3.5 h-3.5" /> Menunggu Approval BMM ({incident.branch})
+                  <Lock className="w-3.5 h-3.5" /> Menunggu Approval BnM Manajer ({incident.branch})
                 </span>
               )}
             </div>
@@ -501,8 +501,8 @@ export function CompletionApprovalCard({
                 ? "Pastikan pekerjaan fisik 100% selesai dan foto serah terima (HANDOVER) telah terlampir."
                 : activeModal === "approve"
                 ? (userRole?.toLowerCase() === "bm" || isSysAdmin)
-                  ? "Persetujuan Building & Maintenance Manager / Administrator akan mengubah status laporan menjadi RESOLVED dan menutup laporan secara resmi."
-                  : "Persetujuan Koordinator akan meneruskan laporan ke tahap akhir (Building & Maintenance Manager Approval)."
+                  ? "Persetujuan BnM Manajer / Administrator akan mengubah status laporan menjadi RESOLVED dan menutup laporan secara resmi."
+                  : "Persetujuan Koordinator akan meneruskan laporan ke tahap akhir (Persetujuan BnM Manajer)."
                 : "Tuliskan alasan atau bagian yang perlu direvisi secara jelas agar PIC dapat memperbaikinya."}
             </p>
 

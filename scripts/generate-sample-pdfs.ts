@@ -40,7 +40,7 @@ async function main() {
       photos: [sampleJpeg.toString("base64")],
       bmApproval: {
         decision: "approved",
-        decidedBy: "Hendro BMM Bandung",
+        decidedBy: "Hendro BnM Manajer Bandung",
         decidedAt: "13 Okt 2026, 10:00 WIB",
         decisionNotes: "Disetujui untuk perbaikan segera oleh tim operasional.",
       },
@@ -59,10 +59,10 @@ async function main() {
         actor: "Asep BMS Bandung",
       },
       {
-        stage: "Persetujuan BM",
-        label: "Persetujuan Awal BMM",
+        stage: "Persetujuan BnM Manajer",
+        label: "Persetujuan Awal BnM Manajer",
         timestamp: "13 Okt 2026, 10:00 WIB",
-        actor: "Hendro BMM Bandung",
+        actor: "Hendro BnM Manajer Bandung",
       },
       {
         stage: "Milestone Ceklis",
@@ -96,9 +96,9 @@ async function main() {
       },
       {
         stage: "Penyelesaian Final",
-        label: "Penyelesaian Disetujui BMM",
+        label: "Penyelesaian Disetujui BnM Manajer",
         timestamp: "13 Okt 2026, 17:00 WIB",
-        actor: "Hendro BMM Bandung",
+        actor: "Hendro BnM Manajer Bandung",
       },
     ],
     createdAt: new Date().toISOString(),

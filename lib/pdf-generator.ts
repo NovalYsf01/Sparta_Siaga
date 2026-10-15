@@ -305,21 +305,21 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
   const inspectNotes = truncate(ver?.notes || "Tidak ada catatan tambahan.", 80);
   doc.addText(inspectNotes, 45, 395, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
 
-  // 6. Section IV: Status Persetujuan Awal Building & Maintenance Manager
+  // 6. Section IV: Status Persetujuan Awal BnM Manajer
   doc.addRect(35, 235, 525, 120, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });
   doc.addRect(35, 333, 525, 22, { fillColor: [0.11, 0.35, 0.65] });
-  doc.addText("IV. PERSETUJUAN AWAL BUILDING & MAINTENANCE MANAGER (BMM)", 45, 340, { font: "bold", size: 9.5, color: [1, 1, 1] });
+  doc.addText("IV. PERSETUJUAN AWAL BnM MANAJER", 45, 340, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const bmDec = ver?.bmApproval;
   doc.addText("Pemberi Persetujuan:", 45, 312, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(truncate(bmDec?.decidedBy || "Building & Maintenance Manager Cabang", 24), 160, 312, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText(truncate(bmDec?.decidedBy || "BnM Manajer Cabang", 24), 160, 312, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
   doc.addText("Waktu Keputusan:", 310, 312, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
   doc.addText(truncate(bmDec?.decidedAt || "-", 24), 415, 312, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
   doc.addText("Keputusan:", 45, 292, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
   doc.addText((bmDec?.decision || report.status || "-").toUpperCase(), 160, 292, { font: "bold", size: 8.5, color: [0.1, 0.4, 0.7] });
 
-  doc.addText("Catatan Manager:", 45, 272, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
+  doc.addText("Catatan BnM Manajer:", 45, 272, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
   const managerNotes = truncate(bmDec?.decisionNotes || bmDec?.rejectionReason || "Pemeriksaan disetujui untuk penanganan.", 70);
   doc.addText(managerNotes, 160, 272, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
 
@@ -371,7 +371,7 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
     size: 13,
     color: [1, 1, 1],
   });
-  doc.addText("LAPORAN FINAL PEKERJAAN FISIK DAN PERSETUJUAN BUILDING & MAINTENANCE MANAGER", 48, 777, {
+  doc.addText("LAPORAN FINAL PEKERJAAN FISIK DAN PERSETUJUAN BnM MANAJER", 48, 777, {
     font: "regular",
     size: 9.5,
     color: [0.85, 0.98, 0.9],
@@ -445,10 +445,10 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
     mY -= 22;
   }
 
-  // 5. Section III: Keputusan Persetujuan Final Building & Maintenance Manager
+  // 5. Section III: Keputusan Persetujuan Final BnM Manajer
   doc.addRect(35, 280, 525, 140, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.9, 0.88] });
   doc.addRect(35, 398, 525, 22, { fillColor: [0.08, 0.42, 0.26] });
-  doc.addText("III. KEPUTUSAN PERSETUJUAN FINAL BUILDING & MAINTENANCE MANAGER (BMM)", 45, 405, {
+  doc.addText("III. KEPUTUSAN PERSETUJUAN FINAL BnM MANAJER", 45, 405, {
     font: "bold",
     size: 9.5,
     color: [1, 1, 1],
@@ -458,7 +458,7 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
   const bmFinal = timeline.slice().reverse().find((t) => t.stage === "Laporan Ditutup" || t.label?.includes("CLOSED"));
 
   doc.addText("Pemberi Persetujuan:", 45, 377, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(truncate(bmFinal?.actor || `Building & Maintenance Manager (${report.branch || "-"})`, 26), 160, 377, { font: "bold", size: 8.5, color: [0.1, 0.1, 0.1] });
+  doc.addText(truncate(bmFinal?.actor || `BnM Manajer (${report.branch || "-"})`, 26), 160, 377, { font: "bold", size: 8.5, color: [0.1, 0.1, 0.1] });
 
   doc.addText("Keputusan Akhir:", 310, 377, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
   doc.addText("DISETUJUI & DITUTUP (CLOSED)", 415, 377, { font: "bold", size: 8.5, color: [0.08, 0.5, 0.25] });
@@ -487,10 +487,10 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
   const picName = truncate(report.verification?.confirmedBy || "Pelaksana Pekerjaan", 26);
   doc.addText(picName, 75, 160, { font: "bold", size: 8, color: [0.1, 0.1, 0.1] });
 
-  // Column 2: Building & Maintenance Manager
-  doc.addText("Building & Maintenance Manager (BMM):", 340, 227, { font: "bold", size: 8, color: [0.3, 0.3, 0.3] });
+  // Column 2: BnM Manajer
+  doc.addText("BnM Manajer:", 340, 227, { font: "bold", size: 8, color: [0.3, 0.3, 0.3] });
   doc.addText("( Tanda tangan digital terverifikasi )", 340, 185, { font: "regular", size: 7.5, color: [0.45, 0.45, 0.45] });
-  const bmSignName = truncate(bmFinal?.actor?.replace(/\s*\(.*\)/, "") || `Building & Maintenance Manager ${report.branch || ""}`, 26);
+  const bmSignName = truncate(bmFinal?.actor?.replace(/\s*\(.*\)/, "") || `BnM Manajer ${report.branch || ""}`, 26);
   doc.addText(bmSignName, 340, 160, { font: "bold", size: 8, color: [0.1, 0.1, 0.1] });
 
   // 7. Footer & Pagination

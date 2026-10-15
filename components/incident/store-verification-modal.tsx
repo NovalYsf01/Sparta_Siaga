@@ -298,11 +298,11 @@ export function StoreVerificationModal({
 
       const resData = await res.json();
       if (!res.ok) {
-        throw new Error(resData.error || "Gagal menyimpan keputusan Building & Maintenance Manager.");
+        throw new Error(resData.error || "Gagal menyimpan keputusan BnM Manajer.");
       }
 
       onConfirmVerification(incident.id, bmDecision === "approved", {
-        confirmedBy: `${identity?.name || "Building & Maintenance Manager"} (BMM)`,
+        confirmedBy: `${identity?.name || "BnM Manajer"}`,
         confirmedAt: new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB",
         isDamaged: bmDecision === "approved",
         notes: bmNotes,
@@ -331,7 +331,7 @@ export function StoreVerificationModal({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                  {isBmView ? "Review & Persetujuan Building & Maintenance Manager (BMM)" : "Pemeriksaan Lapangan Kondisi Lokasi"}
+                  {isBmView ? "Review & Persetujuan BnM Manajer" : "Pemeriksaan Lapangan Kondisi Lokasi"}
                 </h3>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                   {incident.tkpType === "dc" ? "Warehouse / DC" : "Toko"}
@@ -362,7 +362,7 @@ export function StoreVerificationModal({
                 Anda tidak memiliki wewenang untuk memeriksa atau menyetujui laporan ini.
               </p>
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Pemeriksaan gerai toko hanya untuk BMS cabang terkait. Laporan DC untuk BES cabang terkait. Persetujuan untuk Building & Maintenance Manager (BMM) atau Administrator.
+                Pemeriksaan gerai toko hanya untuk BMS cabang terkait. Laporan DC untuk BES cabang terkait. Persetujuan untuk BnM Manajer atau Administrator.
               </p>
             </div>
 
@@ -390,7 +390,7 @@ export function StoreVerificationModal({
           </div>
         ) : isBmView ? (
           /* =========================================================================
-             BUILDING & MAINTENANCE MANAGER (BMM) REVIEW & DECISION MODE
+             BnM MANAJER REVIEW & DECISION MODE
              ========================================================================= */
           <form onSubmit={handleSubmitBmDecision} className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
             {submitError && (
@@ -490,7 +490,7 @@ export function StoreVerificationModal({
             {/* BM Decision Selection */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                Keputusan Building & Maintenance Manager (BMM):
+                Keputusan BnM Manajer:
               </label>
               <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <button
@@ -566,7 +566,7 @@ export function StoreVerificationModal({
                   {bmDecision === "rejected" || bmDecision === "clarification_requested" ? (
                     <span className="text-red-600 dark:text-red-400">* Alasan {bmDecision === "rejected" ? "Penolakan" : "Permintaan Klarifikasi"} (Wajib):</span>
                   ) : (
-                    "Catatan Building & Maintenance Manager (BMM) (Opsional):"
+                    "Catatan BnM Manajer (Opsional):"
                   )}
                 </label>
               </div>
@@ -639,13 +639,13 @@ export function StoreVerificationModal({
               <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-xs space-y-1">
                 <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200">
                   <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>Permintaan Klarifikasi dari Building & Maintenance Manager</span>
+                  <span>Permintaan Klarifikasi dari BnM Manajer</span>
                 </div>
                 <p className="text-amber-800 dark:text-amber-300 text-[11px] leading-relaxed">
-                  Catatan BMM: &quot;{incident.verification?.bmApproval?.clarificationReason || incident.verification?.notes || "Mohon lengkapi foto dan keterangan aktual."}&quot;
+                  Catatan BnM Manajer: &quot;{incident.verification?.bmApproval?.clarificationReason || incident.verification?.notes || "Mohon lengkapi foto dan keterangan aktual."}&quot;
                 </p>
                 <p className="text-[10px] text-amber-700 dark:text-amber-400 font-medium pt-1">
-                  Pengajuan ini akan dicatat sebagai revisi resmi dan dievaluasi kembali oleh Building & Maintenance Manager.
+                  Pengajuan ini akan dicatat sebagai revisi resmi dan dievaluasi kembali oleh BnM Manajer.
                 </p>
               </div>
             )}
@@ -995,7 +995,7 @@ export function StoreVerificationModal({
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition-all"
               >
                 {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>Ajukan Hasil Pemeriksaan ke Building & Maintenance Manager</span>
+                <span>Ajukan Hasil Pemeriksaan ke BnM Manajer</span>
                 {!isSubmitting && <ArrowRight className="w-3.5 h-3.5" />}
               </button>
             </div>

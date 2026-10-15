@@ -91,9 +91,9 @@ async function run() {
 
     // Label verification
     assert(
-      getRoleDisplayLabel("bm") === "Manager Branch",
+      getRoleDisplayLabel("bm") === "BnM Manajer",
       "T1.6",
-      "Role 'bm' berlabel kanonikal 'Manager Branch'"
+      "Role 'bm' berlabel kanonikal 'BnM Manajer'"
     );
     assert(
       getRoleDisplayLabel("bms") === "BMS",

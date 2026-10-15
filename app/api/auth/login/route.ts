@@ -52,7 +52,8 @@ export async function POST(request: Request) {
     const token = await signSession({
       id: user.id,
       nik: user.nik,
-      systemRole: user.systemRole
+      systemRole: user.systemRole,
+      v: user.tokenVersion || 1,
     });
 
     const response = NextResponse.json({ success: true, redirect: "/" });

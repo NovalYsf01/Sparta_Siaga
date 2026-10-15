@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     if (incident.status !== "confirmed_affected" && incident.status !== "in_maintenance" && incident.status !== "closed") {
       return NextResponse.json(
         {
-          error: `Insiden '${id}' belum berstatus persetujuan Branch Manager (Status saat ini: ${incident.status}).`,
+          error: `Insiden '${id}' belum berstatus persetujuan BnM Manajer (Status saat ini: ${incident.status}).`,
         },
         { status: 400 }
       );
@@ -101,7 +101,7 @@ export async function GET(request: Request, { params }: RouteContext) {
         evidencePhotos,
       },
       branchManagerApproval: {
-        decidedBy: incident.verification?.bmApproval?.decidedBy || "Branch Manager",
+        decidedBy: incident.verification?.bmApproval?.decidedBy || "BnM Manajer",
         decidedAt: incident.verification?.bmApproval?.decidedAt || "-",
         decision: incident.verification?.bmApproval?.decision || "approved",
         notes:

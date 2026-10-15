@@ -56,7 +56,7 @@ export async function seedDemoPersonas(): Promise<void> {
       id: "USR-BM-G001",
       nik: "BM0001",
       external_user_id: "bmm",
-      name: "Demo Manager BMM Bandung",
+      name: "Demo BnM Manajer Bandung",
       email: "bmm.bandung@sparta-siaga.local",
       system_role: "USER",
       business_role: "bm",

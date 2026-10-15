@@ -8,6 +8,7 @@ import {
   Building,
   Building2,
   CheckCircle2,
+  ClipboardList,
   Clock3,
   FilePlus2,
   FileText,
@@ -53,6 +54,7 @@ export default function DashboardPage() {
     disasterData,
     dangerCount,
     activeIncidents,
+    incidents,
     handleSelectIncidentForDetail,
     handleOpenReportModal,
     theme,
@@ -127,6 +129,111 @@ export default function DashboardPage() {
       ? `${Math.floor(oldestWaiting / 3600)} jam`
       : `${Math.floor(oldestWaiting / 60)} menit`;
 
+  // Helper for categorizing report handling status
+  const getHandlingStatusCategory = (inc: (typeof incidents)[number]) => {
+    const s = inc.status?.toLowerCase() || "";
+    if (s === "resolved" || s === "closed" || s === "selesai" || s === "confirmed_safe") {
+      return "completed";
+    }
+    if (s === "waiting_approval" || s === "menunggu_approval" || s === "review" || s === "verifying" || s === "pending_bm_approval" || s === "pending_final_approval" || s === "awaiting_st") {
+      return "waiting_approval";
+    }
+    if (inc.primaryPicUserId || s === "in_progress" || s === "handling" || s === "on_progress" || s === "in_maintenance" || s === "investigating") {
+      return "on_progress";
+    }
+    return "unhandled";
+  };
+
+  // 3. POV BMM - 4 Core KPIs (Belum Ditangani, On Progress, Menunggu Approval, Selesai)
+  const bmmKpis = useMemo(() => {
+    let belumDitangani = 0;
+    let onProgress = 0;
+    let menungguApproval = 0;
+    let selesai = 0;
+
+    for (const inc of incidents) {
+      const cat = getHandlingStatusCategory(inc);
+      if (cat === "unhandled") belumDitangani++;
+      else if (cat === "on_progress") onProgress++;
+      else if (cat === "waiting_approval") menungguApproval++;
+      else if (cat === "completed") selesai++;
+    }
+
+    return { belumDitangani, onProgress, menungguApproval, selesai };
+  }, [incidents]);
+
+  // 4. POV HO - National Summary KPIs & Monitoring Per Cabang
+  const hoSummary = useMemo(() => {
+    let total = incidents.length;
+    let onProgress = 0;
+    let menungguApproval = 0;
+    let selesai = 0;
+
+    for (const inc of incidents) {
+      const cat = getHandlingStatusCategory(inc);
+      if (cat === "on_progress") onProgress++;
+      else if (cat === "waiting_approval") menungguApproval++;
+      else if (cat === "completed") selesai++;
+    }
+
+    return { total, onProgress, menungguApproval, selesai };
+  }, [incidents]);
+
+  const hoBranchMonitoring = useMemo(() => {
+    const now = new Date();
+    const branchMap = new Map<
+      string,
+      {
+        branch: string;
+        total: number;
+        belumDitangani: number;
+        onProgress: number;
+        menungguApproval: number;
+        selesai: number;
+        picCount: number;
+        overdueCount: number;
+      }
+    >();
+
+    for (const inc of incidents) {
+      const branchName = inc.branch || "Nasional";
+      if (!branchMap.has(branchName)) {
+        branchMap.set(branchName, {
+          branch: branchName,
+          total: 0,
+          belumDitangani: 0,
+          onProgress: 0,
+          menungguApproval: 0,
+          selesai: 0,
+          picCount: 0,
+          overdueCount: 0,
+        });
+      }
+
+      const row = branchMap.get(branchName)!;
+      row.total++;
+      const cat = getHandlingStatusCategory(inc);
+      if (cat === "unhandled") row.belumDitangani++;
+      else if (cat === "on_progress") row.onProgress++;
+      else if (cat === "waiting_approval") row.menungguApproval++;
+      else if (cat === "completed") row.selesai++;
+
+      if (inc.primaryPicUserId || inc.primaryPicName) {
+        row.picCount++;
+      }
+
+      // Indikator keterlambatan hanya jika target/deadline selesai tersedia dan terlewat
+      if (inc.maintenanceTicket?.completedAt && cat !== "completed") {
+        const targetDate = new Date(inc.maintenanceTicket.completedAt);
+        if (!isNaN(targetDate.getTime()) && targetDate < now) {
+          row.overdueCount++;
+        }
+      }
+    }
+
+    return Array.from(branchMap.values()).sort((a, b) => b.total - a.total);
+  }, [incidents]);
+
   return (
     <div className="w-full">
       {/* MOBILE DASHBOARD (< 1024px) */}
@@ -158,8 +265,10 @@ export default function DashboardPage() {
               <span className="p-2 rounded-xl bg-[#1D5AA6]/10 text-[#1D5AA6]">
                 {roleInfo.isAdmin ? (
                   <ShieldCheck className="w-5 h-5" />
+                ) : roleInfo.isHO ? (
+                  <Activity className="w-5 h-5 text-blue-700" />
                 ) : roleInfo.isBMM ? (
-                  <Users className="w-5 h-5" />
+                  <Users className="w-5 h-5 text-amber-600" />
                 ) : roleInfo.isBES ? (
                   <Building2 className="w-5 h-5 text-emerald-600" />
                 ) : (
@@ -168,11 +277,11 @@ export default function DashboardPage() {
               </span>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                 {roleInfo.isAdmin
-                  ? "Pusat Kendali Administrasi & Audit Nasional"
+                  ? "Pusat Kendali Administrasi & Audit Sistem"
                   : roleInfo.isHO
-                  ? "Command Center Head Office (Nasional)"
+                  ? "Command Center Head Office (Monitoring Nasional)"
                   : roleInfo.isBMM
-                  ? `Panel Supervisi Cabang ${currentUser?.branch || ""}`
+                  ? `Monitoring Operasional Cabang ${currentUser?.branch || ""}`
                   : roleInfo.isBES
                   ? `Dashboard Fasilitas & Gedung (BES) • Cabang ${currentUser?.branch || ""}`
                   : `Dashboard Operasional Toko (BMS) • Cabang ${currentUser?.branch || ""}`}
@@ -180,11 +289,11 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-slate-500 mt-1 ml-9">
               {roleInfo.isAdmin
-                ? "Manajemen 67 fasilitas, rekonsiliasi data gempa, dan tata kelola hak akses cabang."
+                ? "Manajemen hak akses pengguna cabang dan pemantauan integritas laporan insiden."
                 : roleInfo.isHO
-                ? "Pemantauan komprehensif seluruh gerai dan fasilitas nasional secara read-only."
+                ? "Pemantauan komprehensif seluruh gerai dan fasilitas nasional (Read-Only)."
                 : roleInfo.isBMM
-                ? "Distribusi penugasan PIC tim BMS/BES, verifikasi laporan, dan persetujuan penanganan."
+                ? "Pengawasan 4 tahapan penanganan: Belum Ditangani, On Progress, Menunggu Approval, dan Selesai."
                 : roleInfo.isBES
                 ? "Penanganan laporan insiden khusus DC, Warehouse, Depo, Bulky, dan Store Hub."
                 : "Penanganan laporan insiden gerai toko resmi Alfamart di wilayah cabang Anda."}
@@ -195,37 +304,28 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             {roleInfo.isBMM && (
               <Link
-                href="/reports/shared-queue?tab=unassigned"
+                href="/reports"
                 className="px-4 py-2.5 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 transition-colors flex items-center gap-2 shadow-xs"
               >
-                <UserPlus className="w-4 h-4" />
-                <span>Distribusi PIC ({unassigned})</span>
+                <ClipboardList className="w-4 h-4" />
+                <span>Pusat Laporan Cabang ({activeIncidents.length})</span>
               </Link>
             )}
 
-            {roleInfo.isAdmin && (
-              <>
-                <Link
-                  href="/admin/facilities"
-                  className="px-4 py-2.5 bg-[#1D5AA6] text-white rounded-xl text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center gap-2 shadow-xs"
-                >
-                  <Building className="w-4 h-4" />
-                  <span>Master Fasilitas</span>
-                </Link>
-                <Link
-                  href="/admin/reconciliation"
-                  className="px-4 py-2.5 bg-slate-100 text-slate-800 hover:bg-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
-                >
-                  <Activity className="w-4 h-4" />
-                  <span>Rekonsiliasi</span>
-                </Link>
-              </>
+            {roleInfo.isHO && (
+              <Link
+                href="/reports"
+                className="px-4 py-2.5 bg-[#1D5AA6] text-white rounded-xl text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center gap-2 shadow-xs"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Seluruh Laporan Nasional ({incidents.length})</span>
+              </Link>
             )}
 
             {(roleInfo.isBMS || roleInfo.isBES) && (
               <>
                 <Link
-                  href="/reports/shared-queue?tab=my"
+                  href="/reports"
                   className="px-4 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition-colors flex items-center gap-2"
                 >
                   <UserCheck className="w-4 h-4 text-blue-600" />
@@ -244,122 +344,343 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* TOP SITUATION SUMMARY (4 KPI Cards) */}
-        <IncidentKpiRow
-          stats={incidentStats}
-          dangerCount={dangerCount}
-          selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-        />
+        {/* 3. BMM SIMPLIFIED 4 KPIS */}
+        {roleInfo.isBMM && (
+          <section aria-label="Monitoring Cabang 4 Status" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <article className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400">
+                  Belum Ditangani
+                </span>
+                <Clock3 className="w-5 h-5 text-amber-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-amber-900 dark:text-amber-200">
+                {bmmKpis.belumDitangani}
+              </p>
+              <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">
+                Memerlukan klaim PIC petugas lapangan
+              </p>
+            </article>
 
-        {/* ROLE-AWARE METRIC STRIP */}
-        <section
-          className="grid grid-cols-2 gap-3 xl:grid-cols-5"
-          aria-label="Ringkasan lokasi dan PIC"
-        >
-          {roleInfo.isBES ? (
-            /* BES Focused Strip */
-            <>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Tugas PIC Saya</p>
-                  <UserCheck className="h-4 w-4 text-[#1D5AA6]" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-[#1D5AA6]">{myTasks}</p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Laporan Fasilitas</p>
-                  <Building2 className="h-4 w-4 text-emerald-600" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-emerald-700">
-                  {facilityReports.length}
+            <article className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-800 dark:text-blue-400">
+                  On Progress
+                </span>
+                <Wrench className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-[#1D5AA6] dark:text-blue-300">
+                {bmmKpis.onProgress}
+              </p>
+              <p className="mt-1 text-[11px] text-blue-700 dark:text-blue-400">
+                Sedang dikerjakan oleh PIC terdaftar
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/60 dark:bg-indigo-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-400">
+                  Menunggu Approval
+                </span>
+                <ShieldAlert className="w-5 h-5 text-indigo-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-indigo-900 dark:text-indigo-200">
+                {bmmKpis.menungguApproval}
+              </p>
+              <p className="mt-1 text-[11px] text-indigo-700 dark:text-indigo-400">
+                Menunggu review / persetujuan Anda
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400">
+                  Selesai
+                </span>
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-emerald-900 dark:text-emerald-200">
+                {bmmKpis.selesai}
+              </p>
+              <p className="mt-1 text-[11px] text-emerald-700 dark:text-emerald-400">
+                Penanganan terverifikasi & ditutup
+              </p>
+            </article>
+          </section>
+        )}
+
+        {/* 4. HO NATIONAL SUMMARY KPIS */}
+        {roleInfo.isHO && (
+          <section aria-label="Ringkasan Laporan Nasional" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <article className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  Total Laporan Nasional
+                </span>
+                <ClipboardList className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-slate-900 dark:text-white">
+                {hoSummary.total}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Seluruh gerai dan fasilitas se-Indonesia
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-blue-200 dark:border-blue-900/40 bg-blue-50/50 dark:bg-blue-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                  On Progress Nasional
+                </span>
+                <Wrench className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-[#1D5AA6] dark:text-blue-400">
+                {hoSummary.onProgress}
+              </p>
+              <p className="mt-1 text-[11px] text-blue-600 dark:text-blue-400">
+                Sedang ditangani oleh tim lapangan
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-indigo-200 dark:border-indigo-900/40 bg-indigo-50/50 dark:bg-indigo-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                  Menunggu Approval
+                </span>
+                <ShieldAlert className="w-5 h-5 text-indigo-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-indigo-900 dark:text-indigo-200">
+                {hoSummary.menungguApproval}
+              </p>
+              <p className="mt-1 text-[11px] text-indigo-600 dark:text-indigo-400">
+                Dalam proses verifikasi BM Cabang
+              </p>
+            </article>
+
+            <article className="rounded-2xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-5 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                  Selesai Nasional
+                </span>
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <p className="mt-3 text-3xl font-black text-emerald-900 dark:text-emerald-200">
+                {hoSummary.selesai}
+              </p>
+              <p className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+                Pekerjaan tuntas dan terkonfirmasi
+              </p>
+            </article>
+          </section>
+        )}
+
+        {/* 4. HO DEDICATED MONITORING PER CABANG TABLE */}
+        {roleInfo.isHO && (
+          <section aria-label="Monitoring per Cabang" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Building className="w-5 h-5 text-[#1D5AA6]" />
+                  <span>Monitoring Penanganan Per Cabang (Nasional)</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Distribusi laporan operasional, PIC bertugas, dan indikator keterlambatan target selesai.
                 </p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Antrean Belum Ada PIC</p>
-                  <UserRoundX className="h-4 w-4 text-amber-500" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-amber-600">{unassigned}</p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Waktu Tunggu Terlama</p>
-                  <Clock3 className="h-4 w-4 text-slate-400" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{oldestLabel}</p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Kategori Fasilitas</p>
-                  <Building className="h-4 w-4 text-slate-400" />
-                </div>
-                <p className="mt-3 text-xs font-bold text-slate-600">DC, Depo, Gudang, Hub</p>
-              </article>
-            </>
-          ) : roleInfo.isBMS ? (
-            /* BMS Focused Strip */
-            <>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Tugas PIC Saya</p>
-                  <UserCheck className="h-4 w-4 text-[#1D5AA6]" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-[#1D5AA6]">{myTasks}</p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Laporan Toko Aktif</p>
-                  <Store className="h-4 w-4 text-blue-600" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
-                  {storeReports.length}
-                </p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Antrean Bebas (Bisa Diambil)</p>
-                  <UserRoundX className="h-4 w-4 text-amber-500" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-amber-600">{unassigned}</p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Waktu Tunggu Terlama</p>
-                  <Clock3 className="h-4 w-4 text-slate-400" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{oldestLabel}</p>
-              </article>
-              <article className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">Peta & Episentrum</p>
-                  <MapPin className="h-4 w-4 text-slate-400" />
-                </div>
-                <Link href="/monitoring" className="mt-3 block text-xs font-bold text-[#1D5AA6] hover:underline">
-                  Buka Peta Monitoring →
-                </Link>
-              </article>
-            </>
-          ) : (
-            /* BMM, Admin, HO Strip */
-            [
-              { label: "Laporan Toko", value: storeReports.length, icon: Store },
-              { label: "Laporan Fasilitas", value: facilityReports.length, icon: Building2 },
-              { label: "Total Antrean Penugasan", value: queue.length, icon: Activity },
-              { label: "Belum Ditugaskan PIC", value: unassigned, icon: UserRoundX },
-              { label: "Waktu Tunggu Terlama", value: oldestLabel, icon: Clock3 },
-            ].map((item) => (
-              <article key={item.label} className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold text-slate-500">{item.label}</p>
-                  <item.icon className="h-4 w-4 text-[#1D5AA6]" />
-                </div>
-                <p className="mt-3 text-2xl font-bold tracking-tight text-slate-950">{item.value}</p>
-              </article>
-            ))
-          )}
-        </section>
+              </div>
+              <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-700">
+                {hoBranchMonitoring.length} Wilayah Cabang
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/70 text-slate-500 uppercase tracking-wider text-[10px] font-bold border-b border-slate-200 dark:border-slate-800">
+                  <tr>
+                    <th className="px-4 py-3">Nama Cabang</th>
+                    <th className="px-4 py-3 text-center">Total Laporan</th>
+                    <th className="px-4 py-3 text-center">Belum Ditangani</th>
+                    <th className="px-4 py-3 text-center">On Progress</th>
+                    <th className="px-4 py-3 text-center">Menunggu Approval</th>
+                    <th className="px-4 py-3 text-center">Selesai</th>
+                    <th className="px-4 py-3 text-center">Petugas / PIC</th>
+                    <th className="px-4 py-3 text-center">Status Deadline</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {hoBranchMonitoring.map((b) => (
+                    <tr key={b.branch} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="px-4 py-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-[#1D5AA6]" />
+                        <span>{b.branch}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-slate-900 dark:text-white">
+                        {b.total}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${b.belumDitangani > 0 ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" : "text-slate-400"}`}>
+                          {b.belumDitangani}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${b.onProgress > 0 ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300" : "text-slate-400"}`}>
+                          {b.onProgress}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${b.menungguApproval > 0 ? "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300" : "text-slate-400"}`}>
+                          {b.menungguApproval}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                        {b.selesai}
+                      </td>
+                      <td className="px-4 py-3 text-center font-medium text-slate-700 dark:text-slate-300">
+                        {b.picCount} bertugas
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {b.overdueCount > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300">
+                            {b.overdueCount} Terlambat
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            Sesuai Target
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {hoBranchMonitoring.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                        Belum ada data laporan per cabang.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* DEFAULT KPI STRIP FOR BMS, BES & ADMIN */}
+        {!roleInfo.isBMM && !roleInfo.isHO && (
+          <>
+            <IncidentKpiRow
+              stats={incidentStats}
+              dangerCount={dangerCount}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
+            />
+
+            <section
+              className="grid grid-cols-2 gap-3 xl:grid-cols-5"
+              aria-label="Ringkasan lokasi dan PIC"
+            >
+              {roleInfo.isBES ? (
+                <>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Tugas PIC Saya</p>
+                      <UserCheck className="h-4 w-4 text-[#1D5AA6]" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-[#1D5AA6]">{myTasks}</p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Laporan Fasilitas</p>
+                      <Building2 className="h-4 w-4 text-emerald-600" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-emerald-700">
+                      {facilityReports.length}
+                    </p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Antrean Belum Ada PIC</p>
+                      <UserRoundX className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-amber-600">{unassigned}</p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Waktu Tunggu Terlama</p>
+                      <Clock3 className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{oldestLabel}</p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Peta & Episentrum</p>
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <Link href="/monitoring" className="mt-3 block text-xs font-bold text-[#1D5AA6] hover:underline">
+                      Buka Peta Monitoring →
+                    </Link>
+                  </article>
+                </>
+              ) : roleInfo.isBMS ? (
+                <>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Tugas PIC Saya</p>
+                      <UserCheck className="h-4 w-4 text-[#1D5AA6]" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-[#1D5AA6]">{myTasks}</p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Laporan Toko Aktif</p>
+                      <Store className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
+                      {storeReports.length}
+                    </p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Antrean Bebas (Bisa Diambil)</p>
+                      <UserRoundX className="h-4 w-4 text-amber-500" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-amber-600">{unassigned}</p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Waktu Tunggu Terlama</p>
+                      <Clock3 className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{oldestLabel}</p>
+                  </article>
+                  <article className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">Peta & Episentrum</p>
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <Link href="/monitoring" className="mt-3 block text-xs font-bold text-[#1D5AA6] hover:underline">
+                      Buka Peta Monitoring →
+                    </Link>
+                  </article>
+                </>
+              ) : (
+                [
+                  { label: "Laporan Toko", value: storeReports.length, icon: Store },
+                  { label: "Laporan Fasilitas", value: facilityReports.length, icon: Building2 },
+                  { label: "Total Antrean Penugasan", value: queue.length, icon: Activity },
+                  { label: "Belum Ditugaskan PIC", value: unassigned, icon: UserRoundX },
+                  { label: "Waktu Tunggu Terlama", value: oldestLabel, icon: Clock3 },
+                ].map((item) => (
+                  <article key={item.label} className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold text-slate-500">{item.label}</p>
+                      <item.icon className="h-4 w-4 text-[#1D5AA6]" />
+                    </div>
+                    <p className="mt-3 text-2xl font-bold tracking-tight text-slate-950">{item.value}</p>
+                  </article>
+                ))
+              )}
+            </section>
+          </>
+        )}
 
         {/* MAIN HERO: ACTIVE SITUATION PANEL */}
         <div className="flex flex-col lg:flex-row gap-6">
@@ -489,32 +810,38 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-                {roleInfo.isBES
+                {roleInfo.isHO
+                  ? "Daftar Seluruh Laporan Insiden Nasional"
+                  : roleInfo.isBMM
+                  ? `Daftar Laporan Operasional Cabang ${currentUser?.branch || ""}`
+                  : roleInfo.isBES
                   ? "Daftar Laporan Fasilitas Memerlukan Perhatian"
-                  : roleInfo.isBMS
-                  ? "Daftar Laporan Gerai Toko Memerlukan Perhatian"
-                  : "Laporan Memerlukan Perhatian Operasional"}
+                  : "Daftar Laporan Gerai Toko Memerlukan Perhatian"}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                {roleInfo.isBES
+                {roleInfo.isHO
+                  ? "Pemantauan status penanganan, PIC otomatis, progres fisik, dan target selesai nasional (Read-Only)."
+                  : roleInfo.isBMM
+                  ? "Pantau status penanganan, progres, waktu update, target selesai, dan berikan review/approval."
+                  : roleInfo.isBES
                   ? "Menampilkan insiden aktif di Distribution Center, Warehouse, Depo, dan Bulky."
-                  : roleInfo.isBMS
-                  ? "Menampilkan insiden aktif di Gerai Toko Alfamart cabang Anda."
-                  : "Menampilkan seluruh insiden aktif yang memerlukan konfirmasi, verifikasi, atau perbaikan."}
+                  : "Menampilkan insiden aktif di Gerai Toko Alfamart cabang Anda."}
               </p>
             </div>
 
             <Link
-              href="/reports/shared-queue"
+              href="/reports"
               className="px-3.5 py-2 text-xs font-bold text-[#1D5AA6] bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
             >
-              Buka Penugasan Cabang →
+              Lihat Pusat Laporan →
             </Link>
           </div>
 
           <ActiveIncidentsTable
             incidents={
-              roleInfo.isBES
+              roleInfo.isHO
+                ? incidents
+                : roleInfo.isBES
                 ? facilityReports
                 : roleInfo.isBMS
                 ? storeReports
@@ -523,6 +850,11 @@ export default function DashboardPage() {
             onSelectIncident={handleSelectIncidentForDetail}
             onCreateReportClick={handleOpenReportModal}
             hideAction={false}
+            currentUser={currentUser}
+            onClaimSuccess={() => {
+              // Refresh router to refetch data
+              router.refresh();
+            }}
           />
         </div>
       </div>

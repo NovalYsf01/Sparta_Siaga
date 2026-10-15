@@ -183,6 +183,33 @@ export function MaintenanceTrackingModal({
   // Supporting details active tab
   const [activeTab, setActiveTab] = useState<"none" | "milestones" | "estimation" | "progress" | "approval" | "info">("milestones");
 
+  // Target date management state
+  const [currentTargetDate, setCurrentTargetDate] = useState<string | null>(null);
+  const [targetDateInput, setTargetDateInput] = useState<string>("");
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
+
+  const handleSaveTarget = async () => {
+    if (!incident || !targetDateInput) return;
+    setIsSavingTarget(true);
+    try {
+      const res = await fetch(`/api/incidents/${incident.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetCompletionDate: targetDateInput }),
+      });
+      if (res.ok) {
+        setCurrentTargetDate(new Date(targetDateInput).toISOString());
+        setIsEditingTarget(false);
+        loadData();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingTarget(false);
+    }
+  };
+
   const [loading, setLoading] = useState(false);
 
   const loadData = async () => {
@@ -285,9 +312,9 @@ export function MaintenanceTrackingModal({
     if (latestProgress === 100) {
       if (completionApproval?.status === "WAITING_MANAGER_APPROVAL") {
         return {
-          label: "Menunggu Approval Building & Maintenance Manager",
+          label: "Menunggu Approval BnM Manajer",
           badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-700",
-          desc: "Koordinator cabang telah menyetujui hasil serah terima. Menunggu persetujuan Building & Maintenance Manager.",
+          desc: "Koordinator cabang telah menyetujui hasil serah terima. Menunggu persetujuan BnM Manajer.",
         };
       }
       if (completionApproval?.status === "WAITING_COORDINATOR_APPROVAL") {
@@ -409,30 +436,30 @@ export function MaintenanceTrackingModal({
 
     if (isStep2PendingBm) {
       step2PrimaryDetail =
-        "Hasil pemeriksaan diajukan oleh BMS/BES. Menunggu peninjauan & keputusan Building & Maintenance Manager.";
-      step2StateLabel = "Menunggu Approval BMM";
+        "Hasil pemeriksaan diajukan oleh BMS/BES. Menunggu peninjauan & keputusan BnM Manajer.";
+      step2StateLabel = "Menunggu Approval BnM Manajer";
     } else if (incident.status === "clarification_requested") {
       step2PrimaryDetail =
-        `Building & Maintenance Manager meminta klarifikasi/revisi: "${incident.verification?.bmApproval?.clarificationReason || "Mohon lengkapi data"}"`;
+        `BnM Manajer meminta klarifikasi/revisi: "${incident.verification?.bmApproval?.clarificationReason || "Mohon lengkapi data"}"`;
       step2StateLabel = "Klarifikasi Diminta";
     } else if (incident.status === "confirmed_safe") {
-      step2PrimaryDetail = "Kondisi dinyatakan AMAN oleh Building & Maintenance Manager. Operasional normal.";
+      step2PrimaryDetail = "Kondisi dinyatakan AMAN oleh BnM Manajer. Operasional normal.";
       step2StateLabel = "Selesai (Aman)";
     } else if (incident.status === "rejected_invalid") {
-      step2PrimaryDetail = "Laporan DITOLAK oleh Building & Maintenance Manager (Data Tidak Valid).";
-      step2StateLabel = "Ditolak BMM";
+      step2PrimaryDetail = "Laporan DITOLAK oleh BnM Manajer (Data Tidak Valid).";
+      step2StateLabel = "Ditolak BnM Manajer";
     } else if (isStep2Completed) {
       step2PrimaryDetail =
         incident.verification?.isDamaged
-          ? "Pemeriksaan kerusakan disetujui Building & Maintenance Manager. Lanjut penanganan teknis."
-          : "Pemeriksaan selesai dan disetujui Building & Maintenance Manager.";
-      step2StateLabel = "Disetujui BMM";
+          ? "Pemeriksaan kerusakan disetujui BnM Manajer. Lanjut penanganan teknis."
+          : "Pemeriksaan selesai dan disetujui BnM Manajer.";
+      step2StateLabel = "Disetujui BnM Manajer";
     }
 
     const step2: LifecycleStepView = {
       key: "KONFIRMASI_TOKO",
       number: 2,
-      title: "Pemeriksaan & Persetujuan BMM",
+      title: "Pemeriksaan & Persetujuan BnM Manajer",
       state: isStep2Completed ? "completed" : "current",
       stateLabel: step2StateLabel,
       primaryDetail: step2PrimaryDetail,
@@ -593,10 +620,10 @@ export function MaintenanceTrackingModal({
 
     let step7Detail = "Belum dilakukan";
     if (isStep7Completed) {
-      step7Detail = "Laporan resmi disetujui Building & Maintenance Manager & ditutup";
+      step7Detail = "Laporan resmi disetujui BnM Manajer & ditutup";
     } else if (isStep7Current) {
       if (completionApproval?.status === "WAITING_MANAGER_APPROVAL") {
-        step7Detail = "Menunggu persetujuan akhir & penutupan laporan oleh Building & Maintenance Manager";
+        step7Detail = "Menunggu persetujuan akhir & penutupan laporan oleh BnM Manajer";
       } else if (completionApproval?.status === "WAITING_COORDINATOR_APPROVAL") {
         step7Detail = `Menunggu persetujuan Koordinator (${completionRoute?.coordinatorRole?.toUpperCase() || "Cabang"})`;
       } else {
@@ -612,7 +639,7 @@ export function MaintenanceTrackingModal({
       stateLabel: isStep7Completed ? "Selesai" : isStep7Current ? "Sedang Berlangsung" : "Belum dilakukan",
       primaryDetail: step7Detail,
       secondaryDetail: isStep7Completed && completionApproval?.managerApprovedAt
-        ? `Disetujui Building & Maintenance Manager (${completionApproval.managerUserName || "BMM"}) pada ${safeFormatDate(completionApproval.managerApprovedAt)}`
+        ? `Disetujui BnM Manajer (${completionApproval.managerUserName || "BnM Manajer"}) pada ${safeFormatDate(completionApproval.managerApprovedAt)}`
         : null,
       actorDetail: completionApproval?.managerUserName || null,
       timestampDetail: completionApproval?.managerApprovedAt
@@ -697,6 +724,89 @@ export function MaintenanceTrackingModal({
 
         {/* SCROLLABLE MODAL CONTENT BODY */}
         <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-6">
+          {/* OPERATIONAL SUMMARY CARD (PIC, WAKTU MULAI, TARGET SELESAI, OVERDUE) */}
+          {(() => {
+            const targetDateVal = currentTargetDate || incident.maintenanceTicket?.completedAt;
+            const isOverdue = Boolean(
+              targetDateVal &&
+                new Date(targetDateVal) < new Date() &&
+                incident.status !== "closed" &&
+                incident.status !== "resolved" &&
+                incident.status !== "confirmed_safe"
+            );
+            const userRoleStr = (identity?.role || (identity as any)?.businessRole || "").toLowerCase();
+            const canEditTarget =
+              !isReadOnly &&
+              (identity?.systemRole === "ADMIN" ||
+                ["bms", "bes"].includes(userRoleStr) ||
+                incident.primaryPicUserId === identity?.id);
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-50/80 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">PIC Operasional</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
+                    {incident.primaryPicName || (incident.primaryPicUserId ? "Petugas Cabang" : "Belum Ditugaskan")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Waktu Mulai</span>
+                  <span className="text-slate-700 dark:text-slate-300 font-medium truncate block mt-0.5">
+                    {incident.primaryPicClaimedAt ? safeFormatDate(incident.primaryPicClaimedAt) : "Belum Dimulai"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progres Terakhir</span>
+                  <span className="font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
+                    {latestProgress}% • {workStatus.replace("_", " ")}
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Selesai</span>
+                    {canEditTarget && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingTarget(!isEditingTarget)}
+                        className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {isEditingTarget ? "Batal" : targetDateVal ? "Ubah" : "+ Atur Target"}
+                      </button>
+                    )}
+                  </div>
+                  {isEditingTarget ? (
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={targetDateInput}
+                        onChange={(e) => setTargetDateInput(e.target.value)}
+                        className="text-[11px] p-1 border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none w-28"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveTarget}
+                        disabled={isSavingTarget || !targetDateInput}
+                        className="px-2 py-1 text-[10px] font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {isSavingTarget ? "..." : "Simpan"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        {targetDateVal ? safeFormatDate(targetDateVal) : "Belum Ditentukan"}
+                      </span>
+                      {isOverdue && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
+                          Melewati Target
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
           {/* PRIMARY SECTION: LIFECYCLE TRACKER (STEPPER) */}
           <div className="bg-slate-50/60 dark:bg-slate-950/40 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-4 sm:p-5 shadow-2xs">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
@@ -844,7 +954,7 @@ export function MaintenanceTrackingModal({
                       {/* CONTEXTUAL ACTIONS IN ACTIVE STAGE ONLY */}
                       {st.key === "KONFIRMASI_TOKO" && isCurrent && (
                         <div className="mt-2.5 pt-2 border-t border-blue-200/60 dark:border-blue-900/60 flex items-center gap-2 flex-wrap">
-                          {/* Case 1: Building & Maintenance Manager Review Action */}
+                          {/* Case 1: BnM Manajer Review Action */}
                           {incident.status === "pending_bm_approval" && canBmApprove ? (
                             <button
                               type="button"
@@ -852,12 +962,12 @@ export function MaintenanceTrackingModal({
                               className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
                             >
                               <ShieldAlert className="w-3.5 h-3.5" />
-                              Review & Berikan Keputusan BMM
+                              Review & Berikan Keputusan BnM Manajer
                             </button>
                           ) : incident.status === "pending_bm_approval" && !canBmApprove ? (
                             <div className="flex items-center gap-1.5 text-[11px] text-indigo-800 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1.5 rounded-md border border-indigo-200 dark:border-indigo-800">
                               <Lock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                              <span>Menunggu keputusan Building & Maintenance Manager ({incident.branch}).</span>
+                              <span>Menunggu keputusan BnM Manajer ({incident.branch}).</span>
                             </div>
                           ) : canConfirm ? (
                             /* Case 2: BMS / BES Inspection Action */

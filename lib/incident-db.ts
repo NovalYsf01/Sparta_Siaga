@@ -22,6 +22,7 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     locationNameSnapshot: (row.location_name_snapshot as string) ?? undefined,
     primaryPicUserId: (row.primary_pic_user_id as string) ?? undefined,
     primaryPicClaimedAt: row.primary_pic_claimed_at ? String(row.primary_pic_claimed_at) : undefined,
+    primaryPicName: (row.primary_pic_name as string) ?? undefined,
     status: row.status as IncidentRecord["status"],
     progress: row.progress as number,
     disasterMetadata: (row.disaster_metadata as IncidentRecord["disasterMetadata"]) ?? undefined,
@@ -59,7 +60,11 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
 export async function dbGetAllIncidents(): Promise<IncidentRecord[]> {
   const pool = getDbPool();
   const { rows } = await pool.query(
-    `SELECT * FROM incidents WHERE id NOT LIKE 'INC-TEST-%' ORDER BY created_at DESC`
+    `SELECT i.*, u.name AS primary_pic_name
+     FROM incidents i
+     LEFT JOIN users u ON u.id = i.primary_pic_user_id
+     WHERE i.id NOT LIKE 'INC-TEST-%'
+     ORDER BY i.created_at DESC`
   );
   return rows.map(rowToIncident);
 }
@@ -69,7 +74,10 @@ export async function dbGetIncidentById(
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
   const { rows } = await pool.query(
-    `SELECT * FROM incidents WHERE id = $1`,
+    `SELECT i.*, u.name AS primary_pic_name
+     FROM incidents i
+     LEFT JOIN users u ON u.id = i.primary_pic_user_id
+     WHERE i.id = $1`,
     [id]
   );
   if (rows.length === 0) return null;

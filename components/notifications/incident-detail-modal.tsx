@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   FileText,
 } from "lucide-react";
+import { toast } from "sonner";
 import { NotificationLog } from "@/types/notification";
 
 interface IncidentDetailModalProps {
@@ -32,12 +33,114 @@ export function IncidentDetailModal({
   relatedReport,
   theme = "dark",
 }: IncidentDetailModalProps) {
+  const [currentUser, setCurrentUser] = React.useState<{
+    id: string;
+    name: string;
+    role?: string;
+    businessRole?: string;
+    systemRole?: string;
+    branch?: string;
+  } | null>(null);
+  const [isClaiming, setIsClaiming] = React.useState(false);
+  const [claimedPic, setClaimedPic] = React.useState<{ userId: string; name: string } | null>(null);
+  const [claimedAtTime, setClaimedAtTime] = React.useState<string | null>(null);
+  const [targetDateInput, setTargetDateInput] = React.useState<string>("");
+  const [currentTargetDate, setCurrentTargetDate] = React.useState<string | null>(null);
+  const [isSavingTarget, setIsSavingTarget] = React.useState(false);
+  const [isEditingTarget, setIsEditingTarget] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setCurrentUser(data.user || data);
+      })
+      .catch(() => {});
+  }, []);
+
+  React.useEffect(() => {
+    if (relatedReport?.maintenanceTicket?.completedAt) {
+      setCurrentTargetDate(relatedReport.maintenanceTicket.completedAt);
+    } else {
+      setCurrentTargetDate(null);
+    }
+    if (relatedReport?.primaryPicClaimedAt) {
+      setClaimedAtTime(relatedReport.primaryPicClaimedAt);
+    }
+  }, [relatedReport]);
+
   if (!isOpen || !incident) return null;
 
   const isDark = theme === "dark";
   const isEarthquake = incident.disaster_type === "earthquake";
   const stores = incident.affected_stores_sample || [];
   const totalStores = stores.length;
+
+  const effectiveHasPic = Boolean(claimedPic || relatedReport?.primaryPicUserId);
+  const userRoleStr = (currentUser?.businessRole || currentUser?.role || "").toLowerCase();
+  const canClaim = currentUser?.systemRole === "ADMIN" || ["bms", "bes"].includes(userRoleStr);
+
+  const targetRaw = currentTargetDate || relatedReport?.maintenanceTicket?.completedAt;
+  const isOverdue = Boolean(
+    targetRaw &&
+      new Date(targetRaw) < new Date() &&
+      relatedReport?.status !== "closed" &&
+      relatedReport?.status !== "resolved" &&
+      relatedReport?.status !== "confirmed_safe"
+  );
+
+  const handleClaimPic = async () => {
+    if (!relatedReport?.id) return;
+    setIsClaiming(true);
+    try {
+      const res = await fetch(`/api/incidents/${relatedReport.id}/pic`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok && data.claimed) {
+        setClaimedPic({
+          userId: currentUser?.id || "",
+          name: currentUser?.name || "Saya",
+        });
+        if (data.claimedAt) {
+          setClaimedAtTime(data.claimedAt);
+        }
+        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC otomatis.");
+      } else if (res.status === 409) {
+        toast.error("Laporan sudah diambil oleh petugas lain.");
+      } else {
+        toast.error(data.error || "Gagal mengambil tugas laporan.");
+      }
+    } catch {
+      toast.error("Gagal terhubung ke server.");
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
+  const handleSaveTargetDate = async () => {
+    if (!relatedReport?.id || !targetDateInput) return;
+    setIsSavingTarget(true);
+    try {
+      const res = await fetch(`/api/incidents/${relatedReport.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetCompletionDate: targetDateInput }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCurrentTargetDate(new Date(targetDateInput).toISOString());
+        setIsEditingTarget(false);
+        toast.success("Estimasi target selesai berhasil disimpan.");
+      } else {
+        toast.error(data.error || "Gagal menyimpan estimasi target selesai.");
+      }
+    } catch {
+      toast.error("Gagal terhubung ke server.");
+    } finally {
+      setIsSavingTarget(false);
+    }
+  };
 
   const handleFlyToMap = () => {
     onClose();
@@ -120,15 +223,115 @@ export function IncidentDetailModal({
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Status System Banner */}
-          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-slate-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Status Sistem: <strong>Tercatat di Sistem</strong></span>
+          {/* Detailed Info Strip (POV BMS/BES Requirement) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">No. Laporan</span>
+              <span className="font-mono font-bold text-blue-600 dark:text-blue-400 truncate block">
+                {relatedReport?.id || incident.ticket_number || "LOG-NOTIF"}
+              </span>
             </div>
-            <span className="text-[11px] text-slate-400 font-medium">
-              Kanal: {deliveryBadge.text}
-            </span>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kejadian</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                {incident.disaster_type === "earthquake" ? "Gempa Bumi" : "Cuaca & Banjir"}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lokasi</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                {relatedReport?.storeName || `Cabang ${incident.branch}`}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Waktu Mulai</span>
+              <span className="text-slate-600 dark:text-slate-300 truncate block font-medium">
+                {claimedAtTime
+                  ? new Date(claimedAtTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"
+                  : relatedReport?.primaryPicClaimedAt
+                  ? new Date(relatedReport.primaryPicClaimedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"
+                  : effectiveHasPic
+                  ? "Baru saja"
+                  : "Belum Dimulai"}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status Penanganan</span>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                effectiveHasPic || relatedReport?.status === "in_maintenance" || relatedReport?.status === "investigating"
+                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              }`}>
+                {effectiveHasPic || relatedReport?.status === "in_maintenance" || relatedReport?.status === "investigating"
+                  ? "On Progress"
+                  : "Belum Ditangani"}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">PIC Otomatis</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                {claimedPic?.name || relatedReport?.primaryPicName || (effectiveHasPic ? "Petugas Cabang" : "Belum Ditugaskan")}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progres Terakhir</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="font-bold text-slate-800 dark:text-slate-200">
+                  {relatedReport?.progress ?? 0}%
+                </span>
+                <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 rounded-full"
+                    style={{ width: `${relatedReport?.progress ?? 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="col-span-2 sm:col-span-4 pt-1 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Selesai</span>
+                {canClaim && relatedReport && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTarget(!isEditingTarget)}
+                    className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {isEditingTarget ? "Batal" : currentTargetDate ? "Ubah Target" : "+ Atur Target Selesai"}
+                  </button>
+                )}
+              </div>
+              {isEditingTarget ? (
+                <div className="mt-1 flex items-center gap-1.5">
+                  <input
+                    type="date"
+                    value={targetDateInput}
+                    onChange={(e) => setTargetDateInput(e.target.value)}
+                    className="text-xs p-1 border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveTargetDate}
+                    disabled={isSavingTarget || !targetDateInput}
+                    className="px-2.5 py-1 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {isSavingTarget ? "Menyimpan..." : "Simpan Target"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-slate-700 dark:text-slate-300 font-medium">
+                    {currentTargetDate
+                      ? new Date(currentTargetDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
+                      : "Belum Ditentukan"}
+                  </span>
+                  {isOverdue && (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
+                      Melewati Target
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Incident Overview */}
@@ -228,6 +431,18 @@ export function IncidentDetailModal({
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Mulai Menangani Action for BMS/BES */}
+            {relatedReport && !effectiveHasPic && canClaim && (
+              <button
+                type="button"
+                onClick={handleClaimPic}
+                disabled={isClaiming}
+                className="flex-1 sm:flex-none px-4 py-2 rounded-md text-xs font-bold flex items-center justify-center gap-2 transition-colors bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-50"
+              >
+                <span>{isClaiming ? "Memproses..." : "Mulai Menangani"}</span>
+              </button>
+            )}
+
             {/* Requirement 24: Only show Lihat Laporan Terkait if report exists */}
             {relatedReport && onOpenReport && (
               <button

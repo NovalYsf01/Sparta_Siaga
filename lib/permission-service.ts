@@ -760,7 +760,7 @@ export async function canApproveAsBmAsync(
   if (user.scope === "HO") {
     return {
       authorized: false,
-      reason: "Scope Head Office tidak berwenang memberikan keputusan persetujuan Building & Maintenance Manager.",
+      reason: "Scope Head Office tidak berwenang memberikan keputusan persetujuan BnM Manajer.",
     };
   }
 
@@ -772,7 +772,7 @@ export async function canApproveAsBmAsync(
   if (user.role !== "bm") {
     return {
       authorized: false,
-      reason: "Hanya Building & Maintenance Manager cabang terkait yang berwenang memberikan keputusan persetujuan.",
+      reason: "Hanya BnM Manajer cabang terkait yang berwenang memberikan keputusan persetujuan.",
     };
   }
 
@@ -780,7 +780,7 @@ export async function canApproveAsBmAsync(
   if (!user.branch || clean(user.branch) !== clean(report.branch)) {
     return {
       authorized: false,
-      reason: `Building & Maintenance Manager hanya berwenang untuk cabangnya sendiri (${user.branch || "N/A"}), bukan ${report.branch}.`,
+      reason: `BnM Manajer hanya berwenang untuk cabangnya sendiri (${user.branch || "N/A"}), bukan ${report.branch}.`,
     };
   }
 

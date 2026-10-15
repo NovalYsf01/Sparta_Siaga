@@ -73,7 +73,7 @@ export function IncidentAppShell({
     ho_admin: "HO Admin",
     gm_ho: "GM HO",
     sm_ho: "SM HO",
-    bm: "Building & Maintenance Manager",
+    bm: "BnM Manajer",
     bnm: "BnM",
     bbc: "BBC",
     bmc: "BMC",
@@ -207,7 +207,6 @@ export function IncidentAppShell({
       title: "Pelaporan",
       items: [
         { id: "history", href: "/reports", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
-        { id: "shared-queue", href: "/reports/shared-queue", label: "Penugasan", icon: UserCog },
         { id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity },
         { id: "history-browse", href: "/reports/history", label: "Riwayat Laporan", icon: History },
       ],
@@ -225,8 +224,7 @@ export function IncidentAppShell({
       title: "Administrasi",
       items: [
         { id: "user-management", href: "/admin/users", label: "Manajemen User & Role", icon: ShieldAlert },
-        { id: "facility-management", href: "/admin/facilities", label: "Master Fasilitas", icon: MapPin },
-        { id: "reconciliation", href: "/admin/reconciliation", label: "Rekonsiliasi Gempa", icon: Activity },
+        { id: "location-management", href: "/admin/locations", label: "Data Lokasi", icon: MapPin },
       ],
     });
   }
@@ -579,20 +577,6 @@ export function IncidentAppShell({
           </Link>
 
           <Link
-            href="/reports/shared-queue"
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
-              pathname.startsWith("/reports/shared-queue")
-                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
-                : isDark
-                ? "text-slate-400 hover:text-white"
-                : "text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <UserCog className="w-5 h-5" />
-            <span>Penugasan</span>
-          </Link>
-
-          <Link
             href="/reports"
             className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
               pathname === "/reports"
@@ -621,6 +605,20 @@ export function IncidentAppShell({
             {(activeIncidentCount ?? 0) > 0 && (
               <span className="absolute top-1 right-2.5 w-2 h-2 rounded-full bg-red-500" />
             )}
+          </Link>
+
+          <Link
+            href="/alerts"
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
+              pathname.startsWith("/alerts")
+                ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
+                : isDark
+                ? "text-slate-400 hover:text-white"
+                : "text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Bell className="w-5 h-5" />
+            <span>Event</span>
           </Link>
 
           <button
@@ -769,13 +767,13 @@ export function IncidentAppShell({
                         </div>
                       </Link>
                       <Link
-                        href="/admin/facilities"
+                        href="/admin/locations"
                         onClick={() => setIsMoreSheetOpen(false)}
                         className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
                       >
                         <div className="flex items-center gap-2.5">
                           <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                          <span>Master Fasilitas</span>
+                          <span>Data Lokasi (Toko & Fasilitas)</span>
                         </div>
                       </Link>
                     </div>

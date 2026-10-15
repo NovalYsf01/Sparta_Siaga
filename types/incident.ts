@@ -29,11 +29,11 @@ export type ReportOrigin =
 export type IncidentStatus =
   | "pending_confirmation"  // Auto-report dibuat, menunggu konfirmasi/pemeriksaan lapangan cabang
   | "verifying"             // Menunggu verifikasi kondisi toko
-  | "pending_bm_approval"   // Hasil pemeriksaan diajukan oleh BMS/BES, menunggu keputusan Branch Manager
-  | "clarification_requested" // Branch Manager meminta klarifikasi hasil pemeriksaan
-  | "confirmed_affected"    // Kerusakan disetujui Branch Manager, siap masuk penanganan pekerjaan
-  | "confirmed_safe"        // Kondisi aman disetujui/dinyatakan oleh Branch Manager
-  | "rejected_invalid"      // Laporan ditolak oleh Branch Manager (tidak valid / hoax / salah TKP)
+  | "pending_bm_approval"   // Hasil pemeriksaan diajukan oleh BMS/BES, menunggu keputusan BnM Manajer
+  | "clarification_requested" // BnM Manajer meminta klarifikasi hasil pemeriksaan
+  | "confirmed_affected"    // Kerusakan disetujui BnM Manajer, siap masuk penanganan pekerjaan
+  | "confirmed_safe"        // Kondisi aman disetujui/dinyatakan oleh BnM Manajer
+  | "rejected_invalid"      // Laporan ditolak oleh BnM Manajer (tidak valid / hoax / salah TKP)
   | "investigating"         // Dalam penyelidikan/penugasan
   | "in_estimation"         // Sedang dalam proses Buat Estimasi
   | "in_maintenance"        // Sedang dalam perbaikan (MTC/ES)
@@ -41,10 +41,10 @@ export type IncidentStatus =
   | "awaiting_spk"          // Menunggu Surat Perintah Kerja
   | "spk_issued"            // SPK sudah diterbitkan
   | "awaiting_st"           // Menunggu Serah Terima
-  | "pending_final_approval" // Serah Terima 100% diajukan, menunggu persetujuan final Branch Manager
-  | "revision_requested"    // Branch Manager meminta revisi pada persetujuan final
+  | "pending_final_approval" // Serah Terima 100% diajukan, menunggu persetujuan final BnM Manajer
+  | "revision_requested"    // BnM Manajer meminta revisi pada persetujuan final
   | "resolved"              // Selesai (legacy status)
-  | "closed"                // Laporan resmi disetujui final Branch Manager & ditutup
+  | "closed"                // Laporan resmi disetujui final BnM Manajer & ditutup
   | "archived";             // Diarsipkan
 
 /**
@@ -59,7 +59,7 @@ export type SpartaRole =
   | "ho_admin"
   | "gm_ho"         // General Manager HO — dapat memberi instruksi ke cabang
   | "sm_ho"         // Senior Manager HO — dapat memberi instruksi ke cabang
-  | "bm"            // Branch Manager
+  | "bm"            // BnM Manajer
   | "bnm"           // Branch & Maintenance (BnM)
   | "bbc"           // Branch Building Coordinator
   | "bmc"           // Branch Maintenance Coordinator
@@ -259,6 +259,7 @@ export interface IncidentRecord {
   branchSnapshot?: string;
   primaryPicUserId?: string;
   primaryPicClaimedAt?: string;
+  primaryPicName?: string;
 
   // === Status & Progress ===
   status: IncidentStatus;

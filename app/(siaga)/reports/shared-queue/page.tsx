@@ -94,7 +94,7 @@ function getStatusBadge(status: string) {
     case "preliminary_unverified":
       return { label: "Pra-Verifikasi", color: "bg-amber-100 text-amber-900 border-amber-300" };
     case "awaiting_manager_confirmation":
-      return { label: "Menunggu BMM", color: "bg-purple-100 text-purple-800 border-purple-200" };
+      return { label: "Menunggu BnM Manajer", color: "bg-purple-100 text-purple-800 border-purple-200" };
     case "in_progress":
     case "repair_in_progress":
       return { label: "Penanganan", color: "bg-indigo-100 text-indigo-800 border-indigo-200" };
@@ -449,7 +449,7 @@ export default function SharedQueuePage() {
               {activeTab === "unassigned"
                 ? "Seluruh laporan operasional di cabang Anda telah memiliki PIC atau sedang diproses."
                 : activeTab === "my"
-                ? "Ambil tugas dari tab 'Belum Ditugaskan' atau tunggu penunjukan PIC oleh BMM cabang."
+                ? "Ambil tugas dari tab 'Belum Ditugaskan' atau tunggu penunjukan PIC oleh BnM Manajer cabang."
                 : "Coba sesuaikan kata kunci pencarian atau filter lokasi."}
             </p>
           </div>
@@ -805,7 +805,7 @@ export default function SharedQueuePage() {
                             <button
                               onClick={() =>
                                 mutate(selected.id, "DELETE", {
-                                  reason: actionReason || "Dilepas oleh BMM/Admin",
+                                  reason: actionReason || "Dilepas oleh BnM Manajer/Admin",
                                 })
                               }
                               disabled={working === selected.id}
@@ -826,7 +826,7 @@ export default function SharedQueuePage() {
                             <span>Lepaskan Tugas PIC Ini?</span>
                           </div>
                           <p className="text-[11px] text-amber-800 leading-relaxed">
-                            Jika Anda melepaskan tugas ini, laporan akan kembali ke antrean 'Belum Ditugaskan' dan dapat diambil oleh petugas cabang lainnya.
+                            Jika Anda melepaskan tugas ini, laporan akan kembali ke antrean &apos;Belum Ditugaskan&apos; dan dapat diambil oleh petugas cabang lainnya.
                           </p>
                           <button
                             onClick={() =>

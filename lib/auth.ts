@@ -48,6 +48,12 @@ export async function getSessionUser(req?: Request): Promise<UserContext | null>
     return null;
   }
 
+  // Multi-device session revocation check: if user's token version was bumped, old tokens are invalidated
+  if (dbUser.tokenVersion && payload.v && payload.v < dbUser.tokenVersion) {
+    console.warn(`[Auth] User ${dbUser.id} session revoked (token version ${payload.v} < ${dbUser.tokenVersion})`);
+    return null;
+  }
+
   // Deactivated roles: bmc, bec, tim_toko, bbs, bbc, rekanan are denied from operational / application access
   const DEACTIVATED_BUSINESS_ROLES = ["bmc", "bec", "tim_toko", "bbs", "bbc", "rekanan"];
   if (dbUser.businessRole && DEACTIVATED_BUSINESS_ROLES.includes(dbUser.businessRole.toLowerCase())) {

@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     if (!isClosed) {
       return NextResponse.json(
         {
-          error: "Dokumen final hanya dapat diunduh setelah laporan resmi disetujui Building & Maintenance Manager / Administrator (CLOSED).",
+          error: "Dokumen final hanya dapat diunduh setelah laporan resmi disetujui BnM Manajer / Administrator (CLOSED).",
           code: "REPORT_NOT_CLOSED",
         },
         { status: 422 }
