@@ -148,17 +148,17 @@ export function EstimationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none touch-none select-none">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
+    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/55 animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-xl overflow-hidden shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
-            <Calculator className="w-5 h-5 text-white" />
+            <Calculator className="w-5 h-5 text-[#1D5AA6] dark:text-blue-400" />
             <div>
               <h3 className="font-bold text-sm">
                 {activeRoute ? "Status Estimasi Laporan" : "Buat Estimasi"}
               </h3>
-              <p className="text-[11px] text-blue-200">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {incident.storeName} ({incident.branch})
               </p>
             </div>
