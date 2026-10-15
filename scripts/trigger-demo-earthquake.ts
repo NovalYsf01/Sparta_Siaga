@@ -1,31 +1,34 @@
 /**
- * SPARTA SIAGA — Satu laporan gempa SIMULASI Bandung + satu notifikasi BMS.
- * pnpm tsx scripts/trigger-demo-earthquake.ts
- * HANYA untuk database development/staging sparta_siaga_isolated.
- * Tidak memakai kejadian BMKG/USGS atau mengirim email/WA.
+ * SPARTA SIAGA — Satu laporan gempa SIMULASI Bandung + notifikasi pemeriksaan BMS.
+ * Command: pnpm tsx scripts/trigger-demo-earthquake.ts
+ *
+ * HANYA menulis ke sparta_siaga_isolated (staging). Tidak mengubah master
+ * stores/facilities, tidak menggunakan gempa BMKG/USGS dan tidak mengirim WA/email.
+ * Idempotent: trigger berulang tetap satu laporan + satu notifikasi.
  */
 import { getDbPool, closeDbPool } from "../lib/db";
 import { assertIsolatedDatabase } from "../lib/database-safety";
 import { ensureEarthquakeReport } from "../lib/earthquake-report-service";
+import { dbCreateIncident } from "../lib/incident-db";
 import { recordNotificationLog } from "../lib/notification-service";
 
 const REPORT_ID = "LAP-EQ-DEMO-BDG-001";
 const EVENT_ID = "SIMULASI-EQ-BANDUNG-DEMO-001";
+const SOURCE = "SIMULASI INTERNAL - BUKAN BMKG/USGS";
 
 type DemoStore = {
   kode_toko: string;
   nama_toko: string;
   cabang: string;
   fr_type: string | null;
-  latitude: number | string;
-  longitude: number | string;
+  latitude: number | string | null;
+  longitude: number | string | null;
 };
 
 async function main(): Promise<void> {
   if (process.env.NODE_ENV === "production") {
-    throw new Error("Trigger simulasi tidak boleh berjalan pada NODE_ENV=production.");
+    throw new Error("Tidak boleh menjalankan simulasi pada NODE_ENV=production.");
   }
-
   const pool = getDbPool();
   await assertIsolatedDatabase(pool);
 
@@ -37,76 +40,114 @@ async function main(): Promise<void> {
     "SELECT id, earthquake_event_id, branch FROM incidents WHERE id = $1",
     [REPORT_ID]
   );
-
   if (current.rows[0]) {
-    if (
-      current.rows[0].earthquake_event_id !== EVENT_ID ||
-      current.rows[0].branch !== "BANDUNG"
-    ) {
-      throw new Error("ID laporan demo telah dipakai laporan lain.");
+    if (current.rows[0].earthquake_event_id !== EVENT_ID ||
+        current.rows[0].branch !== "BANDUNG") {
+      throw new Error("ID laporan simulasi telah digunakan data lain; dibatalkan.");
     }
   } else {
     const count = await pool.query<{ total: number }>(
       "SELECT COUNT(*)::int AS total FROM incidents"
     );
     if (count.rows[0]?.total !== 0) {
-      throw new Error(
-        "Database masih berisi laporan lain. Trigger ini hanya untuk demo dari data kosong; tidak menghapus data."
-      );
+      throw new Error("Ada laporan lain dalam database. Tidak menghapus/menimpa; gunakan staging yang sudah direset.");
     }
   }
 
-  const stores = await pool.query<DemoStore>(
-    "SELECT kode_toko, nama_toko, cabang, fr_type, latitude, longitude " +
-    "FROM stores WHERE UPPER(TRIM(cabang)) = 'BANDUNG' " +
+  // Data master toko riil lebih diutamakan. Koordinat tidak wajib untuk
+  // workflow inspeksi BMS -> bukti foto -> konfirmasi BnM Manajer.
+  const selected = await pool.query<DemoStore>(
+    "SELECT kode_toko, nama_toko, cabang, fr_type, latitude, longitude FROM stores " +
+    "WHERE UPPER(TRIM(cabang)) = 'BANDUNG' " +
     "AND kode_toko IS NOT NULL AND kode_toko <> '' " +
     "AND nama_toko IS NOT NULL AND nama_toko <> '' " +
-    "AND latitude IS NOT NULL AND longitude IS NOT NULL " +
-    "ORDER BY CASE WHEN nama_toko ILIKE '%DAGO%' THEN 0 ELSE 1 END, kode_toko LIMIT 1"
+    "ORDER BY CASE WHEN latitude IS NOT NULL AND longitude IS NOT NULL THEN 0 ELSE 1 END, " +
+    "CASE WHEN nama_toko ILIKE '%DAGO%' THEN 0 ELSE 1 END, kode_toko LIMIT 1"
   );
-  const store = stores.rows[0];
-  if (!store) {
-    throw new Error("Tidak ada toko Bandung berkoordinat valid pada tabel stores.");
-  }
-  const latitude = Number(store.latitude);
-  const longitude = Number(store.longitude);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    throw new Error("Koordinat toko Bandung tidak valid.");
+
+  const store: DemoStore = selected.rows[0] ?? {
+    kode_toko: "T-DEMO-BDG-001",
+    nama_toko: "Toko Simulasi Bandung",
+    cabang: "BANDUNG",
+    fr_type: "SIMULASI",
+    latitude: null,
+    longitude: null,
+  };
+  const isVirtualStore = !selected.rows[0];
+  const lat = store.latitude == null ? NaN : Number(store.latitude);
+  const lon = store.longitude == null ? NaN : Number(store.longitude);
+  const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lon);
+  const simulationNote =
+    "SIMULASI RAPAT (bukan informasi gempa nyata). " +
+    "Penentuan toko/zona bukan hasil pengukuran BMKG/USGS.";
+
+  if (!current.rows[0]) {
+    if (hasCoordinates) {
+      const created = await ensureEarthquakeReport({
+        reportId: REPORT_ID,
+        canonicalEventId: EVENT_ID,
+        eventOccurredAt: new Date(),
+        source: SOURCE,
+        location: {
+          kind: "STORE",
+          id: store.kode_toko,
+          code: store.kode_toko,
+          name: store.nama_toko,
+          type: store.fr_type || "TOKO",
+          branch: "BANDUNG",
+          latitude: lat,
+          longitude: lon,
+        },
+      });
+      if (created.incidentId !== REPORT_ID ||
+          (created.outcome !== "created" && created.outcome !== "existing")) {
+        throw new Error("Laporan simulasi tidak terbuat dengan ID yang direncanakan.");
+      }
+    } else {
+      // Fallback tanpa koordinat: buat laporan inspeksi, bukan klaim zona
+      // geografis aktual. Tidak menyisipkan toko dummy ke tabel stores.
+      const now = new Date().toISOString();
+      await dbCreateIncident({
+        id: REPORT_ID,
+        date: now,
+        disasterType: "earthquake",
+        reportOrigin: "automatic_earthquake",
+        earthquakeEventId: EVENT_ID,
+        earthquakeSource: SOURCE,
+        earthquakeProvenance: simulationNote,
+        tkpType: "toko",
+        storeId: store.kode_toko,
+        storeName: store.nama_toko,
+        branch: "BANDUNG",
+        locationCity: "Bandung",
+        locationKind: "STORE",
+        locationId: store.kode_toko,
+        status: "pending_confirmation",
+        progress: 0,
+        fieldPhotos: [],
+        timeline: [{
+          stage: "Laporan Simulasi Dibuat",
+          label: "Simulasi gempa untuk pemeriksaan toko oleh BMS",
+          timestamp: now,
+          actor: "SPARTA SIAGA - DEMO",
+          notes: simulationNote,
+        }],
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   }
 
-  const report = await ensureEarthquakeReport({
-    reportId: REPORT_ID,
-    canonicalEventId: EVENT_ID,
-    eventOccurredAt: new Date(),
-    source: "SIMULASI INTERNAL - BUKAN DATA BMKG/USGS",
-    location: {
-      kind: "STORE",
-      id: store.kode_toko,
-      code: store.kode_toko,
-      name: store.nama_toko,
-      type: store.fr_type || "TOKO",
-      branch: "BANDUNG",
-      latitude,
-      longitude,
-    },
-  });
-  if (
-    (report.outcome !== "created" && report.outcome !== "existing") ||
-    report.incidentId !== REPORT_ID
-  ) {
-    throw new Error("Laporan simulasi tidak dibuat sesuai rencana.");
-  }
-
-  const existing = await pool.query<{ id: string }>(
+  const exists = await pool.query<{ id: string }>(
     "SELECT id FROM notification_logs WHERE ticket_number = $1 " +
     "AND branch = 'BANDUNG' AND recipient_group = 'BMS' " +
     "AND notification_category = 'ASSIGNMENT' LIMIT 1",
     [REPORT_ID]
   );
 
-  let notificationId = existing.rows[0]?.id;
+  let notificationId = exists.rows[0]?.id;
   if (!notificationId) {
-    const log = await recordNotificationLog({
+    const created = await recordNotificationLog({
       disasterId: REPORT_ID,
       canonicalEventId: EVENT_ID,
       disasterType: "earthquake",
@@ -116,12 +157,12 @@ async function main(): Promise<void> {
       recipientGroup: "BMS",
       category: "ASSIGNMENT",
       ticketNumber: REPORT_ID,
-      title: "[TUGAS PENANGANAN] [SIMULASI] " + store.nama_toko,
-      message:
-        "SIMULASI RAPAT, bukan kejadian BMKG/USGS aktual. " +
-        "BMS Bandung memeriksa toko " + store.nama_toko +
-        ", mengunggah foto bukti, dan mengajukan hasil untuk " +
-        "konfirmasi BnM Manajer sebelum tindak lanjut maintenance.",
+      title: "[SIMULASI] [TUGAS PEMERIKSAAN] " + store.nama_toko,
+      message: simulationNote + " BMS Bandung perlu memeriksa toko " + store.nama_toko +
+        ", mengunggah foto bukti, lalu mengirim hasil pemeriksaan ke BnM Manajer. " +
+        "Maintenance baru dilanjutkan jika dikonfirmasi ada kerusakan.",
+      // Nilai jarak 0 merupakan placeholder format notifikasi DEMO, bukan
+      // perhitungan jarak gempa sebenarnya (lihat label SIMULASI pada notifikasi).
       affectedStores: [{
         kode_toko: store.kode_toko,
         nama_toko: store.nama_toko,
@@ -131,20 +172,23 @@ async function main(): Promise<void> {
         fr_type: store.fr_type || undefined,
       }],
     });
-    notificationId = log.id;
+    notificationId = created.id;
   }
-
-  const result = await pool.query<{ status: string }>(
+  const verify = await pool.query<{ status: string }>(
     "SELECT status FROM incidents WHERE id = $1",
     [REPORT_ID]
   );
-  console.log("SIMULASI SPARTA SIAGA — BERHASIL");
-  console.log("Laporan       : " + REPORT_ID);
-  console.log("Toko          : " + store.nama_toko);
-  console.log("Cabang        : BANDUNG");
-  console.log("Status        : " + (result.rows[0]?.status || "tidak diketahui"));
-  console.log("Notifikasi BMS: " + notificationId + " (in-app, bukan email/WA)");
-  console.log("Selanjutnya   : login BMS, buka lonceng, periksa toko + foto, ajukan ke BnM Manajer.");
+  console.log("TRIGGER SIMULASI BERHASIL");
+  console.log("Laporan        : " + REPORT_ID);
+  console.log("Toko           : " + store.nama_toko +
+    (isVirtualStore ? " (VIRTUAL - BUKAN MASTER TOKO)" : " (MASTER TOKO)"));
+  console.log("Cabang         : BANDUNG");
+  console.log("Status         : " + (verify.rows[0]?.status || "UNKNOWN"));
+  console.log("Notifikasi BMS : " + notificationId);
+  if (!hasCoordinates) {
+    console.log("Peta/jarak     : Tidak tervalidasi (demo tanpa koordinat toko)");
+  }
+  console.log("Selanjutnya    : Login BMS BMS0001, buka lonceng, inspeksi + foto.");
 }
 
 main()
@@ -152,6 +196,4 @@ main()
     console.error("[GAGAL] " + (error instanceof Error ? error.message : String(error)));
     process.exitCode = 1;
   })
-  .finally(async () => {
-    await closeDbPool();
-  });
+  .finally(async () => { await closeDbPool(); });
