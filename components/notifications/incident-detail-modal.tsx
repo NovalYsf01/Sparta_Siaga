@@ -168,7 +168,7 @@ export function IncidentDetailModal({
   })();
 
   return (
-    <div className="fixed inset-0 z-[850] bg-black/50 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-5 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[850] bg-slate-950/55 flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-5 animate-in fade-in duration-200">
       <div
         className={`w-full max-w-2xl flex flex-col overflow-hidden transition-colors ${
           isDark
