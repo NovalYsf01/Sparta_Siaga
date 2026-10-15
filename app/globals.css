@@ -187,3 +187,111 @@
   .sparta-table td:last-child .flex { display: grid; grid-template-columns: 1fr 1fr; }
   .sparta-button { min-height: 44px; }
 }
+
+
+/* SPARTA SIAGA / Operational UI refresh
+   Restrained enterprise surfaces. Opt-in classes: maps and specialist modules
+   continue to use their own styling and remain fully functional. */
+.sparta-admin-ui {
+  --sparta-page-bg: #f5f7fb;
+  --sparta-panel-bg: #fff;
+  --sparta-hairline: #e4e9f0;
+  --sparta-ink: #13223a;
+  --sparta-secondary: #63748d;
+}
+.sparta-admin-ui .sparta-sidebar {
+  box-shadow: 1px 0 0 rgba(18, 42, 77, .025);
+}
+.sparta-admin-ui .sparta-sidebar img { object-fit: contain; }
+.sparta-admin-ui .sparta-ui-panel {
+  border: 1px solid var(--sparta-hairline);
+  border-radius: 12px;
+  background: var(--sparta-panel-bg);
+  box-shadow: 0 1px 2px rgba(17, 39, 65, .025);
+}
+.sparta-admin-ui .sparta-ui-title {
+  color: var(--sparta-ink);
+  font-size: clamp(1.35rem, 1.05rem + .55vw, 1.8rem);
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.sparta-admin-ui .sparta-ui-muted { color: var(--sparta-secondary); }
+.sparta-admin-ui .sparta-ui-field {
+  min-height: 42px;
+  border: 1px solid var(--sparta-hairline);
+  background: white;
+  border-radius: 8px;
+  color: #24344d;
+}
+.sparta-admin-ui .sparta-ui-field:focus-visible,
+.sparta-admin-ui .sparta-ui-button:focus-visible,
+.sparta-admin-ui .sparta-sidebar a:focus-visible {
+  outline: 2px solid #2a6ac4;
+  outline-offset: 2px;
+}
+.sparta-admin-ui .sparta-ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #cfd9e6;
+  border-radius: 8px;
+  background: white;
+  color: #1854a1;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.sparta-admin-ui .sparta-ui-button:hover { background: #eff5fd; border-color: #a7c5ee; }
+.sparta-admin-ui .sparta-ui-button-primary {
+  background: #1d5aa6;
+  color: #fff;
+  border-color: #1d5aa6;
+}
+.sparta-admin-ui .sparta-ui-button-primary:hover { background: #174b8e; border-color: #174b8e; }
+.sparta-admin-ui .sparta-ui-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.sparta-admin-ui .sparta-ui-table thead { background: #f8fafc; color: #586980; }
+.sparta-admin-ui .sparta-ui-table th {
+  padding: 13px 15px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.sparta-admin-ui .sparta-ui-table td { padding: 15px; border-top: 1px solid #edf0f5; vertical-align: middle; }
+.sparta-admin-ui .sparta-ui-table tbody tr:hover { background: #f9fbff; }
+.sparta-admin-ui .sparta-ui-status {
+  display: inline-flex; align-items: center; gap: 6px;
+  max-width: 100%; padding: 5px 10px; border-radius: 7px;
+  font-size: 11px; font-weight: 650; white-space: nowrap;
+}
+.sparta-admin-ui .sparta-ui-status-blue { background: #e8f1fd; color: #1455a3; }
+.sparta-admin-ui .sparta-ui-status-amber { background: #fff4db; color: #945e08; }
+.sparta-admin-ui .sparta-ui-status-green { background: #e6f6ec; color: #137243; }
+.sparta-admin-ui .sparta-ui-status-red { background: #fdeced; color: #b42337; }
+.sparta-admin-ui .sparta-ui-status-gray { background: #edf1f5; color: #4a596f; }
+.dark .sparta-admin-ui {
+  --sparta-panel-bg: #111b2d;
+  --sparta-hairline: #29364c;
+  --sparta-ink: #f1f5fa;
+  --sparta-secondary: #9bacbf;
+}
+.dark .sparta-admin-ui .sparta-ui-field,
+.dark .sparta-admin-ui .sparta-ui-button { background: #151f32; color: #dbe5f2; }
+.dark .sparta-admin-ui .sparta-ui-button-primary { background: #1d5aa6; color: #fff; }
+.dark .sparta-admin-ui .sparta-ui-table thead,
+.dark .sparta-admin-ui .sparta-ui-table tbody tr:hover { background: #1a2639; }
+.dark .sparta-admin-ui .sparta-ui-table td { border-color: #29364c; }
+@media (max-width: 767px) {
+  .sparta-admin-ui .sparta-ui-table { min-width: 650px; }
+  .sparta-admin-ui .sparta-ui-button { min-height: 44px; }
+  .sparta-admin-ui .sparta-ui-title { font-size: 1.35rem; }
+}
