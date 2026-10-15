@@ -221,7 +221,9 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
   // 2. Banner Tipe Laporan Awal
   doc.addRect(35, 735, 525, 22, { fillColor: [0.93, 0.95, 0.98], strokeColor: [0.8, 0.86, 0.94] });
   doc.addText(`No. Laporan: ${report.id}`, 45, 742, { font: "bold", size: 9, color: [0.1, 0.25, 0.5] });
-  const originLabel = report.reportOrigin === "automatic_earthquake" ? "OTOMATIS BMKG" : "MANUAL LAPANGAN";
+  const originLabel = report.earthquakeSource?.toUpperCase().includes("SIMULASI")
+    ? "SIMULASI INTERNAL"
+    : report.reportOrigin === "automatic_earthquake" ? "OTOMATIS GEMPA" : "MANUAL LAPANGAN";
   doc.addText(`Asal: ${originLabel} | Dicetak: ${printDate}`, 295, 742, {
     font: "regular",
     size: 8,
