@@ -99,8 +99,12 @@ async function main(): Promise<void> {
           longitude: lon,
         },
       });
-      if (created.incidentId !== REPORT_ID ||
-          (created.outcome !== "created" && created.outcome !== "existing")) {
+      // Narrow the result union before reading incidentId: the "ambiguous"
+      // outcome has candidateIncidentIds instead of an incidentId.
+      if (created.outcome !== "created" && created.outcome !== "existing") {
+        throw new Error("Laporan simulasi tidak dapat dibuat: " + created.outcome);
+      }
+      if (created.incidentId !== REPORT_ID) {
         throw new Error("Laporan simulasi tidak terbuat dengan ID yang direncanakan.");
       }
     } else {
