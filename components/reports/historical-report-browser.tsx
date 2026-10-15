@@ -98,10 +98,10 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="sparta-report-page space-y-5 max-w-[1560px] mx-auto w-full px-4 sm:px-6 lg:px-0 pt-5 sm:pt-7 pb-20">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+          <h1 className="sparta-ui-title flex items-center gap-2">
             <History className="w-5 h-5 text-emerald-600" />
             Riwayat Laporan
           </h1>
