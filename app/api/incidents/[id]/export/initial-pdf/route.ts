@@ -52,7 +52,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       } catch {
         continue;
       }
-      if (!/^wm_[a-zA-Z0-9_-]+_\\d+_[a-z0-9]+\\.(jpe?g|png|webp)$/i.test(key) ||
+      if (!/^wm_[a-zA-Z0-9_-]+_\d+_[a-z0-9]+\.(jpe?g|png|webp)$/i.test(key) ||
           photoIds.has(key) || !key.includes(id)) {
         continue;
       }
