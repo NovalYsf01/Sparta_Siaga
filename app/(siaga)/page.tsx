@@ -702,7 +702,7 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* MAIN HERO: ACTIVE SITUATION PANEL */
+        {/* MAIN HERO: ACTIVE SITUATION PANEL */}
         {!roleInfo.isHO && <div className="flex flex-col lg:flex-row gap-6">
           <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col shadow-xs">
             <div className="flex items-center justify-between mb-4">
