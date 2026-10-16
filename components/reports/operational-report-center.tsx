@@ -556,8 +556,6 @@ export function OperationalReportCenter({
         </>
       )}
 
-        </>
-      )}
 
       {/* Select Report Modal (Entry Point D2 & O) */}
       <SelectReportModal
