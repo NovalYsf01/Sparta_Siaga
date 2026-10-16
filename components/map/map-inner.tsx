@@ -60,6 +60,35 @@ function MapFlyController({
   return null;
 }
 
+// Leaflet does not always notice sidebar transitions or parent panel resizing.
+// Sync its viewport with actual container size without resetting map position.
+function MapSizeSync() {
+  const map = useMap();
+
+  useEffect(() => {
+    const node = map.getContainer();
+    let frame: number | null = null;
+    const sync = () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        map.invalidateSize({ pan: false });
+      });
+    };
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(sync) : null;
+    observer?.observe(node);
+    window.addEventListener("resize", sync);
+    sync();
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", sync);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [map]);
+
+  return null;
+}
+
 // Component to track map viewport bounds and zoom level for dynamic LOD and culling
 function ViewportTracker({ 
   onZoomChange, 
@@ -516,6 +545,7 @@ export default function MapInner({
           />
         )}
 
+        <MapSizeSync />
         <ZoomControl position="bottomright" />
         <MapFlyController target={flyToTarget} />
         <ViewportTracker onZoomChange={setCurrentZoom} onBoundsChange={handleBoundsChange} />
