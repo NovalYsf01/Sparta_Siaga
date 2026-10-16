@@ -26,6 +26,39 @@ export const CANONICAL_CORRELATION_THRESHOLDS = {
 };
 
 /**
+ * Indonesia operational monitoring footprint (including nearby offshore
+ * seismic zones). This is a coarse GEOGRAPHIC filter, not an administrative
+ * country-border determination. Never allow global high-magnitude exemptions.
+ */
+export function isInIndonesiaMonitoringArea(latitude: number, longitude: number, place = ""): boolean {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+
+  // Include principal island groups and adjoining offshore seismic zones.
+  // Separate ranges reduce false positives from the large Southeast Asia box.
+  const regions: Array<[number, number, number, number]> = [
+    [-8.0, 7.0, 93.5, 107.0],   // Sumatra / Andaman-adjacent
+    [-12.0, -4.5, 104.0, 119.0], // Java / Bali and southern offshore
+    [-13.0, -5.0, 118.0, 126.0], // Nusa Tenggara / Timor and offshore
+    [-5.5, 5.0, 108.0, 120.0],  // Kalimantan
+    [-6.5, 4.0, 118.0, 126.0],  // Sulawesi and surrounding seas
+    [-9.0, 5.0, 124.0, 136.0],  // Maluku / Banda Sea
+    [-11.0, 2.0, 132.0, 142.0], // Papua and surrounding waters
+  ];
+  const inside = regions.some(([south, north, west, east]) =>
+    latitude >= south && latitude <= north &&
+    longitude >= west && longitude <= east
+  );
+  if (!inside) return false;
+
+  // USGS 'place' is descriptive, not an official jurisdiction classification.
+  // Reject explicitly foreign-labelled epicenters inside overlapping boxes.
+  if (/\\b(?:Philippines|Malaysia|Thailand|Singapore|Vietnam|Cambodia|Papua New Guinea|Brunei|Timor-Leste|East Timor)\\b/i.test(place)) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Generate canonical event key
  */
 export function getCanonicalEventKey(source: "BMKG" | "USGS", dateTimeStr?: string, timestamp?: number): string {
@@ -245,13 +278,13 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
 
       for (const feat of features) {
         const [lon, lat, depth] = feat.geometry.coordinates;
-        // Region: Indonesia / Southeast Asia (-15 to 12 lat, 90 to 145 lon) or M6.5+ global
-        const inRegion = lat >= -15 && lat <= 12 && lon >= 90 && lon <= 145;
+        // Keep ONLY Indonesian operational monitoring zones, never global M6.5+.
+        const inRegion = isInIndonesiaMonitoringArea(lat, lon, feat.properties.place || "");
         const mag = feat.properties.mag || 0;
         const depthKm = Math.round(depth);
         const usgsTimestamp = feat.properties.time;
 
-        if (inRegion || mag >= 6.5) {
+        if (inRegion) {
           const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
 
           // CANONICAL CORRELATION: USGS vs BMKG (Requirement 6)
