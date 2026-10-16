@@ -720,6 +720,7 @@ export function IncidentAppShell({
                     </div>
                   </Link>
 
+                  {!isHoViewer && (
                   <Link
                     href="/reports/tracking"
                     onClick={() => setIsMoreSheetOpen(false)}
@@ -729,6 +730,7 @@ export function IncidentAppShell({
                     <span>Tracking Alur</span>
                   </Link>
 
+                  )}
                   <Link
                     href="/reports/history"
                     onClick={() => setIsMoreSheetOpen(false)}
