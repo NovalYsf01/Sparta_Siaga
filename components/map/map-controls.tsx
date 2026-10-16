@@ -6,7 +6,6 @@ import {
   Eye,
   EyeOff,
   CloudRain,
-  ChevronDown,
   ChevronUp,
   Layers,
   RotateCcw,
@@ -63,12 +62,10 @@ export function MapControls({
   onClearEventFocus,
 }: MapControlsProps) {
   const [isMinimized, setIsMinimized] = useState(false);
-  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
       setIsMinimized(true);
-      setIsLegendExpanded(false);
     }
   }, []);
 
@@ -101,9 +98,9 @@ export function MapControls({
 
   // Expanded compact enterprise card (Requirements 20–32)
   return (
-    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[400] flex flex-col pointer-events-auto transition-all duration-200 max-w-[calc(100vw-1.5rem)] sm:w-[276px]">
+    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[400] flex flex-col pointer-events-auto transition-all duration-200 w-[min(276px,calc(100vw-1.5rem))]">
       <div
-        className={`border rounded-xl p-3 shadow-lg backdrop-blur-md w-full text-xs space-y-2 transition-colors duration-200 max-h-[min(560px,calc(100dvh-155px))] overflow-y-auto ${
+        className={`border rounded-xl p-3 shadow-lg backdrop-blur-md w-full text-xs space-y-2 transition-colors duration-200 max-h-[min(520px,calc(100dvh-155px))] overflow-y-auto ${
           isDark
             ? "bg-slate-900/95 border-slate-700/80 text-white"
             : "bg-white/95 border-slate-200 text-slate-900 shadow-xl"
@@ -274,67 +271,6 @@ export function MapControls({
             <CloudRain className="w-3 h-3 shrink-0" />
             <span className="truncate">Radar</span>
           </button>
-        </div>
-
-        {/* 26. Legenda Status Operasional: Collapsible */}
-        <div
-          className={`rounded-xl border overflow-hidden transition-all duration-200 ${
-            isDark ? "bg-slate-950/50 border-slate-800" : "bg-slate-50 border-slate-200"
-          }`}
-        >
-          <button
-            onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-            className={`w-full flex items-center justify-between p-1.5 px-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-              isDark
-                ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              <span>Legenda Status</span>
-            </span>
-            {isLegendExpanded ? (
-              <ChevronUp className="w-3 h-3" />
-            ) : (
-              <ChevronDown className="w-3 h-3" />
-            )}
-          </button>
-
-          {isLegendExpanded && (
-            <div className="p-2 pt-0.5 flex flex-col gap-1 border-t border-slate-200/40 dark:border-slate-800/40 animate-in fade-in duration-150">
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 border border-emerald-600/50 shrink-0" />
-                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>
-                  Normal
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <div className="w-2 h-2 rounded-full bg-amber-500 border border-amber-600/50 shrink-0" />
-                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>
-                  Perlu Perhatian
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <div className="w-2 h-2 rounded-full bg-red-600 border border-red-700/50 animate-pulse shrink-0" />
-                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>
-                  Terdampak Lapangan
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <div className="w-2 h-2 rounded-full bg-blue-600 border border-blue-700/50 shrink-0" />
-                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>
-                  Dalam Penanganan
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                <div className="w-2 h-2 rounded-full bg-slate-400 border border-slate-500/50 shrink-0" />
-                <span className={isDark ? "text-slate-300 font-medium" : "text-slate-700 font-medium"}>
-                  Selesai
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* 27. Basemap Selector: Compact segmented selector */}
