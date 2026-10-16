@@ -122,9 +122,9 @@ export function MobileIncidentHome({
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 max-w-lg mx-auto pb-12">
+    <div className="flex flex-col gap-4 p-4 max-w-2xl mx-auto pb-24">
       {/* 1. HEADER RINGKAS & INFORMASI CABANG */}
-      <section aria-label="Ringkasan operasional mobile" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
+      <section aria-label="Ringkasan operasional mobile" className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block truncate">
@@ -268,15 +268,15 @@ export function MobileIncidentHome({
         {(isAdmin || isHO) && (
           <div className="grid grid-cols-2 gap-2">
             <Link
-              href="/admin/locations"
-              className="min-h-[46px] px-3 py-2.5 bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+              href={isAdmin ? "/admin/facilities" : "/reports"}
+              className="min-h-[48px] px-3 py-2.5 bg-slate-800 text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-1.5"
             >
               <Building2 className="w-4 h-4" />
-              <span>Data Lokasi</span>
+              <span>{isAdmin ? "Data Fasilitas" : "Monitoring Laporan"}</span>
             </Link>
             <Link
               href="/monitoring"
-              className="min-h-[46px] px-3 py-2.5 bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs"
+              className="min-h-[48px] px-3 py-2.5 bg-blue-700 text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-1.5"
             >
               <Activity className="w-4 h-4" />
               <span>Peta Monitoring</span>
