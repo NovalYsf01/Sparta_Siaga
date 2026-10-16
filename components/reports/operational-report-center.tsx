@@ -46,9 +46,10 @@ export function OperationalReportCenter({
   }, []);
 
   const isSystemAdmin = identity?.systemRole === "ADMIN";
+  const isHoViewer = identity?.scope === "HO" && !isSystemAdmin;
   const canTriggerEstimation = !isSystemAdmin && Boolean(identity?.effectivePermissions?.ESTIMATION_TRIGGER);
   const canUpdateProgress = !isSystemAdmin && Boolean(identity?.effectivePermissions?.REPORT_UPDATE_PROGRESS);
-  const canCreateReport = Boolean(identity) && !isSystemAdmin;
+  const canCreateReport = Boolean(identity) && !isSystemAdmin && !isHoViewer;
 
   // Entry Point D2 & O states
   const [selectReportPurpose, setSelectReportPurpose] = useState<"ESTIMATION" | "PROGRESS" | null>(null);
@@ -58,7 +59,7 @@ export function OperationalReportCenter({
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {
       // Exclude closed/resolved/archived permanently from active operational center
-      if (inc.status === "closed" || inc.status === "resolved" || inc.status === "archived") return false;
+      if (!isHoViewer && (inc.status === "closed" || inc.status === "resolved" || inc.status === "archived")) return false;
 
       // Detailed active status filter
       if (filterStatus !== "all" && inc.status !== filterStatus) return false;
@@ -82,7 +83,7 @@ export function OperationalReportCenter({
 
       return true;
     });
-  }, [incidents, searchQuery, filterStatus, filterType]);
+  }, [incidents, searchQuery, filterStatus, filterType, isHoViewer]);
 
   const activeCount = incidents.filter(i => i.status !== "closed" && i.status !== "resolved" && i.status !== "archived").length;
   const pendingCount = incidents.filter(i => i.status === "pending_confirmation").length;
@@ -117,6 +118,104 @@ export function OperationalReportCenter({
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       
+      {/* HO is a read-only monitoring workspace: not an operational work queue. */}
+      {isHoViewer ? (
+        <section className="space-y-4" aria-label="Monitoring Laporan Head Office">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white">Monitoring Laporan Nasional</h1>
+              <p className="mt-1 text-xs text-slate-500">Ringkasan kejadian dan progres penanganan seluruh cabang. Akses pemantauan saja.</p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              {filteredIncidents.length} laporan ditemukan
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            {[
+              { label: "Total Laporan", value: incidents.length },
+              { label: "Menunggu Persetujuan", value: incidents.filter(i => i.status === "pending_bm_approval" || i.status === "pending_final_approval").length },
+              { label: "Dalam Penanganan", value: incidents.filter(i => i.status === "in_maintenance" || i.status === "in_construction").length },
+            ].map(kpi => (
+              <div key={kpi.label} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-xs text-slate-500">{kpi.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{kpi.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex flex-col gap-2 border-b border-slate-100 p-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/>
+                <input type="search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+                  placeholder="Cari laporan, toko, DC, atau cabang..." aria-label="Cari laporan nasional"
+                  className="min-h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"/>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select aria-label="Filter status laporan" value={filterStatus} onChange={e => setFilterStatus(e.target.value as IncidentStatus | "all")}
+                  className="min-h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                  <option value="all">Semua Status</option>
+                  <option value="pending_confirmation">Menunggu Pemeriksaan</option>
+                  <option value="pending_bm_approval">Persetujuan BnM</option>
+                  <option value="clarification_requested">Klarifikasi</option>
+                  <option value="confirmed_affected">Kerusakan Disetujui</option>
+                  <option value="in_estimation">Estimasi</option>
+                  <option value="in_maintenance">Dalam Penanganan</option>
+                  <option value="closed">Selesai</option>
+                </select>
+                <select aria-label="Filter jenis kejadian" value={filterType} onChange={e => setFilterType(e.target.value as "all" | DisasterType)}
+                  className="min-h-10 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                  <option value="all">Semua Kejadian</option>
+                  <option value="earthquake">Gempa</option>
+                  <option value="flood">Banjir</option>
+                  <option value="other">Lainnya</option>
+                </select>
+              </div>
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-500 dark:bg-slate-800">
+                  <tr><th className="px-4 py-3">Laporan / Lokasi</th><th className="px-4 py-3">Cabang</th><th className="px-4 py-3">Kejadian</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">PIC</th><th className="px-4 py-3">Target</th><th className="px-4 py-3 text-right">Detail</th></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredIncidents.map(inc => (
+                    <tr key={inc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="px-4 py-3">
+                        <div className="max-w-[240px] truncate font-semibold text-slate-900 dark:text-white">{inc.storeName}</div>
+                        <div className="max-w-[240px] truncate text-[10px] text-slate-500">{inc.id}</div>
+                      </td>
+                      <td className="px-4 py-3">{inc.branch}</td>
+                      <td className="px-4 py-3">{inc.disasterType}</td>
+                      <td className="px-4 py-3"><span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">{getStatusBadge(inc.status).label}</span></td>
+                      <td className="px-4 py-3">{inc.primaryPicName || "—"}</td>
+                      <td className="px-4 py-3">{inc.maintenanceTicket?.completedAt ? new Date(inc.maintenanceTicket.completedAt).toLocaleDateString("id-ID") : "—"}</td>
+                      <td className="px-4 py-3 text-right"><button type="button" onClick={() => onSelectIncident(inc)}
+                        className="rounded-lg border border-slate-200 px-3 py-2 font-semibold text-blue-700 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-300">Lihat</button></td>
+                    </tr>
+                  ))}
+                  {!filteredIncidents.length && <tr><td colSpan={7} className="p-8 text-center text-slate-500">Belum ada laporan yang sesuai.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-2 p-3 md:hidden">
+              {filteredIncidents.map(inc => (
+                <article key={inc.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{inc.storeName}</p>
+                      <p className="text-xs text-slate-500">{inc.branch} · {inc.disasterType}</p>
+                    </div>
+                    <button type="button" onClick={() => onSelectIncident(inc)} className="shrink-0 rounded-lg border px-3 py-2 text-xs text-blue-700 dark:text-blue-300">Lihat</button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">{getStatusBadge(inc.status).label} · PIC: {inc.primaryPicName || "Belum ada"}</p>
+                  {inc.maintenanceTicket?.completedAt && <p className="mt-1 text-xs text-slate-500">Target: {new Date(inc.maintenanceTicket.completedAt).toLocaleDateString("id-ID")}</p>}
+                </article>
+              ))}
+              {!filteredIncidents.length && <p className="py-8 text-center text-xs text-slate-500">Tidak ada laporan sesuai filter.</p>}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <>
       {/* ── Header & KPI ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -446,6 +545,9 @@ export function OperationalReportCenter({
               );
             })}
           </div>
+        </>
+      )}
+
         </>
       )}
 
