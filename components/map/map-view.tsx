@@ -20,6 +20,7 @@ const MapInner = dynamic(() => import("./map-inner"), {
 
 interface MapViewProps {
   stores: Store[];
+  locationMode?: "event" | "store" | "dc";
   earthquakes: Earthquake[];
   floodReports?: any[];
   basemap: "esri-dark" | "esri-light" | "osm";
