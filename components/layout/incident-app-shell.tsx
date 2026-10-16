@@ -109,7 +109,7 @@ export function IncidentAppShell({
     if (currentPath === "/") return "Ringkasan Operasional";
     if (currentPath.startsWith("/monitoring")) return "Peta Monitoring Spasial";
     if (currentPath.startsWith("/alerts")) return "Event & Deteksi Bencana";
-    if (currentPath.startsWith("/reports/tracking")) return "Tracking Alur Penanganan";
+    if (currentPath.startsWith("/reports/tracking")) return "Laporan Kejadian";
     if (currentPath.startsWith("/reports/history")) return "Riwayat Laporan Historis";
     if (currentPath.startsWith("/reports/shared-queue")) return "Penugasan";
     if (currentPath.startsWith("/reports")) return "Pusat Laporan Kejadian";
@@ -215,7 +215,6 @@ export function IncidentAppShell({
       title: "Pelaporan",
       items: [
         { id: "history", href: "/reports", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
-        ...(!isHoViewer ? [{ id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity }] : []),
         { id: "history-browse", href: "/reports/history", label: "Riwayat Laporan", icon: History },
       ],
     },
@@ -678,7 +677,7 @@ export function IncidentAppShell({
             type="button"
             onClick={() => setIsMoreSheetOpen(true)}
             className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl text-[10px] font-semibold transition-colors min-h-[44px] min-w-[52px] ${
-              isMoreSheetOpen || pathname.startsWith("/alerts") || pathname.startsWith("/reports/tracking") || pathname.startsWith("/reports/history") || pathname.startsWith("/settings") || pathname.startsWith("/admin")
+              isMoreSheetOpen || pathname.startsWith("/alerts") || pathname.startsWith("/reports/history") || pathname.startsWith("/settings") || pathname.startsWith("/admin")
                 ? "text-[#1D5AA6] dark:text-blue-400 font-bold"
                 : isDark
                 ? "text-slate-400 hover:text-white"
@@ -771,17 +770,6 @@ export function IncidentAppShell({
                     </div>
                   </Link>
 
-                  {!isHoViewer && (
-                  <Link
-                    href="/reports/tracking"
-                    onClick={() => setIsMoreSheetOpen(false)}
-                    className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all text-xs font-semibold"
-                  >
-                    <Activity className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                    <span>Tracking Alur</span>
-                  </Link>
-
-                  )}
                   <Link
                     href="/reports/history"
                     onClick={() => setIsMoreSheetOpen(false)}
