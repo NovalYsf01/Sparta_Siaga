@@ -320,12 +320,12 @@ export function StoreVerificationModal({
   const hasAccess = canConfirm || canBmApprove;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/55 animate-in fade-in overscroll-none touch-none select-none">
-      <div className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full overflow-hidden shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] touch-auto select-text">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] touch-auto select-text">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40 shrink-0">
           <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${isBmView ? "bg-blue-50 dark:bg-blue-950/40 text-[#1D5AA6] dark:text-blue-400" : "bg-slate-100 dark:bg-slate-800 text-[#1D5AA6] dark:text-blue-400"}`}>
+            <div className={`p-2.5 rounded-xl ${isBmView ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400" : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400"}`}>
               {isBmView ? <ShieldAlert className="w-5 h-5" /> : <Store className="w-5 h-5" />}
             </div>
             <div>
@@ -392,7 +392,7 @@ export function StoreVerificationModal({
           /* =========================================================================
              BnM MANAJER REVIEW & DECISION MODE
              ========================================================================= */
-          <form onSubmit={handleSubmitBmDecision} className="p-4 sm:p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
+          <form onSubmit={handleSubmitBmDecision} className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
             {submitError && (
               <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -401,7 +401,7 @@ export function StoreVerificationModal({
             )}
 
             {/* Inspection Submission Summary Card */}
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-3">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40 p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60 pb-2.5">
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
                   Hasil Pengajuan Pemeriksaan Lapangan
