@@ -499,24 +499,6 @@ export default function MonitoringPage() {
             </div>
 
             <div className="mt-4 space-y-3 text-xs">
-              {mapMode === "dc" && <div>
-                <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Kategori Fasilitas
-                </label>
-                <select
-                  value={facilityType}
-                  onChange={(e) => setFacilityType(e.target.value)}
-                  className="w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs"
-                >
-                  <option value="">Semua Kategori</option>
-                  <option value="DC">DC (Distribution Center)</option>
-                  <option value="WAREHOUSE">Warehouse</option>
-                  <option value="DEPO">Depo</option>
-                  <option value="BULKY">Bulky</option>
-                  <option value="STORE_HUB">Store Hub</option>
-                </select>
-              </div>}
-
               <div>
                 <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Cabang Operasional
