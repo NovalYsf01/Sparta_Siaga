@@ -36,6 +36,7 @@ export function OperationalReportCenter({
   const [filterType, setFilterType] = useState<"all" | DisasterType>("all");
 
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
+  const [identityLoading, setIdentityLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -43,7 +44,8 @@ export function OperationalReportCenter({
       .then((data) => {
         if (data) setIdentity(data.user || data);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIdentityLoading(false));
   }, []);
 
   const isSystemAdmin = identity?.systemRole === "ADMIN";
@@ -123,6 +125,8 @@ export function OperationalReportCenter({
         return { label: "Unknown", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
     }
   };
+
+  if (identityLoading) return <div role="status" className="p-6 text-sm text-slate-500">Menyiapkan laporan...</div>;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
