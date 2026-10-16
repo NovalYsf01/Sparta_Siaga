@@ -108,8 +108,16 @@ export function OperationalReportCenter({
         return { label: "Investigasi", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
       case "in_maintenance":
         return { label: "Penanganan", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
+      case "confirmed_safe":
+        return { label: "Dinyatakan Aman", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" };
+      case "closed":
+      case "archived":
       case "resolved":
         return { label: "Selesai", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
+      case "in_construction":
+        return { label: "Perbaikan Berjalan", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" };
+      case "pending_final_approval":
+        return { label: "Persetujuan Akhir", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" };
       default:
         return { label: "Unknown", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
     }
