@@ -111,7 +111,9 @@ export default function MonitoringPage() {
       if (facilityStatus) params.set("status", facilityStatus);
       if (facilityMapping) params.set("mapping", facilityMapping);
     }
-    if (viewport) {
+    // DC mode loads the small branch-scoped master dataset, not only the
+    // current map bounds. Avoid hiding DCs located outside the first viewport.
+    if (viewport && mapMode !== "dc") {
       Object.entries(viewport).forEach(([key, value]) => params.set(key, String(value)));
     }
 
@@ -195,7 +197,9 @@ export default function MonitoringPage() {
   // Event mode intentionally includes both to evaluate risk geographically.
   const displayedLocations = useMemo<Store[]>(() => {
     const isValid = (loc: Store) =>
+      loc.latitude != null && loc.longitude != null &&
       Number.isFinite(Number(loc.latitude)) && Number.isFinite(Number(loc.longitude)) &&
+      !(Number(loc.latitude) === 0 && Number(loc.longitude) === 0) &&
       Math.abs(Number(loc.latitude)) <= 90 && Math.abs(Number(loc.longitude)) <= 180;
     const inBranch = (loc: Store) =>
       !facilityBranch || (loc.cabang || "").toLowerCase() === facilityBranch.toLowerCase();
@@ -369,6 +373,7 @@ export default function MonitoringPage() {
         <div className="flex-1 relative h-full w-full min-w-0 z-0">
           <MapView
             stores={displayedLocations}
+            locationMode={mapMode}
             earthquakes={mapMode === "event" ? mapEarthquakes : []}
             floodReports={mapMode === "event" ? disasterData?.floodReports || [] : []}
             basemap={basemap}
