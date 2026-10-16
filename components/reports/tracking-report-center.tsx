@@ -125,7 +125,7 @@ export function TrackingReportCenter({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase font-semibold transition-colors">
               <tr>
@@ -202,6 +202,34 @@ export function TrackingReportCenter({
               )}
             </tbody>
           </table>
+        </div>
+        <div className="space-y-2 p-3 md:hidden">
+          {filteredIncidents.length === 0 ? (
+            <p className="py-8 text-center text-xs text-slate-500">Tidak ada laporan aktif untuk dilacak.</p>
+          ) : filteredIncidents.map(inc => {
+            const badge = getStatusBadge(inc.status);
+            return (
+              <article key={inc.id} className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-semibold text-blue-700 dark:text-blue-300">{inc.id}</p>
+                    <h3 className="mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{inc.storeName}</h3>
+                    <p className="text-[11px] text-slate-500">{inc.branch} · {inc.disasterType}</p>
+                  </div>
+                  <span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-semibold ${badge.color}`}>{badge.label}</span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div><p className="text-slate-500">PIC</p><p className="mt-1 font-medium text-slate-800 dark:text-slate-200">{inc.primaryPicName || "Belum ditugaskan"}</p></div>
+                  <div><p className="text-slate-500">Target Selesai</p><p className="mt-1 font-medium text-slate-800 dark:text-slate-200">{inc.maintenanceTicket?.completedAt ? new Date(inc.maintenanceTicket.completedAt).toLocaleDateString("id-ID") : "Belum ditentukan"}</p></div>
+                </div>
+                <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+                  <span className="text-xs text-slate-500">{(inc.progress ?? 0) > 0 ? `Progres: ${inc.progress}%` : "Menunggu progres pekerjaan"}</span>
+                  <button type="button" onClick={() => onSelectIncident(inc)}
+                    className="min-h-10 rounded-lg bg-blue-50 px-3 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Lihat Detail</button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </div>
