@@ -67,7 +67,13 @@ export function getHoAttentionReasons(report: IncidentRecord, now = Date.now()):
   const target = getReportTarget(report);
   const inWork = ["in_maintenance", "in_construction", "in_estimation", "awaiting_spk", "spk_issued"].includes(report.status);
   if (inWork && !target) issues.push("Target penyelesaian belum ditentukan");
-  if (target && Date.parse(target) < now) issues.push("Target penyelesaian terlewati");
+  // Target is a calendar deadline, not an hour-by-hour timer.
+  // Do not mark a report overdue on the morning of its due date.
+  if (target) {
+    const targetDay = new Date(target).toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+    const currentDay = new Date(now).toLocaleDateString("sv-SE", { timeZone: "Asia/Jakarta" });
+    if (targetDay < currentDay) issues.push("Target penyelesaian terlewati");
+  }
   return issues;
 }
 
