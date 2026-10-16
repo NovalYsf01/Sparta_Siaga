@@ -151,6 +151,8 @@ export function IncidentAppShell({
   }, []);
 
   const isDark = theme === "dark";
+  const isHoViewer = identity?.scope === "HO" && identity?.systemRole !== "ADMIN";
+  const pageTitle = getPageTitle(pathname);
 
 
   const roleLabels: Record<RoleType, { title: string; subtitle: string; icon: React.ReactNode }> = {
@@ -207,7 +209,7 @@ export function IncidentAppShell({
       title: "Pelaporan",
       items: [
         { id: "history", href: "/reports", label: "Laporan Kejadian", icon: ClipboardList, badge: activeIncidentCount > 0 ? activeIncidentCount.toString() : undefined },
-        { id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity },
+        ...(!isHoViewer ? [{ id: "tracking", href: "/reports/tracking", label: "Tracking Laporan", icon: Activity }] : []),
         { id: "history-browse", href: "/reports/history", label: "Riwayat Laporan", icon: History },
       ],
     },
@@ -247,21 +249,21 @@ export function IncidentAppShell({
         } bg-[#123B6D] text-white shadow-lg`}
       >
         {/* Brand Header */}
-        <div className={`flex flex-col justify-center py-4 shrink-0 border-b border-white/10 ${isSidebarCollapsed ? "items-center px-2" : "px-6"}`}>
+        <div className={`flex flex-col justify-center py-5 shrink-0 border-b border-white/10 ${isSidebarCollapsed ? "items-center px-2" : "px-5"}`}>
           {!isSidebarCollapsed ? (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3">
-                <Image src="/brand/building_logo.png" alt="SPARTA Logo" width={38} height={38} className="shrink-0" />
-                <div className="flex flex-col">
-                  <span className="font-black text-lg tracking-wider text-white leading-none">SPARTA SIAGA</span>
-                  <span className="text-[10px] font-medium text-blue-200 mt-1 tracking-wide leading-tight">
-                    Sistem Integrasi Analisis &<br/>Peringatan Bencana
+                <Image src="/brand/building_logo.png" alt="Logo SPARTA SIAGA" width={44} height={44} className="h-11 w-11 shrink-0 object-contain" />
+                <div className="min-w-0">
+                  <span className="block text-[16px] font-bold tracking-tight text-white leading-tight">SPARTA SIAGA</span>
+                  <span className="mt-1 block text-[10px] leading-[1.4] text-blue-100/80">
+                    Sistem Integrasi Analisis &amp; Peringatan Bencana
                   </span>
                 </div>
               </div>
-              <div className="flex flex-col gap-1 mt-1">
-                <Image src="/brand/alfamart_logo.png" alt="Alfamart Logo" width={80} height={25} className="opacity-90" />
-                <span className="text-[9px] font-semibold text-blue-300 uppercase tracking-widest">Internal System</span>
+              <div className="flex items-center justify-between border-t border-white/10 pt-3">
+                <Image src="/brand/alfamart_logo.png" alt="Alfamart" width={88} height={30} className="h-7 w-auto object-contain" />
+                <span className="text-[9px] font-medium uppercase tracking-wider text-blue-100/60">Internal</span>
               </div>
             </div>
           ) : (
@@ -356,38 +358,38 @@ export function IncidentAppShell({
             </div>
 
             {/* Desktop Breadcrumbs (SPARTA Enterprise Style) */}
-            <div className="hidden lg:flex items-center gap-2 text-xs shrink-0">
+            <div className="hidden xl:flex items-center gap-2 text-xs shrink-0">
               <span className="font-bold text-[#123B6D] dark:text-blue-400">SPARTA SIAGA</span>
               <span className="text-slate-300 dark:text-slate-600">/</span>
-              <span className="text-slate-800 dark:text-slate-200 font-semibold">{getPageTitle(pathname)}</span>
+              <span className="text-slate-800 dark:text-slate-200 font-semibold">{pageTitle}</span>
             </div>
 
             {/* Universal Search Bar */}
             <div
               onClick={onSearchClick}
-              className={`hidden sm:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-sm w-full ${
+              className={`hidden md:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-sm w-full ${
                 isDark
                   ? "bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300"
                   : "bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-500"
               }`}
             >
               <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="truncate text-xs">Cari toko, lokasi, laporan...</span>
+              <span className="truncate text-xs">{pathname.startsWith("/monitoring") ? "Pencarian toko, DC, atau kejadian..." : pathname.startsWith("/reports") ? "Cari laporan dan lokasi..." : "Cari laporan, toko, atau lokasi..."}</span>
               <kbd
                 className={`hidden md:inline-block ml-auto text-[10px] border px-1.5 py-0.5 rounded font-mono ${
                   isDark ? "bg-slate-900 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-400"
                 }`}
               >
-                ⌘K
+                Ctrl K
               </kbd>
             </div>
           </div>
 
           {/* Right: PWA Install, Buat Laporan, Notifications, Role */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <PwaInstallPrompt variant="compact" />
+            <div className="hidden 2xl:block"><PwaInstallPrompt variant="compact" /></div>
 
-            {identity?.systemRole !== "ADMIN" && (
+            {identity?.systemRole !== "ADMIN" && !isHoViewer && (
               <button
                 onClick={() => {
                   if (onOpenReportModal) {
@@ -397,7 +399,7 @@ export function IncidentAppShell({
                     window.dispatchEvent(event);
                   }
                 }}
-                className="hidden md:flex items-center gap-2 px-3.5 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors min-h-[38px]"
+                className="hidden lg:flex items-center gap-2 px-3.5 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors min-h-[38px]"
               >
                 <ClipboardList className="w-4 h-4" />
                 <span>Buat Laporan</span>
@@ -419,7 +421,7 @@ export function IncidentAppShell({
             >
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center animate-pulse">
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
                   {unreadCount}
                 </span>
               )}
@@ -547,7 +549,7 @@ export function IncidentAppShell({
 
         {/* MAIN BODY VIEW */}
         <main
-          className={`relative flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-6 transition-colors duration-200 flex flex-col ${
+          className={`relative flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-5 transition-colors duration-200 flex flex-col ${
             isDark ? "bg-slate-900" : "bg-[#f5f7fa]"
           }`}
         >
