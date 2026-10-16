@@ -187,3 +187,33 @@
   .sparta-table td:last-child .flex { display: grid; grid-template-columns: 1fr 1fr; }
   .sparta-button { min-height: 44px; }
 }
+
+
+/* Map module: keep interactions discoverable without crowding the map. */
+.map-ux-action {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: .375rem;
+  border: 1px solid #d8e0ea;
+  border-radius: .5rem;
+  background: #fff;
+  padding: .5rem .7rem;
+  color: #34465f;
+  font-size: .75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease;
+}
+.map-ux-action:hover { background: #f1f6fc; border-color: #aabed8; }
+.map-ux-action:focus-visible { outline: 2px solid #1d5aa6; outline-offset: 2px; }
+.dark .map-ux-action { background: #19263b; color: #e2e8f0; border-color: #40516a; }
+.dark .map-ux-action:hover { background: #243650; }
+@media (max-width: 639px) {
+  .map-ux-action { min-height: 44px; }
+  /* Leaflet controls should stay clear of the mobile bottom navigation. */
+  .leaflet-bottom.leaflet-right { bottom: 9px; }
+  .sparta-page-header { flex-wrap: wrap; }
+  .sparta-page-header > * { min-width: 0; }
+}
