@@ -825,7 +825,7 @@ export default function DashboardPage() {
           </div>
         </div>}
 
-        {/* Secondary report table stays available on demand. */
+        {/* Secondary report table stays available on demand. */}
         {!roleInfo.isHO && <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
           <summary className="cursor-pointer select-none text-sm font-semibold text-blue-700 dark:text-blue-300">Lihat seluruh laporan yang perlu perhatian</summary>
         <div className="pt-4">
