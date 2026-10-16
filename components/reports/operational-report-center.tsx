@@ -408,11 +408,11 @@ export function OperationalReportCenter({
                             <div className="w-16 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                               <div
                                 className="bg-[#1D5AA6] h-full rounded-full transition-all duration-300"
-                                style={{ width: `${(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "—"}` }}
+                                style={{ width: `${inc.progress ?? 0}%` }}
                               />
                             </div>
                             <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                              {inc.progress ?? 0}%
+                              {(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "—"}
                             </span>
                           </div>
                         </td>
