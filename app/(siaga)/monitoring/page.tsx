@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Activity, AlertTriangle, Building2, Filter, List, Loader2, MapPin, Radio, Search, Store as StoreIcon, X } from "lucide-react";
+import { Activity, AlertTriangle, Building2, Filter, Layers, List, Loader2, MapPin, Radio, Search, Store as StoreIcon, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 type MapMode = "event" | "store" | "dc";
 import { MapControls } from "@/components/map/map-controls";
@@ -44,6 +44,7 @@ export default function MonitoringPage() {
   const [isEarthquakeModalOpen, setIsEarthquakeModalOpen] = useState(false);
   const [viewport, setViewport] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isMobileControlsOpen, setIsMobileControlsOpen] = useState(false);
 
   const {
     computedStores,
@@ -72,6 +73,8 @@ export default function MonitoringPage() {
     selectedEarthquake,
     clearEventFocus,
   } = useSiaga();
+
+  const isDark = theme === "dark";
 
   // Detect mobile screen for responsive side-panel vs bottom-sheet
   useEffect(() => {
@@ -270,6 +273,7 @@ export default function MonitoringPage() {
     setIsLocationListOpen(false);
     setIsEarthquakeModalOpen(false);
     setIsAffectedSheetOpen(false);
+    setIsMobileControlsOpen(false);
     handleCloseDetail();
   };
 
@@ -311,73 +315,210 @@ export default function MonitoringPage() {
   };
 
   return (
-    <div className="w-full h-full relative overflow-hidden flex flex-col bg-slate-100 dark:bg-slate-950">
-      {/* Context-aware map navigation. Separate Store and DC, not mixed. */}
-      <div className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white sm:px-4">
-        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-2 overflow-x-auto" role="tablist" aria-label="Jenis monitoring peta">
-            {([
+    <div className="w-full h-full relative overflow-hidden flex flex-col bg-slate-900">
+      {/* 1. FLOATING TOP CONTROL OVERLAY (NASA FIRMS Inspired, Task 1 & Task 5) */}
+      <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[450] pointer-events-none flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        {/* Left: Floating Mode Switcher Pill + Mobile Kontrol Peta Button */}
+        <div className="pointer-events-auto flex items-center gap-2 flex-wrap">
+          {/* Floating Mode Switcher Pill: [ Kejadian | Toko | DC ] */}
+          <div
+            role="tablist"
+            aria-label="Jenis monitoring peta"
+            className={`flex items-center p-1 rounded-xl shadow-lg backdrop-blur-md border ${
+              isDark
+                ? "bg-slate-900/90 border-slate-700/80"
+                : "bg-white/95 border-slate-200 shadow-md"
+            }`}
+          >
+            {[
               { id: "event" as const, label: "Kejadian", icon: Activity },
               { id: "store" as const, label: "Toko", icon: StoreIcon },
               { id: "dc" as const, label: "DC", icon: Building2 },
-            ]).map(tab => {
+            ].map((tab) => {
               const Icon = tab.icon;
               const selected = mapMode === tab.id;
               return (
-                <button key={tab.id} type="button" role="tab" aria-selected={selected}
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
                   onClick={() => handleModeChange(tab.id)}
-                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${selected ? "bg-[#1D5AA6] text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}>
-                  <Icon className="h-4 w-4" />{tab.label}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all min-h-[38px] ${
+                    selected
+                      ? "bg-[#1D5AA6] text-white shadow-sm"
+                      : isDark
+                      ? "text-slate-300 hover:text-white hover:bg-white/5"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
           </div>
+
+          {/* Tombol Kontrol Peta Mobile */}
+          <button
+            type="button"
+            onClick={() => setIsMobileControlsOpen(true)}
+            className={`lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl shadow-lg backdrop-blur-md border text-xs font-bold transition-all min-h-[38px] shrink-0 ${
+              isDark
+                ? "bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-cyan-400"
+                : "bg-white/95 hover:bg-slate-50 border-slate-200 text-[#123B6D] shadow-md"
+            }`}
+            aria-label="Buka Kontrol Peta"
+            title="Buka Kontrol Peta"
+          >
+            <Layers className="w-4 h-4 text-cyan-500 shrink-0" />
+            <span>Kontrol Peta</span>
+            {showRadar && <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />}
+          </button>
+        </div>
+
+        {/* Right: Floating Mode Actions & Context Info */}
+        <div className="pointer-events-auto flex items-center gap-2 overflow-x-auto max-w-full pb-0.5 sm:pb-0">
           {mapMode === "event" ? (
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {latestEq && <span className="min-w-0 max-w-[380px] truncate text-xs text-slate-600 dark:text-slate-300" title={latestEq.title || latestEq.place}>
-                <span className="font-semibold">M {latestEq.magnitude}</span> · {latestEq.title || latestEq.place}
-              </span>}
-              <button type="button" onClick={handleOpenEarthquakes} className="map-ux-action">
-                <List className="h-4 w-4" /> Gempa ({activeQuakes.length})
+            <div
+              className={`flex items-center gap-1.5 p-1.5 rounded-xl shadow-lg backdrop-blur-md border ${
+                isDark
+                  ? "bg-slate-900/90 border-slate-700/80 text-white"
+                  : "bg-white/95 border-slate-200 text-slate-800 shadow-md"
+              }`}
+            >
+              {latestEq && (
+                <div
+                  className="hidden md:flex items-center gap-1.5 px-2 py-1 max-w-[280px] xl:max-w-[360px] truncate text-xs"
+                  title={latestEq.title || latestEq.place}
+                >
+                  <span className="font-bold text-red-500 bg-red-50 dark:bg-red-950/60 px-1.5 py-0.5 rounded text-[11px]">
+                    M {latestEq.magnitude}
+                  </span>
+                  <span className="truncate text-slate-600 dark:text-slate-300">
+                    {latestEq.title || latestEq.place}
+                  </span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleOpenEarthquakes}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[34px] ${
+                  isDark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-100 text-slate-700"
+                }`}
+              >
+                <List className="w-4 h-4 text-blue-500" />
+                <span>Gempa ({activeQuakes.length})</span>
               </button>
-              <button type="button" onClick={handleOpenEvaluated} className="map-ux-action">
-                <AlertTriangle className="h-4 w-4 text-amber-600" /> Prioritas Pantau ({dangerCount})
+              <button
+                type="button"
+                onClick={handleOpenEvaluated}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[34px] ${
+                  isDark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-100 text-slate-700"
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <span>Prioritas ({dangerCount})</span>
               </button>
-              {latestEq && <button type="button" onClick={() => handleFocusDisaster(latestEq)} className="map-ux-action">
-                <MapPin className="h-4 w-4" /> Episentrum
-              </button>}
+              {latestEq && (
+                <button
+                  type="button"
+                  onClick={() => handleFocusDisaster(latestEq)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white shadow-sm transition-colors min-h-[34px]"
+                  title="Pusatkan peta ke episentrum gempa"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span className="hidden sm:inline">Episentrum</span>
+                </button>
+              )}
             </div>
           ) : (
-            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:max-w-[730px] lg:justify-end">
-              <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/>
-                <input type="search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
-                  aria-label={mapMode === "store" ? "Cari nama toko atau kode toko" : "Cari nama DC atau kode DC"}
+            <div
+              className={`flex items-center gap-2 p-1.5 rounded-xl shadow-lg backdrop-blur-md border max-w-full ${
+                isDark
+                  ? "bg-slate-900/90 border-slate-700/80 text-white"
+                  : "bg-white/95 border-slate-200 text-slate-800 shadow-md"
+              }`}
+            >
+              {/* Search bar */}
+              <div className="relative flex items-center min-w-0">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  aria-label={mapMode === "store" ? "Cari nama atau kode toko" : "Cari nama atau kode DC"}
                   placeholder={mapMode === "store" ? "Cari nama atau kode toko..." : "Cari nama atau kode DC..."}
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"/>
+                  className={`h-9 w-32 sm:w-44 md:w-56 rounded-lg border py-1.5 pl-8 pr-2.5 text-xs outline-none focus:border-blue-500 transition-all ${
+                    isDark
+                      ? "bg-slate-800/80 border-slate-700 text-white placeholder-slate-400"
+                      : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
+                  }`}
+                />
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={handleOpenFilter} className="map-ux-action">
-                  <Filter className="h-4 w-4"/> Filter {mapMode === "store" ? "Toko" : "DC"}
+
+              <button
+                type="button"
+                onClick={handleOpenFilter}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[34px] ${
+                  facilityBranch || facilityStatus || facilityMapping
+                    ? "bg-blue-50 dark:bg-blue-950/60 text-[#1D5AA6] dark:text-blue-400 font-bold"
+                    : isDark
+                    ? "hover:bg-slate-800 text-slate-200"
+                    : "hover:bg-slate-100 text-slate-700"
+                }`}
+              >
+                <Filter className="w-4 h-4 text-[#1D5AA6] dark:text-blue-400" />
+                <span>Filter {mapMode === "store" ? "Toko" : "DC"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenLocationList}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors min-h-[34px] ${
+                  isDark ? "hover:bg-slate-800 text-slate-200" : "hover:bg-slate-100 text-slate-700"
+                }`}
+              >
+                <List className="w-4 h-4 text-blue-500" />
+                <span>Daftar ({displayedLocations.length})</span>
+              </button>
+
+              {(searchQuery || facilityBranch || facilityStatus || facilityMapping) && (
+                <button
+                  type="button"
+                  onClick={handleResetLocationFilters}
+                  className="inline-flex items-center px-2 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors min-h-[34px]"
+                  title="Reset pencarian dan filter"
+                >
+                  Reset
                 </button>
-                <button type="button" onClick={handleOpenLocationList} className="map-ux-action">
-                  <List className="h-4 w-4"/> Daftar ({displayedLocations.length})
-                </button>
-                <button type="button" onClick={handleResetLocationFilters} className="map-ux-action">Reset</button>
-              </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
+      {/* Floating alert if facility data fails to refresh */}
       {facilityFetchError && (
-        <div className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="status">
-          <span>Data fasilitas terbaru gagal dimuat. Peta mempertahankan data terakhir yang tersedia.</span>
-          <button type="button" className="shrink-0 rounded border border-amber-300 px-2 py-1 font-semibold dark:border-amber-800" onClick={() => setFacilityRefreshKey((key) => key + 1)}>Coba lagi</button>
+        <div
+          role="status"
+          className="absolute top-16 right-3 sm:top-20 sm:right-4 z-[460] max-w-sm rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/95 dark:bg-amber-950/90 p-3 text-xs text-amber-900 dark:text-amber-200 shadow-xl backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="leading-tight">Data fasilitas terbaru gagal dimuat. Peta mempertahankan data terakhir.</span>
+          </div>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg border border-amber-400 px-2 py-1 text-[11px] font-bold hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors"
+            onClick={() => setFacilityRefreshKey((key) => key + 1)}
+          >
+            Coba lagi
+          </button>
         </div>
       )}
 
-      {/* 2. Interactive map with the classic floating control panel. */}
+      {/* 2. Interactive map with maximum available space */}
       <div className="flex-1 relative w-full h-full flex overflow-hidden">
         {/* INTERACTIVE MAP AREA (Takes maximum available space) */}
         <div className="flex-1 relative h-full w-full min-w-0 z-0">
@@ -420,27 +561,28 @@ export default function MonitoringPage() {
               </p>
             </div>
           )}
-          {mapMode === "event" && (
-            <MapControls
-              latestEarthquake={latestEq}
-              incidentOnly={incidentOnly}
-              onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
-              basemap={basemap}
-              onChangeBasemap={setBasemap}
-              onResetView={handleResetView}
-              totalStoresCount={displayedLocations.length}
-              affectedStoresCount={dangerCount}
-              showRadar={showRadar}
-              onToggleRadar={() => setShowRadar((prev) => !prev)}
-              theme={theme}
-              activeLayer={activeLayer}
-              onLayerChange={setActiveLayer}
-              mapTimeFilter={mapTimeFilter}
-              onChangeMapTimeFilter={(value) => { setMapTimeFilter(value); clearEventFocus(); }}
-              selectedEarthquake={selectedEarthquake}
-              onClearEventFocus={clearEventFocus}
-            />
-          )}
+          {/* Map Controls (Desktop floating panel + Mobile bottom sheet) */}
+          <MapControls
+            latestEarthquake={latestEq}
+            incidentOnly={incidentOnly}
+            onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
+            basemap={basemap}
+            onChangeBasemap={setBasemap}
+            onResetView={handleResetView}
+            totalStoresCount={displayedLocations.length}
+            affectedStoresCount={dangerCount}
+            showRadar={showRadar}
+            onToggleRadar={() => setShowRadar((prev) => !prev)}
+            theme={theme}
+            activeLayer={activeLayer}
+            onLayerChange={setActiveLayer}
+            mapTimeFilter={mapTimeFilter}
+            onChangeMapTimeFilter={(value) => { setMapTimeFilter(value); clearEventFocus(); }}
+            selectedEarthquake={selectedEarthquake}
+            onClearEventFocus={clearEventFocus}
+            isMobileSheetOpen={isMobileControlsOpen}
+            onCloseMobileSheet={() => setIsMobileControlsOpen(false)}
+          />
         </div>
 
         {/* CONTEXTUAL DETAIL PANEL (DESKTOP: Slide-in Side Panel) */}

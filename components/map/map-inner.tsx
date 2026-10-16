@@ -51,13 +51,26 @@ function MapFlyController({
 
   useEffect(() => {
     if (target) {
-      map.flyTo([target.lat, target.lng], target.zoom || 13, {
+      const targetZoom = Math.min(target.zoom || 13, map.getMaxZoom());
+      map.flyTo([target.lat, target.lng], targetZoom, {
         duration: 1.5,
         easeLinearity: 0.25,
       });
     }
   }, [target, map]);
 
+  return null;
+}
+
+// Synchronize max zoom with active basemap capability to avoid "Zoom Level Not Supported" tiles
+function BasemapZoomSync({ maxZoom }: { maxZoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setMaxZoom(maxZoom);
+    if (map.getZoom() > maxZoom) {
+      map.setZoom(maxZoom);
+    }
+  }, [map, maxZoom]);
   return null;
 }
 
@@ -122,18 +135,20 @@ function ViewportTracker({
   return null;
 }
 
-// Function to generate dynamic Alfamart store markers using L.divIcon
+// Function to generate dynamic Alfamart store and DC markers using L.divIcon
 function createStoreIcon(store: Store, isSelected: boolean = false) {
   const isFacility = store.id.startsWith("FACILITY:");
+  const isDC = isFacility && (store.fr_type === "FACILITY_DC" || (store.nama_toko && store.nama_toko.toUpperCase().includes("DC")));
+  const markerLabel = isDC ? "DC" : isFacility ? "F" : "A";
   const visualStatus = store.visualStatus || (
     store.status === "PRIORITY_MONITOR" ? "TERDAMPAK" :
     store.status === "MONITOR" ? "PERLU_PERHATIAN" : "NORMAL"
   );
 
-  let ringColor = "border-emerald-500 shadow-emerald-500/20";
+  let ringColor = isDC ? "border-indigo-500 shadow-indigo-500/20" : "border-emerald-500 shadow-emerald-500/20";
   let pulseClass = "";
-  let badgeColor = "bg-emerald-600";
-  let innerColor = "bg-emerald-600";
+  let badgeColor = isDC ? "bg-indigo-600" : "bg-emerald-600";
+  let innerColor = isDC ? "bg-indigo-600" : "bg-emerald-600";
 
   if (isSelected) {
     ringColor = "border-cyan-400 shadow-cyan-400/80 scale-125";
@@ -175,8 +190,8 @@ function createStoreIcon(store: Store, isSelected: boolean = false) {
         : ""
       }
       <div class="w-8 h-8 rounded-full bg-slate-900 border-2 ${ringColor} ${pulseClass} flex items-center justify-center shadow-lg transition-transform hover:scale-125 z-20">
-        <div class="w-5 h-5 rounded-full ${innerColor} flex items-center justify-center text-[9px] font-black text-white tracking-tighter">
-          ${isFacility ? "F" : "A"}
+        <div class="w-5 h-5 rounded-full ${innerColor} flex items-center justify-center ${isDC ? "text-[8px]" : "text-[9px]"} font-black text-white tracking-tighter">
+          ${markerLabel}
         </div>
       </div>
       <div class="absolute -bottom-1 -right-1 w-3 h-3 rounded-full ${badgeColor} border border-slate-900 z-30"></div>
@@ -306,7 +321,7 @@ function ClusterMarkerItem({
     >
       <Tooltip direction="top" offset={[0, -16]} opacity={0.95}>
         <div className="text-xs font-semibold text-slate-900 px-1">
-          {cluster.count} Toko — Klik untuk memperbesar
+          {cluster.count} Toko, klik untuk memperbesar
         </div>
       </Tooltip>
     </Marker>
@@ -522,28 +537,40 @@ export default function MapInner({
     return 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
   }, [basemap]);
 
+  const mapMaxZoom = basemap === "osm" ? 18 : 16;
+
   return (
     <div className="w-full h-full relative">
       <MapContainer
         center={[-2.5, 118.0]}
         zoom={5}
         minZoom={4}
-        maxZoom={18}
+        maxZoom={mapMaxZoom}
         scrollWheelZoom={true}
         zoomControl={false}
         className="w-full h-full z-0"
         preferCanvas={true}
       >
-        {/* Basemap Tile Layer */}
-        <TileLayer key={tileUrl} url={tileUrl} attribution={tileAttribution} maxNativeZoom={basemap === "esri-dark" ? 16 : 18} />
+        <BasemapZoomSync maxZoom={mapMaxZoom} />
 
-        {/* Live Doppler Weather Radar Layer */}
-        {showWeatherLayer && radarTileUrl && (
+        {/* Basemap Tile Layer */}
+        <TileLayer
+          key={tileUrl}
+          url={tileUrl}
+          attribution={tileAttribution}
+          maxZoom={mapMaxZoom}
+          maxNativeZoom={mapMaxZoom}
+        />
+
+        {/* Live Doppler Weather Radar Layer (Capped to zoom 12 with maxNativeZoom 7 to prevent RainViewer unsupported tile errors) */}
+        {showWeatherLayer && radarTileUrl && currentZoom <= 12 && (
           <TileLayer
             key={radarTileUrl}
             url={radarTileUrl}
             opacity={0.65}
             zIndex={350}
+            maxNativeZoom={7}
+            maxZoom={12}
           />
         )}
 

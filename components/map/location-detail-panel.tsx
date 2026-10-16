@@ -154,49 +154,61 @@ export function LocationDetailPanel({
   if (!location) return null;
 
   return (
-    <aside
-      className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xl z-[1200] flex flex-col transition-all duration-300 ${
-        isMobile
-          ? "fixed inset-x-0 bottom-0 max-h-[82vh] rounded-t-2xl border-t pb-28 overflow-y-auto"
-          : "w-96 md:w-[400px] h-full border-l overflow-y-auto shrink-0"
-      }`}
-      aria-label="Panel Kontekstual Lokasi"
-    >
-      {/* Mobile drag handle */}
+    <>
       {isMobile && (
-        <div className="w-full flex justify-center pt-2 pb-1">
-          <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
-              {isFacility ? <Building className="w-3 h-3" /> : <Store className="w-3 h-3" />}
-              {locType}
-            </span>
-            <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-              {locCode}
-            </span>
-          </div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white truncate" title={locName}>
-            {locName}
-          </h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-            {location.alamat || (isFacility ? "Master Fasilitas Operasional" : "Jaringan Toko Alfamart")}
-          </p>
-        </div>
-
-        <button
+        <div
+          className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-[1190] transition-opacity"
           onClick={onClose}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0"
-          aria-label="Tutup panel detail"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={`bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-2xl z-[1200] flex flex-col transition-all duration-300 ${
+          isMobile
+            ? "fixed inset-x-0 bottom-0 max-h-[82vh] rounded-t-2xl border-t pb-28 overflow-y-auto overscroll-y-contain animate-in slide-in-from-bottom duration-200"
+            : "w-96 md:w-[400px] h-full border-l overflow-y-auto shrink-0"
+        }`}
+        aria-label="Panel Kontekstual Lokasi"
+      >
+        {/* Mobile drag handle */}
+        {isMobile && (
+          <div className="w-full flex justify-center pt-2.5 pb-1">
+            <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800">
+                {isFacility ? <Building className="w-3 h-3" /> : <Store className="w-3 h-3" />}
+                {locType}
+              </span>
+              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                {locCode}
+              </span>
+            </div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white truncate" title={locName}>
+              {locName}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+              {location.alamat || (isFacility ? "Master Fasilitas Operasional" : "Jaringan Toko Alfamart")}
+            </p>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Tutup panel detail"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
       <div className="p-4 space-y-4 flex-1">
         {/* Status Terminology Card */}
@@ -297,5 +309,6 @@ export function LocationDetailPanel({
         </div>
       </div>
     </aside>
-  );
+  </>
+);
 }

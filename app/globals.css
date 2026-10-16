@@ -217,3 +217,12 @@
   .sparta-page-header { flex-wrap: wrap; }
   .sparta-page-header > * { min-width: 0; }
 }
+
+/* Watermark-Free & High-Resolution Tile Filters for OpenStreetMap */
+.dark-map-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(88%) contrast(92%);
+}
+
+.light-map-tiles {
+  filter: grayscale(40%) brightness(102%) contrast(96%);
+}

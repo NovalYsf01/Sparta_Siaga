@@ -16,14 +16,17 @@ import {
   Calendar,
   ShieldAlert,
   Store,
-  Wrench,
   ChevronDown,
+  ChevronUp,
   Menu,
   X,
   Sun,
   Moon,
   UserCog,
   MoreHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Wrench,
 } from "lucide-react";
 import { RoleType } from "@/types/incident";
 import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt";
@@ -56,6 +59,7 @@ export function IncidentAppShell({
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [isMoreSheetOpen, setIsMoreSheetOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const profileMenuRef = React.useRef<HTMLDivElement>(null);
   const [identity, setIdentity] = useState<{
     id: string;
     nik?: string | null;
@@ -116,7 +120,7 @@ export function IncidentAppShell({
     return "Sistem Mitigasi";
   };
 
-  // Lock body scroll when mobile Lainnya bottom sheet is open
+  // Lock body scroll when mobile sheet is open
   React.useEffect(() => {
     if (isMoreSheetOpen) {
       document.body.style.overflow = "hidden";
@@ -128,16 +132,17 @@ export function IncidentAppShell({
     };
   }, [isMoreSheetOpen]);
 
-  // Close sheet on Escape key
+  // Close menus and sheets on Escape key
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isMoreSheetOpen) {
-        setIsMoreSheetOpen(false);
+      if (e.key === "Escape") {
+        if (isRoleDropdownOpen) setIsRoleDropdownOpen(false);
+        if (isMoreSheetOpen) setIsMoreSheetOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isMoreSheetOpen]);
+  }, [isRoleDropdownOpen, isMoreSheetOpen]);
 
   React.useEffect(() => {
     fetch("/api/auth/me")
@@ -153,6 +158,7 @@ export function IncidentAppShell({
   const isDark = theme === "dark";
   const isHoViewer = identity?.scope === "HO" && identity?.systemRole !== "ADMIN";
   const pageTitle = getPageTitle(pathname);
+  const isMonitoringPage = pathname.startsWith("/monitoring");
 
 
   const roleLabels: Record<RoleType, { title: string; subtitle: string; icon: React.ReactNode }> = {
@@ -249,26 +255,46 @@ export function IncidentAppShell({
         } bg-[#123B6D] text-white shadow-lg`}
       >
         {/* Brand Header */}
-        <div className={`flex flex-col justify-center py-5 shrink-0 border-b border-white/10 ${isSidebarCollapsed ? "items-center px-2" : "px-5"}`}>
+        <div className={`flex flex-col justify-center py-4 shrink-0 border-b border-white/10 ${isSidebarCollapsed ? "items-center px-2" : "px-5"}`}>
           {!isSidebarCollapsed ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3">
-                <Image src="/brand/building_logo.png" alt="Logo SPARTA SIAGA" width={44} height={44} className="h-11 w-11 shrink-0 object-contain" />
-                <div className="min-w-0">
-                  <span className="block text-[16px] font-bold tracking-tight text-white leading-tight">SPARTA SIAGA</span>
-                  <span className="mt-1 block text-[10px] leading-[1.4] text-blue-100/80">
-                    Sistem Integrasi Analisis &amp; Peringatan Bencana
-                  </span>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Image src="/brand/building_logo.png" alt="Logo SPARTA SIAGA" width={40} height={40} className="h-10 w-10 shrink-0 object-contain" />
+                  <div className="min-w-0">
+                    <span className="block text-[15px] font-bold tracking-tight text-white leading-tight">SPARTA SIAGA</span>
+                    <span className="mt-0.5 block text-[10px] leading-tight text-blue-100/75 truncate">
+                      Mitigasi Bencana &amp; Fasilitas
+                    </span>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+                  title="Kecilkan sidebar"
+                  aria-label="Kecilkan sidebar"
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex items-center justify-between border-t border-white/10 pt-3">
-                <Image src="/brand/alfamart_logo.png" alt="Alfamart" width={88} height={30} className="h-7 w-auto object-contain" />
-                <span className="text-[9px] font-medium uppercase tracking-wider text-blue-100/60">Internal</span>
+              <div className="flex items-center justify-between border-t border-white/10 pt-2.5">
+                <Image src="/brand/alfamart_logo.png" alt="Alfamart" width={80} height={26} className="h-6 w-auto object-contain" />
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-blue-100/60 bg-white/5 px-1.5 py-0.5 rounded">Internal</span>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-4">
-              <Image src="/brand/building_logo.png" alt="SPARTA" width={32} height={32} />
+            <div className="flex flex-col items-center gap-3">
+              <Image src="/brand/building_logo.png" alt="SPARTA" width={32} height={32} className="h-8 w-8 object-contain" />
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-white/10 transition-colors"
+                title="Perluas sidebar"
+                aria-label="Perluas sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
             </div>
           )}
         </div>
@@ -302,11 +328,7 @@ export function IncidentAppShell({
                     </div>
                     {!isSidebarCollapsed && item.badge && (
                       <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                          isActive 
-                            ? "bg-[#D9272E] text-white" 
-                            : "bg-[#D9272E] text-white"
-                        }`}
+                        className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#D9272E] text-white"
                       >
                         {item.badge}
                       </span>
@@ -321,249 +343,273 @@ export function IncidentAppShell({
           ))}
         </nav>
 
-        {/* Sidebar Toggle Button (Moved from Header for better layout) */}
-        <div className="p-4 mt-auto border-t border-white/10">
+        {/* Desktop Sidebar Bottom: User Profile Card (Task 3) */}
+        <div ref={profileMenuRef} className="p-3 mt-auto border-t border-white/10 relative">
           <button
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className={`w-full flex items-center ${isSidebarCollapsed ? "justify-center" : "justify-start px-4"} py-2 rounded-lg transition-colors text-blue-200 hover:bg-white/10 hover:text-white`}
-            title="Toggle Sidebar"
+            type="button"
+            onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+            className={`w-full flex items-center gap-2.5 p-2 rounded-xl transition-all text-left ${
+              isRoleDropdownOpen
+                ? "bg-white/20 text-white"
+                : "hover:bg-white/10 text-white"
+            } ${isSidebarCollapsed ? "justify-center px-0" : "justify-between"}`}
+            title={isSidebarCollapsed ? (identity?.name || "Profil Pengguna") : undefined}
+            aria-expanded={isRoleDropdownOpen}
+            aria-label="Menu profil pengguna"
           >
-            <Menu className="w-5 h-5" />
-            {!isSidebarCollapsed && <span className="ml-3 text-sm font-medium">Tutup Sidebar</span>}
+            <div className="flex items-center gap-2.5 min-w-0">
+              {identity?.avatarUrl ? (
+                <img
+                  src={identity.avatarUrl}
+                  alt={identity.name}
+                  className="w-9 h-9 rounded-full object-cover border-2 border-white/20 shrink-0"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-xs shrink-0 border-2 border-white/20 shadow-xs">
+                  {identity?.name ? identity.name.charAt(0).toUpperCase() : "U"}
+                </div>
+              )}
+              {!isSidebarCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold truncate text-white leading-tight">
+                    {identity ? identity.name : "Memuat..."}
+                  </div>
+                  <div className="text-[10px] text-blue-200/80 truncate leading-tight mt-0.5">
+                    {getRoleSubtitle(identity)}
+                  </div>
+                </div>
+              )}
+            </div>
+            {!isSidebarCollapsed && (
+              <ChevronUp className={`w-4 h-4 text-blue-200/70 shrink-0 transition-transform duration-200 ${isRoleDropdownOpen ? "rotate-180" : ""}`} />
+            )}
           </button>
+
+          {/* Upward Profile Menu Popover */}
+          {isRoleDropdownOpen && (
+            <div
+              className={`absolute z-50 rounded-2xl shadow-2xl border overflow-hidden animate-in fade-in slide-in-from-bottom-2 ${
+                isSidebarCollapsed
+                  ? "bottom-2 left-20 ml-2 w-72"
+                  : "bottom-full left-2 right-2 mb-2"
+              } ${
+                isDark
+                  ? "bg-slate-900 border-slate-800 text-slate-200"
+                  : "bg-white border-slate-200 text-slate-800"
+              }`}
+            >
+              <div className={`p-4 flex items-center gap-3 border-b ${isDark ? "border-slate-800 bg-slate-800/50" : "border-slate-100 bg-slate-50"}`}>
+                {identity?.avatarUrl ? (
+                  <img src={identity.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-sm shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm border-2 border-white dark:border-slate-700">
+                    {identity?.name ? identity.name.charAt(0).toUpperCase() : "U"}
+                  </div>
+                )}
+                <div className="overflow-hidden min-w-0">
+                  <div className="font-bold text-sm text-[#1D5AA6] dark:text-blue-400 truncate">{identity ? identity.name : "Memuat..."}</div>
+                  <div className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">{identity?.nik || "-"}</div>
+                  <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-1 truncate">
+                    {getRoleSubtitle(identity)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-2 space-y-1">
+                <Link
+                  href="/settings"
+                  onClick={() => setIsRoleDropdownOpen(false)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-colors ${
+                    isDark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  <UserCog className="w-4 h-4 text-slate-400" />
+                  <span>Pengaturan Akun</span>
+                </Link>
+
+                {process.env.NEXT_PUBLIC_ENABLE_ROLE_SIMULATION === "true" && (
+                  <div className="mt-2 mb-1">
+                    <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border-t ${isDark ? "text-slate-500 border-slate-800" : "text-slate-400 border-slate-100"}`}>
+                      Simulasi Dev Role
+                    </div>
+                    {(Object.keys(roleLabels) as RoleType[]).map((roleKey) => {
+                      const isSelected = activeRole === roleKey;
+                      return (
+                        <button
+                          key={roleKey}
+                          type="button"
+                          onClick={() => {
+                            onRoleChange(roleKey);
+                            setIsRoleDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-xs transition-colors ${
+                            isSelected
+                              ? isDark
+                                ? "bg-blue-900/30 text-blue-400 font-semibold"
+                                : "bg-blue-50 text-blue-700 font-semibold"
+                              : isDark
+                              ? "hover:bg-slate-800 text-slate-400"
+                              : "hover:bg-slate-50 text-slate-600"
+                          }`}
+                        >
+                          <div className={`p-1.5 rounded-md shrink-0 ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
+                            {roleLabels[roleKey].icon}
+                          </div>
+                          <div>
+                            <div className="font-medium">{roleLabels[roleKey].title}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className={`p-2 border-t ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-100 bg-white"}`}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/login';
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-bold transition-colors text-red-600 dark:text-red-400 ${
+                    isDark ? "hover:bg-red-950/50" : "hover:bg-red-50"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
 
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* TOP BAR / HEADER */}
-        <header
-          className={`h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 shrink-0 z-40 border-b transition-colors duration-200 ${
-            isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
-          }`}
-        >
-          {/* Left: Mobile Title (no duplicate hamburger) & Desktop Breadcrumbs */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* Mobile Header Title */}
-            <div className="lg:hidden flex items-center gap-2.5 min-w-0">
-              <Image src="/brand/building_logo.png" alt="SPARTA" width={28} height={28} className="shrink-0" />
-              <div className="min-w-0">
-                <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
-                  {getPageTitle(pathname)}
-                </h1>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block leading-tight">
-                  SPARTA SIAGA
+        {/* TOP BAR / HEADER (Hidden on Peta Monitoring, Task 1 & Task 4) */}
+        {!isMonitoringPage && (
+          <header
+            className={`h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 shrink-0 z-40 border-b transition-colors duration-200 ${
+              isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            {/* Left: Mobile hamburger & title, Desktop Breadcrumbs */}
+            <div className="flex items-center gap-3 flex-1 min-w-0">              {/* Mobile Header Title */}
+              <div className="lg:hidden flex items-center gap-2.5 min-w-0">
+                <Image src="/brand/building_logo.png" alt="SPARTA" width={28} height={28} className="shrink-0 object-contain" />
+                <div className="min-w-0">
+                  <h1 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
+                    {getPageTitle(pathname)}
+                  </h1>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block leading-tight">
+                    SPARTA SIAGA
+                  </span>
+                </div>
+              </div>
+
+              {/* Desktop Breadcrumbs (SPARTA Enterprise Style) */}
+              <div className="hidden xl:flex items-center gap-2 text-xs shrink-0">
+                <span className="font-bold text-[#123B6D] dark:text-blue-400">SPARTA SIAGA</span>
+                <span className="text-slate-300 dark:text-slate-600">/</span>
+                <span className="text-slate-800 dark:text-slate-200 font-semibold">{pageTitle}</span>
+              </div>
+
+              {/* Universal Search Bar */}
+              <div
+                onClick={onSearchClick}
+                className={`hidden md:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-xs w-full ${
+                  isDark
+                    ? "bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300"
+                    : "bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-500"
+                }`}
+              >
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="truncate text-xs">
+                  {pathname.startsWith("/reports") ? "Cari laporan dan lokasi..." : "Cari laporan, toko, atau lokasi..."}
                 </span>
+                <kbd
+                  className={`hidden md:inline-block ml-auto text-[10px] border px-1.5 py-0.5 rounded font-mono ${
+                    isDark ? "bg-slate-900 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-400"
+                  }`}
+                >
+                  Ctrl K
+                </kbd>
               </div>
             </div>
 
-            {/* Desktop Breadcrumbs (SPARTA Enterprise Style) */}
-            <div className="hidden xl:flex items-center gap-2 text-xs shrink-0">
-              <span className="font-bold text-[#123B6D] dark:text-blue-400">SPARTA SIAGA</span>
-              <span className="text-slate-300 dark:text-slate-600">/</span>
-              <span className="text-slate-800 dark:text-slate-200 font-semibold">{pageTitle}</span>
-            </div>
+            {/* Right: PWA Install, Buat Laporan, Notifications */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <div className="hidden 2xl:block"><PwaInstallPrompt variant="compact" /></div>
 
-            {/* Universal Search Bar */}
-            <div
-              onClick={onSearchClick}
-              className={`hidden md:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-xs w-full ${
-                isDark
-                  ? "bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300"
-                  : "bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-500"
-              }`}
-            >
-              <Search className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="truncate text-xs">{pathname.startsWith("/monitoring") ? "Pencarian toko, DC, atau kejadian..." : pathname.startsWith("/reports") ? "Cari laporan dan lokasi..." : "Cari laporan, toko, atau lokasi..."}</span>
-              <kbd
-                className={`hidden md:inline-block ml-auto text-[10px] border px-1.5 py-0.5 rounded font-mono ${
-                  isDark ? "bg-slate-900 border-slate-700 text-slate-400" : "bg-white border-slate-200 text-slate-400"
-                }`}
-              >
-                Ctrl K
-              </kbd>
-            </div>
-          </div>
-
-          {/* Right: PWA Install, Buat Laporan, Notifications, Role */}
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            <div className="hidden 2xl:block"><PwaInstallPrompt variant="compact" /></div>
-
-            {identity?.systemRole !== "ADMIN" && !isHoViewer && (
-              <button
-                onClick={() => {
-                  if (onOpenReportModal) {
-                    onOpenReportModal();
-                  } else {
-                    const event = new CustomEvent('open-manual-report');
-                    window.dispatchEvent(event);
-                  }
-                }}
-                className="hidden lg:flex items-center gap-2 px-3.5 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors min-h-[38px]"
-              >
-                <ClipboardList className="w-4 h-4" />
-                <span>Buat Laporan</span>
-              </button>
-            )}
-            <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 hidden md:block mx-0.5"></div>
-
-
-
-
-
-            {/* Accessible mobile universal search */}
-            <button type="button" onClick={onSearchClick} aria-label="Cari toko, DC atau laporan"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 md:hidden">
-              <Search className="h-5 w-5"/>
-            </button>
-            {/* Notification Bell */}
-            <button
-              onClick={onOpenNotifications}
-              className={`relative p-2 rounded-lg transition-colors ${
-                isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
-              }`}
-              aria-label="Notifikasi"
-            >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            {/* Active Role Switcher Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className={`flex items-center gap-2 pl-1.5 pr-2 sm:pr-3 py-1.5 rounded-full border transition-all text-left ${
-                  isDark
-                    ? "border-slate-700 hover:bg-slate-800 bg-slate-900"
-                    : "border-slate-200 hover:bg-slate-50 bg-white"
-                }`}
-              >
-                {identity?.avatarUrl ? (
-                  <img src={identity.avatarUrl} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs border border-blue-500">
-                    {identity?.name ? identity.name.charAt(0).toUpperCase() : "U"}
-                  </div>
-                )}
-                <div className="hidden sm:block max-w-[115px]">
-                  <div className={`text-xs font-bold truncate leading-tight ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                    {identity ? identity.name : "Memuat..."}
-                  </div>
-                  <div className={`text-[10px] truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                    {getRoleSubtitle(identity)}
-                  </div>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              </button>
-
-              {isRoleDropdownOpen && (
-                <div
-                  className={`absolute right-0 mt-2 w-72 border rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 ${
-                    isDark ? "bg-slate-900 border-slate-800 text-slate-200" : "bg-white border-slate-200 text-slate-800"
-                  }`}
+              {identity?.systemRole !== "ADMIN" && !isHoViewer && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenReportModal) {
+                      onOpenReportModal();
+                    } else {
+                      const event = new CustomEvent('open-manual-report');
+                      window.dispatchEvent(event);
+                    }
+                  }}
+                  className="hidden lg:flex items-center gap-2 px-3.5 py-2 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors min-h-[38px]"
                 >
-                  <div className={`p-4 flex items-center gap-3 border-b ${isDark ? "border-slate-800 bg-slate-800/50" : "border-slate-100 bg-slate-50"}`}>
-                    {identity?.avatarUrl ? (
-                      <img src={identity.avatarUrl} alt="Avatar" className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow-sm shrink-0" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-[#1D5AA6] text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-sm border-2 border-white dark:border-slate-700">
-                        {identity?.name ? identity.name.charAt(0).toUpperCase() : "U"}
-                      </div>
-                    )}
-                    <div className="overflow-hidden">
-                      <div className="font-bold text-sm text-[#1D5AA6] dark:text-blue-400 truncate">{identity ? identity.name : "Memuat..."}</div>
-                      <div className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate mt-0.5">{identity?.nik || "-"}</div>
-                      <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-1">
-                        {getRoleSubtitle(identity)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-2">
-                    <Link
-                      href="/settings"
-                      onClick={() => setIsRoleDropdownOpen(false)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-medium transition-colors ${
-                        isDark ? "hover:bg-slate-800 text-slate-300" : "hover:bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      <UserCog className="w-4 h-4 text-slate-400" />
-                      Profil Saya
-                    </Link>
-
-                    {process.env.NEXT_PUBLIC_ENABLE_ROLE_SIMULATION === "true" && (
-                      <div className="mt-2 mb-1">
-                        <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider border-t ${isDark ? "text-slate-500 border-slate-800" : "text-slate-400 border-slate-100"}`}>
-                          Simulasi Dev Role
-                        </div>
-                        {(Object.keys(roleLabels) as RoleType[]).map((roleKey) => {
-                          const isSelected = activeRole === roleKey;
-                          return (
-                            <button
-                              key={roleKey}
-                              onClick={() => {
-                                onRoleChange(roleKey);
-                                setIsRoleDropdownOpen(false);
-                              }}
-                              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left text-xs transition-colors ${
-                                isSelected
-                                  ? isDark
-                                    ? "bg-blue-900/30 text-blue-400 font-semibold"
-                                    : "bg-blue-50 text-blue-700 font-semibold"
-                                  : isDark
-                                  ? "hover:bg-slate-800 text-slate-400"
-                                  : "hover:bg-slate-50 text-slate-600"
-                              }`}
-                            >
-                              <div className={`p-1.5 rounded-md shrink-0 ${isDark ? "bg-slate-800" : "bg-slate-100"}`}>
-                                {roleLabels[roleKey].icon}
-                              </div>
-                              <div>
-                                <div className="font-medium">{roleLabels[roleKey].title}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className={`p-2 border-t ${isDark ? "border-slate-800 bg-slate-900" : "border-slate-100 bg-white"}`}>
-                    <button
-                      onClick={async () => {
-                        await fetch('/api/auth/logout', { method: 'POST' });
-                        window.location.href = '/login';
-                      }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-bold transition-colors text-red-600 dark:text-red-400 ${
-                        isDark ? "hover:bg-red-950/50" : "hover:bg-red-50"
-                      }`}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                      Logout
-                    </button>
-                  </div>
-                </div>
+                  <ClipboardList className="w-4 h-4" />
+                  <span>Buat Laporan</span>
+                </button>
               )}
+
+              {/* Accessible mobile universal search */}
+              <button
+                type="button"
+                onClick={onSearchClick}
+                aria-label="Cari toko, DC atau laporan"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 md:hidden"
+              >
+                <Search className="h-5 w-5"/>
+              </button>
+
+              {/* Notification Bell */}
+              <button
+                type="button"
+                onClick={onOpenNotifications}
+                className={`relative p-2 rounded-lg transition-colors ${
+                  isDark ? "text-slate-300 hover:bg-slate-800" : "text-slate-600 hover:bg-slate-100"
+                }`}
+                aria-label="Notifikasi"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* MAIN BODY VIEW */}
         <main
-          className={`relative flex-1 overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-5 transition-colors duration-200 flex flex-col ${
-            isDark ? "bg-slate-900" : "bg-[#f5f7fa]"
+          className={`relative flex-1 transition-colors duration-200 flex flex-col min-w-0 min-h-0 ${
+            isMonitoringPage
+              ? "p-0 m-0 w-full h-full overflow-hidden pb-16 lg:pb-0"
+              : `overflow-y-auto pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:pb-6 lg:px-5 ${
+                  isDark ? "bg-slate-900" : "bg-[#f5f7fa]"
+                }`
           }`}
         >
-          <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
-            {children}
-          </div>
+          {isMonitoringPage ? (
+            children
+          ) : (
+            <div className="max-w-[1600px] mx-auto w-full flex-1 flex flex-col">
+              {children}
+            </div>
+          )}
         </main>
 
-        {/* MOBILE BOTTOM NAVIGATION BAR (antislop-layoutmobile) */}
+        {/* MOBILE BOTTOM NAVIGATION BAR (Always visible on mobile across all pages) */}
         <nav
           className={`lg:hidden fixed bottom-0 left-0 right-0 h-16 safe-area-bottom border-t flex items-center justify-around z-40 px-1 shadow-lg transition-colors duration-200 ${
             isDark ? "bg-slate-900/95 border-slate-800 backdrop-blur-md" : "bg-white/95 border-slate-200 backdrop-blur-md"
