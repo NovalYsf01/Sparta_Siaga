@@ -2,9 +2,10 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Filter, Loader2, X } from "lucide-react";
+import { Activity, AlertTriangle, Filter, List, Loader2, MapPin, Radio, Store, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 import { MapToolbar, type MapMode } from "@/components/map/map-toolbar";
+import { MapControls } from "@/components/map/map-controls";
 import { LocationDetailPanel, type FacilityDetail } from "@/components/map/location-detail-panel";
 import { LocationListSheet } from "@/components/map/location-list-sheet";
 import { EarthquakeListModal } from "@/components/disaster/earthquake-list-modal";
@@ -36,6 +37,8 @@ export default function MonitoringPage() {
   const [facilityMapping, setFacilityMapping] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [facilityFetchError, setFacilityFetchError] = useState(false);
+  const [facilityRefreshKey, setFacilityRefreshKey] = useState(0);
   const [isLocationListOpen, setIsLocationListOpen] = useState(false);
   const [selectedFacility, setSelectedFacility] = useState<FacilityDetail | null>(null);
   const [isEarthquakeModalOpen, setIsEarthquakeModalOpen] = useState(false);
@@ -112,6 +115,7 @@ export default function MonitoringPage() {
       Object.entries(viewport).forEach(([key, value]) => params.set(key, String(value)));
     }
 
+    setFacilityFetchError(false);
     fetch(`/api/locations/facilities?${params}`, {
       cache: "no-store",
       signal: controller.signal,
@@ -121,15 +125,18 @@ export default function MonitoringPage() {
         const payload = text ? JSON.parse(text) : {};
         if (!response.ok) throw new Error(payload.error || "Gagal memuat fasilitas");
         setFacilities(payload.data || []);
+        setFacilityFetchError(false);
       })
       .catch((error) => {
         if (error instanceof Error && error.name !== "AbortError") {
-          setFacilities([]);
+          // Retain last known facilities if network fails; do not silently
+          // present an empty map as if there were no facilities.
+          setFacilityFetchError(true);
         }
       });
 
     return () => controller.abort();
-  }, [facilityBranch, facilityMapping, facilityStatus, facilityType, mapMode, viewport]);
+  }, [facilityBranch, facilityMapping, facilityStatus, facilityType, mapMode, viewport, facilityRefreshKey]);
 
   // Active operational earthquakes filtered strictly by active window (24h or 72h max)
   const activeQuakes = useMemo(() => {
@@ -185,11 +192,15 @@ export default function MonitoringPage() {
     let list: Store[] = [];
     if (mapMode === "location") {
       if (facilityType === "STORE") {
-        list = [...computedStores];
+        list = [...computedStores.filter((store) =>
+          !facilityBranch || store.cabang?.toLowerCase() === facilityBranch.toLowerCase()
+        )];
       } else if (facilityType) {
         list = [...locationModeStores];
       } else {
-        list = [...computedStores, ...locationModeStores];
+        list = [...computedStores.filter((store) =>
+          !facilityBranch || store.cabang?.toLowerCase() === facilityBranch.toLowerCase()
+        ), ...locationModeStores];
       }
     } else {
       // In Event Focus / Mode Kejadian: include both stores and facilities in evaluated zone!
@@ -215,8 +226,11 @@ export default function MonitoringPage() {
   );
 
   const branchOptions = useMemo(
-    () => [...new Set(facilities.map((facility) => facility.branch_id).filter(Boolean))] as string[],
-    [facilities]
+    () => [...new Set([
+      ...facilities.map((facility) => facility.branch_id),
+      ...computedStores.map((store) => store.cabang),
+    ].filter((branch): branch is string => Boolean(branch)))].sort((a, b) => a.localeCompare(b, "id")),
+    [facilities, computedStores]
   );
 
   // Selected item detail resolver
@@ -271,8 +285,8 @@ export default function MonitoringPage() {
 
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col bg-slate-100 dark:bg-slate-950">
-      {/* 1. TOP TOOLBAR & CONTEXT BAR (NO OVERLAYS OVER MAP) */}
-      <MapToolbar
+      {/* 1. Location management retains its full filtering toolbar. */}
+      {mapMode === "location" ? <MapToolbar
         mapMode={mapMode}
         onModeChange={handleModeChange}
         latestEarthquake={latestEq}
@@ -309,12 +323,59 @@ export default function MonitoringPage() {
         onOpenFilterModal={handleOpenFilter}
         onOpenLocationListSheet={handleOpenLocationList}
         isMobileDetailOpen={Boolean(activeDetailStore || activeDetailFacility || filterOpen || isLocationListOpen || isEarthquakeModalOpen)}
-      />
+      /> : (
+        <div className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 text-slate-800 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:px-4">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <div className="hidden shrink-0 rounded-lg bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 sm:grid">
+                <Activity className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
+                    <Radio className="h-3 w-3" />
+                    {latestEq ? `${latestEq.source || "Gempa"} • Terkini` : "Monitoring Kejadian"}
+                  </span>
+                  <span className="min-w-0 truncate font-semibold text-slate-900 dark:text-white">
+                    {latestEq ? `M ${latestEq.magnitude} — ${latestEq.title || latestEq.place}` : "Belum ada data gempa terbaru"}
+                  </span>
+                </div>
+                {latestEq && (
+                  <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    Kedalaman: {latestEq.depth} • {latestEq.time}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
+              <button type="button" onClick={handleOpenEvaluated} className="inline-flex min-h-9 items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-700">
+                <AlertTriangle className="h-3.5 w-3.5" /> Prioritas Pantau ({dangerCount})
+              </button>
+              <button type="button" onClick={handleOpenEarthquakes} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                <List className="h-3.5 w-3.5" /> Gempa ({activeQuakes.length})
+              </button>
+              {latestEq && <button type="button" onClick={() => handleFocusDisaster(latestEq)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
+                <MapPin className="h-3.5 w-3.5" /> Episentrum
+              </button>}
+              <button type="button" onClick={() => handleModeChange("location")} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
+                <Store className="h-3.5 w-3.5" /> Mode Lokasi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* 2. MAIN WORKSPACE: MAP (LEFT/MAIN) + CONTEXTUAL SIDE PANEL (RIGHT) */}
+      {facilityFetchError && (
+        <div className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="status">
+          <span>Data fasilitas terbaru gagal dimuat. Peta mempertahankan data terakhir yang tersedia.</span>
+          <button type="button" className="shrink-0 rounded border border-amber-300 px-2 py-1 font-semibold dark:border-amber-800" onClick={() => setFacilityRefreshKey((key) => key + 1)}>Coba lagi</button>
+        </div>
+      )}
+
+      {/* 2. Interactive map with the classic floating control panel. */}
       <div className="flex-1 relative w-full h-full flex overflow-hidden">
         {/* INTERACTIVE MAP AREA (Takes maximum available space) */}
-        <div className="flex-1 relative h-full w-full z-0">
+        <div className="flex-1 relative h-full w-full min-w-0 z-0">
           <MapView
             stores={displayedLocations}
             earthquakes={mapMode === "event" ? mapEarthquakes : []}
@@ -343,6 +404,27 @@ export default function MonitoringPage() {
             theme={theme}
             onViewportChange={handleViewportChange}
           />
+          {mapMode === "event" && (
+            <MapControls
+              latestEarthquake={latestEq}
+              incidentOnly={incidentOnly}
+              onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
+              basemap={basemap}
+              onChangeBasemap={setBasemap}
+              onResetView={handleResetView}
+              totalStoresCount={displayedLocations.length}
+              affectedStoresCount={dangerCount}
+              showRadar={showRadar}
+              onToggleRadar={() => setShowRadar((prev) => !prev)}
+              theme={theme}
+              activeLayer={activeLayer}
+              onLayerChange={setActiveLayer}
+              mapTimeFilter={mapTimeFilter}
+              onChangeMapTimeFilter={setMapTimeFilter}
+              selectedEarthquake={selectedEarthquake}
+              onClearEventFocus={clearEventFocus}
+            />
+          )}
         </div>
 
         {/* CONTEXTUAL DETAIL PANEL (DESKTOP: Slide-in Side Panel) */}
