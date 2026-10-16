@@ -2,9 +2,9 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Activity, AlertTriangle, Filter, List, Loader2, MapPin, Radio, Store as StoreIcon, X } from "lucide-react";
+import { Activity, AlertTriangle, Building2, Filter, List, Loader2, MapPin, Radio, Search, Store as StoreIcon, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
-import { MapToolbar, type MapMode } from "@/components/map/map-toolbar";
+type MapMode = "event" | "store" | "dc";
 import { MapControls } from "@/components/map/map-controls";
 import { LocationDetailPanel, type FacilityDetail } from "@/components/map/location-detail-panel";
 import { LocationListSheet } from "@/components/map/location-list-sheet";
@@ -105,8 +105,8 @@ export default function MonitoringPage() {
   useEffect(() => {
     const controller = new AbortController();
     const params = new URLSearchParams();
-    if (mapMode === "location") {
-      if (facilityType && facilityType !== "STORE") params.set("type", facilityType);
+    if (mapMode === "dc") {
+      params.set("type", "DC");
       if (facilityBranch) params.set("branch", facilityBranch);
       if (facilityStatus) params.set("status", facilityStatus);
       if (facilityMapping) params.set("mapping", facilityMapping);
@@ -151,7 +151,9 @@ export default function MonitoringPage() {
 
   // Map earthquakes: In Event Focus Mode render focused event; otherwise render all active window quakes
   const mapEarthquakes = useMemo(() => {
-    if (selectedEarthquake) {
+    // A manually focused earthquake should only remain on the map if it
+    // falls within the selected time window.
+    if (selectedEarthquake && activeQuakes.some(eq => eq.id === selectedEarthquake.id)) {
       return [selectedEarthquake];
     }
     return activeQuakes;
@@ -187,38 +189,43 @@ export default function MonitoringPage() {
     });
   }, [facilities, mapEarthquakes]);
 
-  // Filter stores and facilities based on search and filters
-  const displayedLocations = useMemo(() => {
-    let list: Store[] = [];
-    if (mapMode === "location") {
-      if (facilityType === "STORE") {
-        list = [...computedStores.filter((store) =>
-          !facilityBranch || store.cabang?.toLowerCase() === facilityBranch.toLowerCase()
-        )];
-      } else if (facilityType) {
-        list = [...locationModeStores];
-      } else {
-        list = [...computedStores.filter((store) =>
-          !facilityBranch || store.cabang?.toLowerCase() === facilityBranch.toLowerCase()
-        ), ...locationModeStores];
-      }
-    } else {
-      // In Event Focus / Mode Kejadian: include both stores and facilities in evaluated zone!
-      list = [...computedStores, ...locationModeStores];
-    }
+  // Each category has its own marker set: no mixed Store/DC results.
+  // Event mode intentionally includes both to evaluate risk geographically.
+  const displayedLocations = useMemo<Store[]>(() => {
+    const isValid = (loc: Store) =>
+      Number.isFinite(Number(loc.latitude)) && Number.isFinite(Number(loc.longitude)) &&
+      Math.abs(Number(loc.latitude)) <= 90 && Math.abs(Number(loc.longitude)) <= 180;
+    const inBranch = (loc: Store) =>
+      !facilityBranch || (loc.cabang || "").toLowerCase() === facilityBranch.toLowerCase();
+    const realStores = computedStores.filter(loc => isValid(loc) && inBranch(loc));
+    const dcs = locationModeStores.filter(loc =>
+      isValid(loc) && loc.fr_type === "FACILITY_DC" && inBranch(loc)
+    );
+    let list = mapMode === "store" ? realStores
+      : mapMode === "dc" ? dcs
+      : [...realStores, ...dcs];
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (loc) =>
-          loc.kode_toko.toLowerCase().includes(q) ||
-          loc.nama_toko.toLowerCase().includes(q) ||
-          (loc.cabang && loc.cabang.toLowerCase().includes(q))
+    if (mapMode !== "event" && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(loc =>
+        (loc.kode_toko || "").toLowerCase().includes(q) ||
+        (loc.nama_toko || "").toLowerCase().includes(q) ||
+        (loc.cabang || "").toLowerCase().includes(q)
       );
     }
-
+    if (mapMode === "dc") {
+      if (facilityStatus) {
+        list = list.filter(loc => facilities.some(f => "FACILITY:" + f.id === loc.id &&
+          f.operational_status === facilityStatus));
+      }
+      if (facilityMapping) {
+        list = list.filter(loc => facilities.some(f => "FACILITY:" + f.id === loc.id &&
+          (facilityMapping === "mapped" ? Boolean(f.mapping_verified_at) : !f.mapping_verified_at)));
+      }
+    }
     return list;
-  }, [mapMode, facilityType, facilityBranch, computedStores, locationModeStores, searchQuery]);
+  }, [mapMode, computedStores, locationModeStores, searchQuery, facilityBranch,
+      facilityStatus, facilityMapping, facilities]);
 
   const facilityByStoreId = useMemo(
     () => new Map(facilities.map((facility) => [`FACILITY:${facility.id}`, facility])),
@@ -272,6 +279,10 @@ export default function MonitoringPage() {
 
   const handleModeChange = (m: MapMode) => {
     setMapMode(m);
+    setSearchQuery("");
+    setFacilityBranch("");
+    setFacilityStatus("");
+    setFacilityMapping("");
     handleCloseAllSheets();
   };
 
@@ -285,85 +296,63 @@ export default function MonitoringPage() {
 
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col bg-slate-100 dark:bg-slate-950">
-      {/* 1. Location management retains its full filtering toolbar. */}
-      {mapMode === "location" ? <MapToolbar
-        mapMode={mapMode}
-        onModeChange={handleModeChange}
-        latestEarthquake={latestEq}
-        activeEarthquakesCount={activeQuakes.length}
-        evaluatedLocationsCount={dangerCount}
-        onOpenEvaluatedSheet={handleOpenEvaluated}
-        onOpenEarthquakeListModal={handleOpenEarthquakes}
-        onFocusEpicenter={() => {
-          if (latestEq) handleFocusDisaster(latestEq);
-        }}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        facilityType={facilityType}
-        onFacilityTypeChange={setFacilityType}
-        facilityBranch={facilityBranch}
-        onFacilityBranchChange={setFacilityBranch}
-        facilityMapping={facilityMapping}
-        onFacilityMappingChange={setFacilityMapping}
-        branchOptions={branchOptions}
-        onResetLocationFilters={handleResetLocationFilters}
-        totalLocationsCount={displayedLocations.length}
-        basemap={basemap}
-        onChangeBasemap={setBasemap}
-        activeLayer={activeLayer}
-        onLayerChange={setActiveLayer}
-        mapTimeFilter={mapTimeFilter}
-        onChangeMapTimeFilter={setMapTimeFilter}
-        incidentOnly={incidentOnly}
-        onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
-        showRadar={showRadar}
-        onToggleRadar={() => setShowRadar((prev) => !prev)}
-        onResetView={handleResetView}
-        theme={theme}
-        onOpenFilterModal={handleOpenFilter}
-        onOpenLocationListSheet={handleOpenLocationList}
-        isMobileDetailOpen={Boolean(activeDetailStore || activeDetailFacility || filterOpen || isLocationListOpen || isEarthquakeModalOpen)}
-      /> : (
-        <div className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-3 py-2.5 text-slate-800 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:px-4">
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex min-w-0 flex-1 items-center gap-2.5">
-              <div className="hidden shrink-0 rounded-lg bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 sm:grid">
-                <Activity className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
-                    <Radio className="h-3 w-3" />
-                    {latestEq ? `${latestEq.source || "Gempa"} • Terkini` : "Monitoring Kejadian"}
-                  </span>
-                  <span className="min-w-0 truncate font-semibold text-slate-900 dark:text-white">
-                    {latestEq ? `M ${latestEq.magnitude} — ${latestEq.title || latestEq.place}` : "Belum ada data gempa terbaru"}
-                  </span>
-                </div>
-                {latestEq && (
-                  <p className="mt-0.5 truncate text-[11px] text-slate-500 dark:text-slate-400">
-                    Kedalaman: {latestEq.depth} • {latestEq.time}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
-              <button type="button" onClick={handleOpenEvaluated} className="inline-flex min-h-9 items-center gap-1 rounded-md bg-rose-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-rose-700">
-                <AlertTriangle className="h-3.5 w-3.5" /> Prioritas Pantau ({dangerCount})
-              </button>
-              <button type="button" onClick={handleOpenEarthquakes} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                <List className="h-3.5 w-3.5" /> Gempa ({activeQuakes.length})
-              </button>
-              {latestEq && <button type="button" onClick={() => handleFocusDisaster(latestEq)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-[11px] font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">
-                <MapPin className="h-3.5 w-3.5" /> Episentrum
-              </button>}
-              <button type="button" onClick={() => handleModeChange("location")} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
-                <StoreIcon className="h-3.5 w-3.5" /> Mode Lokasi
-              </button>
-            </div>
+      {/* Context-aware map navigation. Separate Store and DC, not mixed. */}
+      <div className="relative z-20 shrink-0 border-b border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white sm:px-4">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-2 overflow-x-auto" role="tablist" aria-label="Jenis monitoring peta">
+            {([
+              { id: "event" as const, label: "Kejadian", icon: Activity },
+              { id: "store" as const, label: "Toko", icon: StoreIcon },
+              { id: "dc" as const, label: "DC", icon: Building2 },
+            ]).map(tab => {
+              const Icon = tab.icon;
+              const selected = mapMode === tab.id;
+              return (
+                <button key={tab.id} type="button" role="tab" aria-selected={selected}
+                  onClick={() => handleModeChange(tab.id)}
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${selected ? "bg-[#1D5AA6] text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"}`}>
+                  <Icon className="h-4 w-4" />{tab.label}
+                </button>
+              );
+            })}
           </div>
+          {mapMode === "event" ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {latestEq && <span className="min-w-0 max-w-[380px] truncate text-xs text-slate-600 dark:text-slate-300" title={latestEq.title || latestEq.place}>
+                <span className="font-semibold">M {latestEq.magnitude}</span> · {latestEq.title || latestEq.place}
+              </span>}
+              <button type="button" onClick={handleOpenEarthquakes} className="map-ux-action">
+                <List className="h-4 w-4" /> Gempa ({activeQuakes.length})
+              </button>
+              <button type="button" onClick={handleOpenEvaluated} className="map-ux-action">
+                <AlertTriangle className="h-4 w-4 text-amber-600" /> Prioritas Pantau ({dangerCount})
+              </button>
+              {latestEq && <button type="button" onClick={() => handleFocusDisaster(latestEq)} className="map-ux-action">
+                <MapPin className="h-4 w-4" /> Episentrum
+              </button>}
+            </div>
+          ) : (
+            <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:max-w-[730px] lg:justify-end">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/>
+                <input type="search" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+                  aria-label={mapMode === "store" ? "Cari nama toko atau kode toko" : "Cari nama DC atau kode DC"}
+                  placeholder={mapMode === "store" ? "Cari nama atau kode toko..." : "Cari nama atau kode DC..."}
+                  className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"/>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={handleOpenFilter} className="map-ux-action">
+                  <Filter className="h-4 w-4"/> Filter {mapMode === "store" ? "Toko" : "DC"}
+                </button>
+                <button type="button" onClick={handleOpenLocationList} className="map-ux-action">
+                  <List className="h-4 w-4"/> Daftar ({displayedLocations.length})
+                </button>
+                <button type="button" onClick={handleResetLocationFilters} className="map-ux-action">Reset</button>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {facilityFetchError && (
         <div className="z-20 flex shrink-0 items-center justify-between gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="status">
@@ -420,7 +409,7 @@ export default function MonitoringPage() {
               activeLayer={activeLayer}
               onLayerChange={setActiveLayer}
               mapTimeFilter={mapTimeFilter}
-              onChangeMapTimeFilter={setMapTimeFilter}
+              onChangeMapTimeFilter={(value) => { setMapTimeFilter(value); clearEventFocus(); }}
               selectedEarthquake={selectedEarthquake}
               onClearEventFocus={clearEventFocus}
             />
@@ -463,7 +452,7 @@ export default function MonitoringPage() {
           handleSelectStore(loc);
         }}
         selectedLocationId={selectedStore?.id}
-        mapMode={mapMode}
+        mapMode={mapMode === "event" ? "event" : "location"}
         theme={theme}
       />
 
@@ -496,7 +485,7 @@ export default function MonitoringPage() {
               <div className="w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700" />
             </div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h2 className="font-bold text-sm">Filter Fasilitas & Jaringan</h2>
+              <h2 className="font-bold text-sm">{mapMode === "store" ? "Filter Toko" : "Filter DC"}</h2>
               <button
                 type="button"
                 onClick={() => setFilterOpen(false)}
@@ -508,7 +497,7 @@ export default function MonitoringPage() {
             </div>
 
             <div className="mt-4 space-y-3 text-xs">
-              <div>
+              {mapMode === "dc" && <div>
                 <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Kategori Fasilitas
                 </label>
@@ -524,7 +513,7 @@ export default function MonitoringPage() {
                   <option value="BULKY">Bulky</option>
                   <option value="STORE_HUB">Store Hub</option>
                 </select>
-              </div>
+              </div>}
 
               <div>
                 <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">
@@ -544,7 +533,7 @@ export default function MonitoringPage() {
                 </select>
               </div>
 
-              <div>
+              {mapMode === "dc" && <div>
                 <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Status Operasional
                 </label>
@@ -557,9 +546,9 @@ export default function MonitoringPage() {
                   <option value="ACTIVE">Aktif</option>
                   <option value="INACTIVE">Tidak Aktif</option>
                 </select>
-              </div>
+              </div>}
 
-              <div>
+              {mapMode === "dc" && <div>
                 <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">
                   Status Pemetaan Cabang
                 </label>
@@ -572,7 +561,7 @@ export default function MonitoringPage() {
                   <option value="mapped">Terpetakan ke Cabang</option>
                   <option value="unmapped">Belum Terpetakan</option>
                 </select>
-              </div>
+              </div>}
 
               <div className="pt-2 grid grid-cols-2 gap-2">
                 <button
