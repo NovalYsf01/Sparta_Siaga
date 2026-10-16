@@ -52,7 +52,7 @@ export function isInIndonesiaMonitoringArea(latitude: number, longitude: number,
 
   // USGS 'place' is descriptive, not an official jurisdiction classification.
   // Reject explicitly foreign-labelled epicenters inside overlapping boxes.
-  if (/\\b(?:Philippines|Malaysia|Thailand|Singapore|Vietnam|Cambodia|Papua New Guinea|Brunei|Timor-Leste|East Timor)\\b/i.test(place)) {
+  if (/\b(?:Philippines|Malaysia|Thailand|Singapore|Vietnam|Cambodia|Papua New Guinea|Brunei|Timor-Leste|East Timor)\b/i.test(place)) {
     return false;
   }
   return true;
