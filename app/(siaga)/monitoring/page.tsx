@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Activity, AlertTriangle, Filter, List, Loader2, MapPin, Radio, Store, X } from "lucide-react";
+import { Activity, AlertTriangle, Filter, List, Loader2, MapPin, Radio, Store as StoreIcon, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 import { MapToolbar, type MapMode } from "@/components/map/map-toolbar";
 import { MapControls } from "@/components/map/map-controls";
@@ -358,7 +358,7 @@ export default function MonitoringPage() {
                 <MapPin className="h-3.5 w-3.5" /> Episentrum
               </button>}
               <button type="button" onClick={() => handleModeChange("location")} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
-                <Store className="h-3.5 w-3.5" /> Mode Lokasi
+                <StoreIcon className="h-3.5 w-3.5" /> Mode Lokasi
               </button>
             </div>
           </div>
