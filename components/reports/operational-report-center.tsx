@@ -408,7 +408,7 @@ export function OperationalReportCenter({
                             <div className="w-16 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                               <div
                                 className="bg-[#1D5AA6] h-full rounded-full transition-all duration-300"
-                                style={{ width: `${inc.progress ?? 0}%` }}
+                                style={{ width: `${(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "—"}` }}
                               />
                             </div>
                             <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">
@@ -528,7 +528,7 @@ export function OperationalReportCenter({
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="text-[10px] text-slate-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {inc.date} • Progres: {inc.progress ?? 0}%
+                      {inc.date}{(inc.progress ?? 0) > 0 ? ` • Progres: ${inc.progress}%` : ""}
                     </div>
                     <button
                       onClick={() => onSelectIncident(inc)}
