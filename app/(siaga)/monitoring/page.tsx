@@ -218,7 +218,7 @@ export default function MonitoringPage() {
     }
 
     return list;
-  }, [mapMode, facilityType, computedStores, locationModeStores, searchQuery]);
+  }, [mapMode, facilityType, facilityBranch, computedStores, locationModeStores, searchQuery]);
 
   const facilityByStoreId = useMemo(
     () => new Map(facilities.map((facility) => [`FACILITY:${facility.id}`, facility])),
