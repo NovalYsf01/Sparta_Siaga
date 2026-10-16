@@ -533,7 +533,7 @@ export default function MapInner({
         preferCanvas={true}
       >
         {/* Basemap Tile Layer */}
-        <TileLayer key={tileUrl} url={tileUrl} attribution={tileAttribution} />
+        <TileLayer key={tileUrl} url={tileUrl} attribution={tileAttribution} maxNativeZoom={basemap === "esri-dark" ? 16 : 18} />
 
         {/* Live Doppler Weather Radar Layer */}
         {showWeatherLayer && radarTileUrl && (

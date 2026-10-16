@@ -277,7 +277,7 @@ export function IncidentDetailModal({
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progres Terakhir</span>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="font-bold text-slate-800 dark:text-slate-200">
-                  {relatedReport?.progress ?? 0}%
+                  {(relatedReport?.progress ?? 0) > 0 ? `${relatedReport?.progress}%` : "Belum dimulai"}
                 </span>
                 <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                   <div

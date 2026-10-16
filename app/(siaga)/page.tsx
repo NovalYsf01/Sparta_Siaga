@@ -257,9 +257,9 @@ export default function DashboardPage() {
       </div>
 
       {/* DESKTOP DASHBOARD (>= 1024px) */}
-      <div className="hidden lg:block p-8 space-y-6 max-w-[1600px] mx-auto w-full">
+      <div className="hidden lg:block px-6 py-6 space-y-5 max-w-[1600px] mx-auto w-full">
         {/* Header: Contextual Role Welcome & Quick Actions */}
-        <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+        <div className="flex items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
           <div>
             <div className="flex items-center gap-2">
               <span className="p-2 rounded-xl bg-[#1D5AA6]/10 text-[#1D5AA6]">
@@ -275,16 +275,16 @@ export default function DashboardPage() {
                   <Store className="w-5 h-5" />
                 )}
               </span>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 {roleInfo.isAdmin
-                  ? "Pusat Kendali Administrasi & Audit Sistem"
+                  ? "Administrasi SPARTA SIAGA"
                   : roleInfo.isHO
-                  ? "Command Center Head Office (Monitoring Nasional)"
+                  ? "Ringkasan Head Office"
                   : roleInfo.isBMM
                   ? `Monitoring Operasional Cabang ${currentUser?.branch || ""}`
                   : roleInfo.isBES
-                  ? `Dashboard Fasilitas & Gedung (BES) • Cabang ${currentUser?.branch || ""}`
-                  : `Dashboard Operasional Toko (BMS) • Cabang ${currentUser?.branch || ""}`}
+                  ? `Ringkasan Fasilitas • Cabang ${currentUser?.branch || ""}`
+                  : `Ringkasan Toko • Cabang ${currentUser?.branch || ""}`}
               </h1>
             </div>
             <p className="text-xs text-slate-500 mt-1 ml-9">
@@ -476,7 +476,9 @@ export default function DashboardPage() {
 
         {/* 4. HO DEDICATED MONITORING PER CABANG TABLE */}
         {roleInfo.isHO && (
-          <section aria-label="Monitoring per Cabang" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+          <details className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <summary className="cursor-pointer select-none text-sm font-semibold text-[#123B6D] dark:text-blue-300">Monitoring terperinci per cabang</summary>
+            <section aria-label="Monitoring per Cabang" className="mt-4 p-2">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -560,12 +562,28 @@ export default function DashboardPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+            </section>
+          </details>
         )}
 
         {/* DEFAULT KPI STRIP FOR BMS, BES & ADMIN */}
         {!roleInfo.isBMM && !roleInfo.isHO && (
           <>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Tugas Saya", value: myTasks },
+                { label: "Laporan Aktif", value: roleInfo.isBES ? facilityReports.length : roleInfo.isBMS ? storeReports.length : activeIncidents.length },
+                { label: "Belum Ditugaskan", value: unassigned },
+              ].map(item => (
+                <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                  <p className="text-xs text-slate-500">{item.label}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{item.value}</p>
+                </div>
+              ))}
+            </div>
+            <details className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <summary className="cursor-pointer select-none text-sm font-semibold text-blue-700 dark:text-blue-300">Statistik tambahan</summary>
+              <div className="mt-4 space-y-4">
             <IncidentKpiRow
               stats={incidentStats}
               dangerCount={dangerCount}
@@ -679,11 +697,13 @@ export default function DashboardPage() {
                 ))
               )}
             </section>
+              </div>
+            </details>
           </>
         )}
 
         {/* MAIN HERO: ACTIVE SITUATION PANEL */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        {!roleInfo.isHO && <div className="flex flex-col lg:flex-row gap-6">
           <div className="w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col shadow-xs">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-bold text-[#123B6D] dark:text-blue-400 uppercase tracking-wider flex items-center gap-2">
@@ -803,10 +823,12 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
 
-        {/* SECONDARY SECTION: REPORTS REQUIRING ATTENTION */}
-        <div className="pt-2">
+        {/* Secondary report table stays available on demand. */
+        {!roleInfo.isHO && <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <summary className="cursor-pointer select-none text-sm font-semibold text-blue-700 dark:text-blue-300">Lihat seluruh laporan yang perlu perhatian</summary>
+        <div className="pt-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -857,6 +879,7 @@ export default function DashboardPage() {
             }}
           />
         </div>
+        </details>}
       </div>
     </div>
   );
