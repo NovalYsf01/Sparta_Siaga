@@ -356,7 +356,7 @@ export function ActiveIncidentsTable({
                         <div className="w-20 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(inc.progress)}`}
-                            style={{ width: `${inc.progress > 0 ? `${inc.progress}%` : "—"}` }}
+                            style={{ width: `${inc.progress ?? 0}%` }}
                           />
                         </div>
                         <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
@@ -487,7 +487,7 @@ export function ActiveIncidentsTable({
                   <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${getProgressBarColor(inc.progress)}`}
-                      style={{ width: `${inc.progress > 0 ? `${inc.progress}%` : "—"}` }}
+                      style={{ width: `${inc.progress ?? 0}%` }}
                     />
                   </div>
                 </div>
