@@ -25,6 +25,7 @@ import {
 
 interface MapInnerProps {
   stores: Store[];
+  locationMode?: "event" | "store" | "dc";
   earthquakes: Earthquake[];
   basemap: "esri-dark" | "esri-light" | "osm";
   incidentOnly: boolean;
@@ -314,6 +315,7 @@ function ClusterMarkerItem({
 
 export default function MapInner({
   stores,
+  locationMode = "event",
   earthquakes,
   basemap,
   incidentOnly,
@@ -640,7 +642,7 @@ export default function MapInner({
 
                       {eq.felt && (
                         <div className={`text-[10px] ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-                          Dirasakan: <span className="font-medium">{eq.felt}</span>
+                          Wilayah merasakan guncangan (MMI): <span className="font-medium">{eq.felt}</span>
                         </div>
                       )}
 
@@ -678,8 +680,27 @@ export default function MapInner({
             );
           })}
 
+        {/* DC mode: few master locations, always render INDIVIDUAL markers,
+            independently of zoom. Click resolves the same LocationDetailPanel as stores. */}
+        {showStoresLayer && locationMode === "dc" && stores.map((dc) => (
+          <Marker
+            key={dc.id}
+            position={[dc.latitude, dc.longitude]}
+            icon={createStoreIcon(dc, selectedStore?.id === dc.id)}
+            eventHandlers={{ click: () => onSelectStore(dc) }}
+          >
+            <Tooltip direction="top" offset={[0, -18]} opacity={0.95}>
+              <div className="px-1 text-xs text-slate-900">
+                <span className="font-bold text-blue-700">DC {dc.kode_toko}</span>
+                <div>{dc.nama_toko}</div>
+                <span className="text-[10px] text-slate-500">Klik untuk melihat detail DC</span>
+              </div>
+            </Tooltip>
+          </Marker>
+        ))}
+
         {/* 2. STORES LAYER (LOD: Zoom <= 7 Branch Aggregation, Zoom 8–12 Clustering, Zoom >= 13 Individual) */}
-        {showStoresLayer && (
+        {showStoresLayer && locationMode !== "dc" && (
           <>
             {/* LEVEL NASIONAL / PROVINSI (Zoom <= 7): Titik Percabang (Kantor Cabang / DC) */}
             {currentZoom <= 7 &&
@@ -778,7 +799,7 @@ export default function MapInner({
 
         {/* 3. OPERATIONAL & AFFECTED STORES (Requirements 10, 11, 31)
             Always distinctly visible on Zoom >= 8 even if quake >72h old */}
-        {showStoresLayer &&
+        {showStoresLayer && locationMode !== "dc" &&
           currentZoom >= 8 &&
           operationalStores.map((store) => {
             const isDanger =

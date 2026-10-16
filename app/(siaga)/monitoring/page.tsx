@@ -111,7 +111,9 @@ export default function MonitoringPage() {
       if (facilityStatus) params.set("status", facilityStatus);
       if (facilityMapping) params.set("mapping", facilityMapping);
     }
-    if (viewport) {
+    // DC mode loads the small branch-scoped master dataset, not only the
+    // current map bounds. Avoid hiding DCs located outside the first viewport.
+    if (viewport && mapMode !== "dc") {
       Object.entries(viewport).forEach(([key, value]) => params.set(key, String(value)));
     }
 
@@ -163,7 +165,17 @@ export default function MonitoringPage() {
 
   // Convert facilities to Store-compatible format with evaluated earthquake risk
   const locationModeStores = useMemo<Store[]>(() => {
-    return facilities.map((facility) => {
+    return facilities
+      .filter((facility) => {
+        // A missing master coordinate must not turn into a fictitious 0° point.
+        if (facility.latitude == null || facility.longitude == null) return false;
+        const lat = Number(facility.latitude);
+        const lng = Number(facility.longitude);
+        return Number.isFinite(lat) && Number.isFinite(lng) &&
+          lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 &&
+          !(lat === 0 && lng === 0);
+      })
+      .map((facility) => {
       const lat = Number(facility.latitude);
       const lng = Number(facility.longitude);
       const risk = assessStoreRisk({ latitude: lat, longitude: lng }, mapEarthquakes);
@@ -195,7 +207,9 @@ export default function MonitoringPage() {
   // Event mode intentionally includes both to evaluate risk geographically.
   const displayedLocations = useMemo<Store[]>(() => {
     const isValid = (loc: Store) =>
+      loc.latitude != null && loc.longitude != null &&
       Number.isFinite(Number(loc.latitude)) && Number.isFinite(Number(loc.longitude)) &&
+      !(Number(loc.latitude) === 0 && Number(loc.longitude) === 0) &&
       Math.abs(Number(loc.latitude)) <= 90 && Math.abs(Number(loc.longitude)) <= 180;
     const inBranch = (loc: Store) =>
       !facilityBranch || (loc.cabang || "").toLowerCase() === facilityBranch.toLowerCase();
@@ -369,6 +383,7 @@ export default function MonitoringPage() {
         <div className="flex-1 relative h-full w-full min-w-0 z-0">
           <MapView
             stores={displayedLocations}
+            locationMode={mapMode}
             earthquakes={mapMode === "event" ? mapEarthquakes : []}
             floodReports={mapMode === "event" ? disasterData?.floodReports || [] : []}
             basemap={basemap}
@@ -395,6 +410,16 @@ export default function MonitoringPage() {
             theme={theme}
             onViewportChange={handleViewportChange}
           />
+          {mapMode === "dc" && displayedLocations.length === 0 && !facilityFetchError && (
+            <div role="status" className="pointer-events-none absolute bottom-20 left-1/2 z-[450] w-[min(360px,calc(100%-24px))] -translate-x-1/2 rounded-xl border border-slate-200 bg-white/95 p-4 text-center shadow-lg dark:border-slate-700 dark:bg-slate-900/95">
+              <p className="text-sm font-semibold text-slate-900 dark:text-white">Belum ada titik DC yang bisa ditampilkan</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                {facilities.length === 0
+                  ? "Master DC belum tersedia untuk cakupan akun ini, atau datanya belum dimuat."
+                  : "Periksa koordinat DC dan filter cabang/status pada master fasilitas."}
+              </p>
+            </div>
+          )}
           {mapMode === "event" && (
             <MapControls
               latestEarthquake={latestEq}

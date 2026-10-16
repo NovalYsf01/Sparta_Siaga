@@ -23,13 +23,22 @@ export async function GET(request: Request) {
   if (status) where.push(`operational_status = ${add(status)}`);
   if (mapping === "mapped") where.push("branch_id IS NOT NULL AND mapping_verified_at IS NOT NULL");
   if (mapping === "unmapped") where.push("(branch_id IS NULL OR mapping_verified_at IS NULL)");
-  const north = Number(url.searchParams.get("north"));
-  const south = Number(url.searchParams.get("south"));
-  const east = Number(url.searchParams.get("east"));
-  const west = Number(url.searchParams.get("west"));
-  if ([north, south, east, west].every(Number.isFinite)) {
-    where.push(`latitude BETWEEN ${add(south)} AND ${add(north)}`);
-    where.push(`longitude BETWEEN ${add(west)} AND ${add(east)}`);
+  // No viewport parameters means ALL facilities in the user's authorized scope.
+  // Number(null) === 0 previously caused an accidental 0/0 bounding box,
+  // making the DC map appear empty when first opened.
+  const boundsKeys = ["north", "south", "east", "west"] as const;
+  const hasBounds = boundsKeys.every((key) => url.searchParams.has(key));
+  if (hasBounds) {
+    const north = Number(url.searchParams.get("north"));
+    const south = Number(url.searchParams.get("south"));
+    const east = Number(url.searchParams.get("east"));
+    const west = Number(url.searchParams.get("west"));
+    if ([north, south, east, west].every(Number.isFinite) &&
+        north >= south && east >= west &&
+        north <= 90 && south >= -90 && east <= 180 && west >= -180) {
+      where.push(`latitude BETWEEN ${add(south)} AND ${add(north)}`);
+      where.push(`longitude BETWEEN ${add(west)} AND ${add(east)}`);
+    }
   }
   const { rows } = await getDbPool().query(
     `SELECT id::text, code, name, facility_type, latitude, longitude,
