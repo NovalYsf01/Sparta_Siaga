@@ -180,7 +180,7 @@ export function TrackingReportCenter({
                           <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                             <div
                               className="h-full bg-blue-600 dark:bg-blue-500 rounded-full"
-                              style={{ width: `${inc.progress ?? 0}%` }}
+                              style={{ width: `${(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "—"}` }}
                             />
                           </div>
                           <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{inc.progress ?? 0}%</span>
