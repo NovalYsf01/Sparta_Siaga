@@ -115,17 +115,17 @@ export function OperationalReportCenter({
   };
 
   return (
-    <div className="sparta-report-page space-y-5 max-w-[1560px] mx-auto w-full px-4 sm:px-6 lg:px-0 pt-5 sm:pt-7 pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
       
       {/* ── Header & KPI ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="sparta-ui-title flex items-center gap-2">
+          <h1 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
             <ClipboardList className="w-5 h-5 text-blue-600" />
             Pusat Laporan Kejadian
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Pantau laporan kejadian, pemeriksaan, persetujuan, dan tindak lanjut pekerjaan.
+            Kelola dan pantau seluruh laporan insiden operasional.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -166,12 +166,12 @@ export function OperationalReportCenter({
           { label: "Dalam Penanganan", value: maintenanceCount, icon: Wrench, color: "text-amber-500" },
           { label: "Selesai (Arsip)", value: resolvedCount, icon: CheckCircle2, color: "text-emerald-500" },
         ].map((kpi, i) => (
-          <div key={i} className="sparta-ui-panel dark:bg-slate-900 p-4 flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <kpi.icon className={`w-3.5 h-3.5 ${kpi.color}`} />
               {kpi.label}
             </div>
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">
               {kpi.value}
             </div>
           </div>
@@ -187,7 +187,7 @@ export function OperationalReportCenter({
             placeholder="Cari No. Laporan, Toko, Cabang..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="sparta-ui-field w-full pl-9 pr-4 py-2.5 text-sm dark:bg-slate-900 dark:text-slate-200 min-h-[44px]"
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 min-h-[44px]"
           />
         </div>
         
@@ -195,14 +195,14 @@ export function OperationalReportCenter({
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
-            className="sparta-ui-field flex-1 sm:flex-initial px-3 py-2 text-xs dark:bg-slate-900 dark:text-slate-300 min-h-[44px]"
+            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none min-h-[44px]"
           >
             <option value="all">Semua Aktif</option>
             <option value="pending_confirmation">Perlu Konfirmasi</option>
             <option value="pending_bm_approval">Menunggu Persetujuan BnM</option>
             <option value="clarification_requested">Perlu Klarifikasi</option>
             <option value="confirmed_affected">Disetujui BnM</option>
-            <option value="in_estimation">Estimasi</option>
+            <option value="in_estimation">Dalam Estimasi</option>
             <option value="investigating">Investigasi</option>
             <option value="in_maintenance">Penanganan</option>
           </select>
@@ -214,11 +214,7 @@ export function OperationalReportCenter({
             <option value="all">Semua Kejadian</option>
             <option value="earthquake">Gempa Bumi</option>
             <option value="flood">Banjir</option>
-            <option value="fire">Kebakaran</option>
-            <option value="theft">Pencurian</option>
-            <option value="heavy_rain">Hujan Lebat</option>
-            <option value="strong_wind">Angin Kencang</option>
-            <option value="severe_building_damage">Kerusakan Bangunan</option>
+            <option value="other">Lainnya</option>
           </select>
         </div>
       </div>
@@ -232,10 +228,10 @@ export function OperationalReportCenter({
       ) : (
         <>
           {/* DESKTOP VIEW */}
-          <div className="hidden md:block sparta-ui-panel dark:bg-slate-900 overflow-hidden">
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="sparta-ui-table text-left">
-                <thead className="dark:bg-slate-800 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-700">
                   <tr>
                     <th className="px-4 py-3">No. Laporan</th>
                     <th className="px-4 py-3">Tanggal</th>
@@ -381,7 +377,7 @@ export function OperationalReportCenter({
                 new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
 
               return (
-                <div key={inc.id} className="sparta-ui-panel dark:bg-slate-900 p-4 flex flex-col gap-3">
+                <div key={inc.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-0.5">

@@ -409,7 +409,7 @@ export function NotificationCenterSheet({
 
   return (
     <div
-      className={`fixed z-[700] flex flex-col shadow-xl transition-all duration-300 ease-in-out animate-in fade-in ${
+      className={`fixed z-[700] flex flex-col shadow-2xl transition-all duration-300 ease-in-out animate-in fade-in ${
         isDark ? "bg-slate-900 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-900 shadow-2xl"
       }
       /* Mobile: bottom sheet */
@@ -453,7 +453,7 @@ export function NotificationCenterSheet({
       </div>
 
       {/* Tabs: [ TERBARU ] [ RIWAYAT ] (Requirements 2, 7, 8) */}
-      <div className={`px-4 pt-2.5 pb-2 border-b flex items-center justify-between gap-2 ${isDark ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-100"}`}>
+      <div className={`px-4 pt-2.5 pb-2 border-b flex items-center justify-between gap-2 ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-100"}`}>
         <div className="flex items-center gap-1.5 bg-slate-200/80 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-300/40 dark:border-slate-700/60">
           <button
             onClick={() => setActiveTab("recent")}
@@ -611,7 +611,7 @@ export function NotificationCenterSheet({
                   return (
                     <div
                       key={canonicalKey}
-                      className={`rounded-lg p-3.5 border transition-all ${
+                      className={`rounded-xl p-3.5 border transition-all ${
                         isDark
                           ? isAnyUnread
                             ? "bg-slate-800/90 border-slate-700 shadow-md"
@@ -833,7 +833,7 @@ export function NotificationCenterSheet({
     return (
       <div
         key={log.id}
-        className={`rounded-lg p-3.5 border transition-all ${
+        className={`rounded-xl p-3.5 border transition-all ${
           isDark
             ? isUnread
               ? "bg-slate-800/90 border-slate-700 shadow-md"

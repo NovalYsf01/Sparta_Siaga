@@ -10,6 +10,10 @@ import {
   ChevronUp,
   Layers,
   RotateCcw,
+  Globe2,
+  Activity,
+  Waves,
+  Store,
 } from "lucide-react";
 import { Earthquake } from "@/types/disaster";
 
@@ -97,9 +101,9 @@ export function MapControls({
 
   // Expanded compact enterprise card (Requirements 20–32)
   return (
-    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[400] flex flex-col pointer-events-auto transition-all duration-200 max-w-[calc(100vw-1.5rem)] sm:w-[260px]">
+    <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[400] flex flex-col pointer-events-auto transition-all duration-200 max-w-[calc(100vw-1.5rem)] sm:w-[276px]">
       <div
-        className={`border rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl w-full text-xs space-y-2 transition-colors duration-200 max-h-[calc(100vh-140px)] overflow-y-auto ${
+        className={`border rounded-xl p-3 shadow-lg backdrop-blur-md w-full text-xs space-y-2 transition-colors duration-200 max-h-[min(560px,calc(100dvh-155px))] overflow-y-auto ${
           isDark
             ? "bg-slate-900/95 border-slate-700/80 text-white"
             : "bg-white/95 border-slate-200 text-slate-900 shadow-xl"
@@ -119,6 +123,7 @@ export function MapControls({
                 : "hover:bg-slate-100 text-slate-500 hover:text-slate-900"
             }`}
             title="Minimalkan Kontrol"
+            aria-label="Minimalkan kontrol peta"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
@@ -160,6 +165,7 @@ export function MapControls({
           >
             <button
               onClick={() => onChangeMapTimeFilter?.("24h")}
+              aria-pressed={mapTimeFilter === "24h"}
               className={`flex-1 py-1 px-2 rounded-md text-[10px] font-bold transition-all text-center ${
                 mapTimeFilter === "24h"
                   ? "bg-amber-500 text-white shadow-xs"
@@ -172,6 +178,7 @@ export function MapControls({
             </button>
             <button
               onClick={() => onChangeMapTimeFilter?.("3d")}
+              aria-pressed={mapTimeFilter === "3d"}
               className={`flex-1 py-1 px-2 rounded-md text-[10px] font-bold transition-all text-center ${
                 mapTimeFilter === "3d"
                   ? "bg-blue-600 text-white shadow-xs"
@@ -192,12 +199,13 @@ export function MapControls({
           </div>
           <div className="grid grid-cols-4 gap-1">
             {[
-              { id: "all", label: "Semua", icon: "🌐" },
-              { id: "earthquake", label: "Gempa", icon: "🌋" },
-              { id: "flood", label: "Banjir", icon: "🌊" },
-              { id: "stores", label: "Toko", icon: "🏪" },
+              { id: "all", label: "Semua", icon: Globe2 },
+              { id: "earthquake", label: "Gempa", icon: Activity },
+              { id: "flood", label: "Banjir", icon: Waves },
+              { id: "stores", label: "Toko", icon: Store },
             ].map((layer) => {
               const isActive = activeLayer === layer.id;
+              const LayerIcon = layer.icon;
               return (
                 <button
                   key={layer.id}
@@ -206,7 +214,8 @@ export function MapControls({
                       layer.id as "all" | "earthquake" | "stores" | "flood"
                     )
                   }
-                  className={`py-1 px-1 rounded-lg border text-center text-[10px] transition-all flex flex-col items-center gap-0.5 ${
+                  aria-pressed={isActive}
+                  className={`py-1.5 px-1 rounded-lg border text-center text-[10px] transition-all flex flex-col items-center justify-center gap-1 min-h-[40px] ${
                     isActive
                       ? isDark
                         ? "bg-slate-800 text-white border-cyan-500/50 shadow-xs font-bold"
@@ -216,8 +225,8 @@ export function MapControls({
                       : "bg-transparent border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-800"
                   }`}
                 >
-                  <span className="text-xs leading-none">{layer.icon}</span>
-                  <span className="leading-none text-[9px]">{layer.label}</span>
+                  <LayerIcon className="h-3.5 w-3.5" />
+                  <span className="leading-none text-[10px]">{layer.label}</span>
                 </button>
               );
             })}
@@ -228,6 +237,7 @@ export function MapControls({
         <div className="grid grid-cols-2 gap-1 pt-0.5">
           <button
             onClick={onToggleIncidentOnly}
+            aria-pressed={incidentOnly}
             className={`py-1 px-1.5 rounded-lg border text-center font-semibold text-[10px] flex items-center justify-center gap-1 transition-all ${
               incidentOnly
                 ? isDark
@@ -249,6 +259,7 @@ export function MapControls({
 
           <button
             onClick={onToggleRadar}
+            aria-pressed={showRadar}
             className={`py-1 px-1.5 rounded-lg border text-center font-semibold text-[10px] flex items-center justify-center gap-1 transition-all ${
               showRadar
                 ? isDark
@@ -345,7 +356,8 @@ export function MapControls({
               return (
                 <button
                   key={b.id}
-                  onClick={() => onChangeBasemap(b.id as any)}
+                  onClick={() => onChangeBasemap(b.id as "esri-dark" | "esri-light" | "osm")}
+                  aria-pressed={isSelected}
                   className={`flex-1 py-1 rounded-md text-[10px] font-semibold transition-all text-center ${
                     isSelected
                       ? isDark
