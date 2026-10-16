@@ -147,7 +147,9 @@ export default function MonitoringPage() {
     return allActive.filter((eq) => now - eq.timestamp <= maxAgeMs);
   }, [disasterData, mapTimeFilter]);
 
-  const latestEq = selectedEarthquake || disasterData?.latestBmkgEarthquake;
+  const latestEq = selectedEarthquake && activeQuakes.some(eq => eq.id === selectedEarthquake.id)
+    ? selectedEarthquake
+    : activeQuakes[0] || disasterData?.latestBmkgEarthquake;
 
   // Map earthquakes: In Event Focus Mode render focused event; otherwise render all active window quakes
   const mapEarthquakes = useMemo(() => {
@@ -368,10 +370,10 @@ export default function MonitoringPage() {
           <MapView
             stores={displayedLocations}
             earthquakes={mapMode === "event" ? mapEarthquakes : []}
-            floodReports={disasterData?.floodReports || []}
+            floodReports={mapMode === "event" ? disasterData?.floodReports || [] : []}
             basemap={basemap}
-            incidentOnly={incidentOnly}
-            statusFilter={statusFilter}
+            incidentOnly={mapMode === "event" && incidentOnly}
+            statusFilter={mapMode === "event" ? statusFilter : "all"}
             selectedStore={selectedStore}
             onSelectStore={(store) => {
               setFilterOpen(false);
@@ -387,9 +389,9 @@ export default function MonitoringPage() {
               handleSelectStore(store);
             }}
             flyToTarget={flyToTarget}
-            showRadar={showRadar}
+            showRadar={mapMode === "event" && showRadar}
             radarTileUrl={radarData?.tileUrl}
-            activeLayer={activeLayer}
+            activeLayer={mapMode === "event" ? activeLayer : "stores"}
             theme={theme}
             onViewportChange={handleViewportChange}
           />
