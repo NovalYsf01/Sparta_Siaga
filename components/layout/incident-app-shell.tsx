@@ -338,7 +338,7 @@ export function IncidentAppShell({
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* TOP BAR / HEADER */}
         <header
-          className={`h-16 flex items-center justify-between px-6 lg:px-8 shrink-0 z-40 border-b transition-colors duration-200 ${
+          className={`h-16 flex items-center justify-between px-3 sm:px-4 lg:px-6 shrink-0 z-40 border-b transition-colors duration-200 ${
             isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
           }`}
         >
@@ -367,7 +367,7 @@ export function IncidentAppShell({
             {/* Universal Search Bar */}
             <div
               onClick={onSearchClick}
-              className={`hidden md:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-sm w-full ${
+              className={`hidden md:flex items-center gap-2.5 px-3.5 py-2 border rounded-lg cursor-pointer transition-colors text-sm max-w-xs w-full ${
                 isDark
                   ? "bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300"
                   : "bg-slate-100/80 hover:bg-slate-100 border-slate-200 text-slate-500"
@@ -386,7 +386,7 @@ export function IncidentAppShell({
           </div>
 
           {/* Right: PWA Install, Buat Laporan, Notifications, Role */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <div className="hidden 2xl:block"><PwaInstallPrompt variant="compact" /></div>
 
             {identity?.systemRole !== "ADMIN" && !isHoViewer && (
@@ -411,6 +411,11 @@ export function IncidentAppShell({
 
 
 
+            {/* Accessible mobile universal search */}
+            <button type="button" onClick={onSearchClick} aria-label="Cari toko, DC atau laporan"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 md:hidden">
+              <Search className="h-5 w-5"/>
+            </button>
             {/* Notification Bell */}
             <button
               onClick={onOpenNotifications}
@@ -431,7 +436,7 @@ export function IncidentAppShell({
             <div className="relative">
               <button
                 onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className={`flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full border transition-all text-left ${
+                className={`flex items-center gap-2 pl-1.5 pr-2 sm:pr-3 py-1.5 rounded-full border transition-all text-left ${
                   isDark
                     ? "border-slate-700 hover:bg-slate-800 bg-slate-900"
                     : "border-slate-200 hover:bg-slate-50 bg-white"
@@ -444,7 +449,7 @@ export function IncidentAppShell({
                     {identity?.name ? identity.name.charAt(0).toUpperCase() : "U"}
                   </div>
                 )}
-                <div className="hidden sm:block max-w-[140px]">
+                <div className="hidden sm:block max-w-[115px]">
                   <div className={`text-xs font-bold truncate leading-tight ${isDark ? "text-slate-200" : "text-slate-800"}`}>
                     {identity ? identity.name : "Memuat..."}
                   </div>
