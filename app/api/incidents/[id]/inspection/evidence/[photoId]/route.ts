@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { canViewReport } from "@/lib/report-permissions";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { getInspectionPhotoFile } from "@/lib/inspection-storage";
 
@@ -39,15 +40,28 @@ export async function GET(request: Request, { params }: RouteContext) {
       );
     }
 
-    // Branch authorization check
-    if (sessionUser.systemRole !== "ADMIN" && sessionUser.scope !== "HO") {
-      const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
-      if (clean(sessionUser.branch) !== clean(incident.branch)) {
-        return NextResponse.json(
-          { error: "Akses ditolak: Anda tidak memiliki akses ke laporan cabang ini." },
-          { status: 403 }
-        );
+    // Read access alone is not enough: the photo must belong to this incident.
+    if ((sessionUser.systemRole !== "ADMIN" && sessionUser.scope !== "HO" && !sessionUser.branch?.trim()) ||
+        !canViewReport(sessionUser, incident)) {
+      return NextResponse.json({ error: "Akses foto laporan ditolak." }, { status: 403 });
+    }
+
+    const prefix = "/api/incidents/" + encodeURIComponent(id) + "/inspection/evidence/";
+    const referencedPhotos = [
+      ...(incident.verification?.photos || []),
+      ...(incident.fieldPhotos || []),
+      ...(incident.verification?.evidenceDetails?.map(e => e.photoUrl) || []),
+    ];
+    const belongsToReport = referencedPhotos.some(url => {
+      if (typeof url !== "string" || !url.startsWith(prefix)) return false;
+      try {
+        return decodeURIComponent(url.slice(prefix.length)) === photoId;
+      } catch {
+        return false;
       }
+    });
+    if (!belongsToReport) {
+      return NextResponse.json({ error: "Foto tidak terdaftar sebagai bukti laporan ini." }, { status: 404 });
     }
 
     const file = await getInspectionPhotoFile(photoId);
@@ -63,7 +77,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       headers: {
         "Content-Type": file.mimeType,
         "Content-Length": file.fileSize.toString(),
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
       },
     });
