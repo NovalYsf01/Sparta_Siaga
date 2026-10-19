@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { canViewReport } from "@/lib/report-permissions";
+import { isEvidencePhotoLinked } from "@/lib/inspection-photo-access";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { getInspectionPhotoFile } from "@/lib/inspection-storage";
 
@@ -46,20 +47,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Akses foto laporan ditolak." }, { status: 403 });
     }
 
-    const prefix = "/api/incidents/" + encodeURIComponent(id) + "/inspection/evidence/";
-    const referencedPhotos = [
-      ...(incident.verification?.photos || []),
-      ...(incident.fieldPhotos || []),
-      ...(incident.verification?.evidenceDetails?.map(e => e.photoUrl) || []),
-    ];
-    const belongsToReport = referencedPhotos.some(url => {
-      if (typeof url !== "string" || !url.startsWith(prefix)) return false;
-      try {
-        return decodeURIComponent(url.slice(prefix.length)) === photoId;
-      } catch {
-        return false;
-      }
-    });
+    const belongsToReport = isEvidencePhotoLinked(incident, id, photoId);
     if (!belongsToReport) {
       return NextResponse.json({ error: "Foto tidak terdaftar sebagai bukti laporan ini." }, { status: 404 });
     }
