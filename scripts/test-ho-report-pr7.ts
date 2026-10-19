@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import React from "react";
+import sharp from "sharp";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { IncidentRecord } from "../types/incident";
 import type { UserContext } from "../lib/report-permissions";
@@ -11,6 +12,7 @@ import { canViewReport } from "../lib/report-permissions";
 import { isEvidencePhotoLinked } from "../lib/inspection-photo-access";
 import { getHoAttentionReasons, getReportTarget, isFinalPdfAvailable } from "../lib/ho-report-monitoring";
 import { generateMonitoringReportPdf } from "../lib/pdf-generator";
+import { appendInspectionEvidencePages } from "../lib/pdf-evidence-appendix";
 import { HoReportMonitoring } from "../components/reports/ho-report-monitoring";
 
 const reportA: IncidentRecord = {
@@ -68,4 +70,10 @@ const pdf = generateMonitoringReportPdf(reportB);
 assert.ok(pdf.subarray(0, 8).toString("latin1").startsWith("%PDF-1.4"), "PDF header");
 assert.ok(pdf.toString("latin1").includes("BUKAN DOKUMEN FINAL"), "Monitoring PDF must be non-final");
 assert.ok(pdf.toString("latin1").includes("TCK-B"), "Actual maintenance ticket must appear");
-console.log("HO PR #7 smoke tests PASS (render, tabs, status, PDF, branch/photo rules)");
+const samplePhoto = await sharp({
+  create: { width: 64, height: 48, channels: 3, background: { r: 35, g: 65, b: 95 } },
+}).png().toBuffer();
+const pdfWithEvidence = await appendInspectionEvidencePages(pdf, [{ buffer: samplePhoto }]);
+assert.ok(pdfWithEvidence.length > pdf.length, "Photo appendix increases PDF length");
+assert.ok(pdfWithEvidence.toString("latin1").includes("/Count 2"), "PDF document has evidence page");
+console.log("HO PR #7 smoke tests PASS (render, tabs, status, PDF, photo appendix and branch/photo rules)");
