@@ -5,6 +5,8 @@
  * Mendukung Laporan Awal (Initial) dan Laporan Akhir (Final - CLOSED).
  */
 
+import { formatReportDate, getHoAttentionReasons, getReportTarget, reportStatusLabel } from "@/lib/ho-report-monitoring";
+
 import {
   IncidentRecord,
   MilestoneRecord,
@@ -509,4 +511,88 @@ export function generateFinalReportPdf(report: IncidentRecord, milestones: Miles
   });
 
   return doc.build();
+}
+
+
+/**
+ * Current-state monitoring document for HO and authorized branch viewers.
+ * Not a final approval, sign-off, or proof that construction is completed.
+ */
+export function generateMonitoringReportPdf(report: IncidentRecord): Buffer {
+  const pdf = new SimplePdfDocument();
+  const navy: [number, number, number] = [0.07, 0.23, 0.43];
+  const muted: [number, number, number] = [0.34, 0.4, 0.47];
+  const ink: [number, number, number] = [0.13, 0.18, 0.25];
+  const printTime = new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB";
+  const target = getReportTarget(report);
+  const approval = report.verification?.bmApproval;
+  const issues = getHoAttentionReasons(report);
+
+  const value = (label: string, text: string | number | null | undefined, y: number) => {
+    pdf.addText(label + ":", 46, y, { font: "bold", size: 8.5, color: muted });
+    pdf.addText(truncate(String(text ?? "Belum tersedia"), 75), 174, y, { size: 8.5, color: ink });
+  };
+  const header = (title: string, y: number) => {
+    pdf.addRect(35, y - 5, 525, 25, { fillColor: [0.92, 0.95, 0.98] });
+    pdf.addText(title, 45, y + 4, { font: "bold", size: 10, color: navy });
+  };
+
+  pdf.addRect(35, 765, 525, 48, { fillColor: navy });
+  pdf.addText("SPARTA SIAGA - MONITORING LAPORAN", 48, 794, { font: "bold", size: 14, color: [1, 1, 1] });
+  pdf.addText("RINGKASAN MONITORING - BUKAN DOKUMEN FINAL", 48, 777, { size: 9.5, color: [0.91, 0.95, 1] });
+  pdf.addText("No. Laporan: " + truncate(report.id, 49), 42, 745, { font: "bold", size: 10, color: navy });
+  pdf.addText("Dicetak: " + printTime, 42, 728, { size: 8.5, color: muted });
+
+  header("I. IDENTITAS DAN STATUS LAPORAN", 692);
+  value("Lokasi", report.storeName, 671);
+  value("Cabang", report.branch, 654);
+  value("Kejadian", report.disasterType, 637);
+  value("Tanggal Laporan", formatReportDate(report.createdAt), 620);
+  value("Status Saat Ini", reportStatusLabel(report.status), 603);
+  value("PIC Operasional", report.primaryPicName || report.maintenanceTicket?.assignedTechnician, 586);
+  value("Target Selesai", target ? formatReportDate(target) : "Belum ditentukan", 569);
+  value("Progres Fisik", report.progress > 0 ? report.progress + "%" : "Belum ada progres tercatat", 552);
+
+  header("II. PEMERIKSAAN DAN PERSETUJUAN", 520);
+  value("Pemeriksa", report.verification?.confirmedBy || "Belum ada pemeriksaan", 499);
+  value("Kondisi", report.verification?.condition === "damaged" ? "Ada Kerusakan" :
+    report.verification?.condition === "safe" ? "Aman" :
+    report.verification?.condition === "uncertain" ? "Belum Pasti" : "Belum ditentukan", 482);
+  value("Catatan Inspeksi", report.verification?.notes || "-", 465);
+  value("Keputusan BnM", approval?.decision === "approved" ? "Kerusakan disetujui" :
+    approval?.decision === "safe" ? "Dinyatakan aman" :
+    approval?.decision === "rejected" ? "Ditolak" :
+    approval?.decision === "clarification_requested" ? "Perlu Klarifikasi" : "Belum diputuskan", 448);
+  value("Oleh / Tanggal", approval ?
+    (approval.decidedBy || "-") + " / " + formatReportDate(approval.decidedAt) : "-", 431);
+  value("Catatan BnM", approval?.decisionNotes || approval?.clarificationReason || approval?.rejectionReason || "-", 414);
+
+  header("III. KONDISI PEKERJAAN DAN PEMANTAUAN", 383);
+  value("ID Pekerjaan", report.maintenanceTicket?.ticketId || report.externalWorkId || "Belum tersedia", 362);
+  value("Deskripsi Pekerjaan", report.maintenanceTicket?.workDescription || "-", 345);
+  value("Update Terakhir", formatReportDate(report.updatedAt), 328);
+
+  header("IV. RIWAYAT AKTIVITAS TERBARU", 294);
+  const latest = (report.timeline || []).slice(-4);
+  if (latest.length === 0) {
+    pdf.addText("Belum ada aktivitas tambahan.", 45, 274, { size: 8.5, color: muted });
+  } else {
+    latest.forEach((event, i) => {
+      const y = 274 - i * 18;
+      pdf.addText(truncate((event.label || event.stage) + " | " + event.timestamp + " | " + event.actor, 97), 45, y, { size: 8.1, color: ink });
+    });
+  }
+
+  header("V. PERLU PERHATIAN (BERDASARKAN DATA TERKINI)", 185);
+  if (issues.length === 0) {
+    pdf.addText("Tidak ada kondisi khusus yang teridentifikasi oleh aturan monitoring.", 45, 165, { size: 8.5, color: muted });
+  } else {
+    issues.slice(0, 3).forEach((issue, i) => {
+      pdf.addText("- " + truncate(issue, 99), 45, 166 - i * 17, { size: 8.5, color: [0.63, 0.34, 0.06] });
+    });
+  }
+  pdf.addLine(35, 94, 560, 94, { strokeColor: [0.82, 0.85, 0.89], lineWidth: 0.6 });
+  pdf.addText("SPARTA SIAGA | RINGKASAN PEMANTAUAN INTERNAL | HALAMAN 1", 45, 79, { font: "bold", size: 8, color: navy });
+  pdf.addText("Bukan persetujuan, penutupan, maupun bukti penyelesaian pekerjaan.", 45, 65, { size: 8, color: muted });
+  return pdf.build();
 }

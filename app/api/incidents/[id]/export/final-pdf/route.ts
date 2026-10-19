@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { canViewReport } from "@/lib/report-permissions";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { getMilestones } from "@/lib/milestone-service";
 import { generateFinalReportPdf } from "@/lib/pdf-generator";
@@ -19,15 +20,10 @@ export async function GET(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
     }
 
-    // Branch authorization check
-    const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
-    if (sessionUser.scope !== "HO" && sessionUser.systemRole !== "ADMIN") {
-      if (sessionUser.branch && clean(sessionUser.branch) !== clean(report.branch)) {
-        return NextResponse.json(
-          { error: "Forbidden: Anda tidak berwenang mengunduh dokumen laporan cabang lain." },
-          { status: 403 }
-        );
-      }
+    // Deny unscoped branch accounts, and enforce the report's branch at the API boundary.
+    if ((sessionUser.scope !== "HO" && sessionUser.systemRole !== "ADMIN" && !sessionUser.branch?.trim()) ||
+        !canViewReport(sessionUser, report)) {
+      return NextResponse.json({ error: "Akses dokumen laporan ditolak." }, { status: 403 });
     }
 
     // Validation: Final PDF requires CLOSED / resolved status
@@ -50,7 +46,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="SPARTA_Laporan_Final_${id}.pdf"`,
-        "Cache-Control": "private, max-age=60",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (err) {

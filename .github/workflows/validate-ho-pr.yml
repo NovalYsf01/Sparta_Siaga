@@ -1,0 +1,30 @@
+name: Validate HO Report PR
+on:
+  push:
+    branches:
+      - feat/ho-report-monitoring-pdf-20261016
+  pull_request:
+    branches:
+      - main
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pnpm 11
+        run: npm install --global pnpm@11.28.3
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: HO reports, PDF, permissions and rendering smoke test
+        run: pnpm exec tsx scripts/test-ho-report-pr7.ts
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Production build
+        run: pnpm build
