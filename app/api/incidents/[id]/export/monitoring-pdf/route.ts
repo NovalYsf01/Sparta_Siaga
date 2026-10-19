@@ -22,7 +22,8 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     // Server-side permission checks, independent of hidden frontend controls.
-    if (!canViewReport(sessionUser, report)) {
+    if ((sessionUser.scope !== "HO" && sessionUser.systemRole !== "ADMIN" && !sessionUser.branch?.trim()) ||
+        !canViewReport(sessionUser, report)) {
       return NextResponse.json({ error: "Akses dokumen laporan ditolak." }, { status: 403 });
     }
 
@@ -31,6 +32,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     // is accepted, then the authenticated file is read from private storage.
     const photoCandidates = [
       ...(report.verification?.photos || []),
+      ...(report.verification?.evidenceDetails?.map(e => e.photoUrl) || []),
       ...(report.fieldPhotos || []),
     ];
     const evidencePrefix =
