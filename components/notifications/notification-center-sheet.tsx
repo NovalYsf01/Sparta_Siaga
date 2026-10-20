@@ -126,7 +126,7 @@ export function NotificationCenterSheet({
             picName: currentUser?.name || "Saya",
           },
         }));
-        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC otomatis.");
+        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC Penanggung Jawab.");
       } else if (res.status === 409) {
         toast.error("Laporan sudah diambil oleh petugas lain.");
       } else {

@@ -11,15 +11,14 @@ export async function GET(request: Request) {
   const values: unknown[] = [];
   const where: string[] = [];
   const add = (value: unknown) => { values.push(value); return `$${values.length}`; };
-  if (user.systemRole !== "ADMIN" && user.scope !== "HO") {
-    where.push(`branch_id = ${add(user.branch)}`);
-  }
+  // All authenticated internal users with Maps permission may view national DC locations
+  // and non-sensitive facility information. Branch filtering is only applied if explicitly requested.
   const type = url.searchParams.get("type");
   const branch = url.searchParams.get("branch");
   const status = url.searchParams.get("status");
   const mapping = url.searchParams.get("mapping");
   if (type) where.push(`facility_type = ${add(type)}`);
-  if (branch && (user.systemRole === "ADMIN" || user.scope === "HO")) where.push(`branch_id = ${add(branch)}`);
+  if (branch) where.push(`branch_id = ${add(branch)}`);
   if (status) where.push(`operational_status = ${add(status)}`);
   if (mapping === "mapped") where.push("branch_id IS NOT NULL AND mapping_verified_at IS NOT NULL");
   if (mapping === "unmapped") where.push("(branch_id IS NULL OR mapping_verified_at IS NULL)");

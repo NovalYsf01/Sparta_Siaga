@@ -8,6 +8,12 @@ export interface PetabencanaReport {
   depth?: number | null;
   imageUrl?: string;
   timestamp: string;
+  source: string;
+  locationName?: string;
+  description?: string;
+  verificationStatus?: string;
+  geometryType: "Point" | "Polygon";
+  polygonCoordinates?: [number, number][];
 }
 
 export interface PetabencanaResult {
@@ -15,59 +21,137 @@ export interface PetabencanaResult {
   health: SourceHealth;
 }
 
+function parseGeometryItem(item: any): PetabencanaReport | null {
+  const props = item.properties || {};
+  if (props.disaster_type && props.disaster_type !== "flood") {
+    return null;
+  }
+
+  const rawId = String(props.pkey || props.id || "");
+  if (!rawId) return null;
+
+  let lat = 0;
+  let lng = 0;
+  let geometryType: "Point" | "Polygon" = "Point";
+  let polygonCoordinates: [number, number][] | undefined = undefined;
+
+  const geomType = item.type || item.geometry?.type || "Point";
+
+  if (geomType === "Point") {
+    const rawCoords = item.coordinates || item.geometry?.coordinates;
+    if (!Array.isArray(rawCoords) || rawCoords.length < 2) return null;
+
+    let c0 = Number(rawCoords[0]);
+    let c1 = Number(rawCoords[1]);
+    if (isNaN(c0) || isNaN(c1)) return null;
+
+    // GeoJSON standard: [lng, lat]
+    // Indonesia bounds: lat [-12, 7], lng [94, 142]
+    if (c0 >= -15 && c0 <= 15 && c1 >= 90 && c1 <= 150) {
+      // Coordinates were reversed [lat, lng]
+      lat = c0;
+      lng = c1;
+    } else {
+      lng = c0;
+      lat = c1;
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  } else if (geomType === "Polygon" || geomType === "MultiPolygon") {
+    geometryType = "Polygon";
+    const rings = geomType === "Polygon"
+      ? (item.coordinates || item.geometry?.coordinates || [])[0]
+      : (item.coordinates || item.geometry?.coordinates || [])[0]?.[0];
+
+    if (Array.isArray(rings) && rings.length >= 3) {
+      polygonCoordinates = rings.map((pt: any) => {
+        const c0 = Number(pt[0]);
+        const c1 = Number(pt[1]);
+        if (c0 >= -15 && c0 <= 15 && c1 >= 90 && c1 <= 150) {
+          return [c0, c1] as [number, number];
+        }
+        return [c1, c0] as [number, number];
+      });
+
+      // Centroid approximation
+      lat = polygonCoordinates.reduce((acc, c) => acc + c[0], 0) / polygonCoordinates.length;
+      lng = polygonCoordinates.reduce((acc, c) => acc + c[1], 0) / polygonCoordinates.length;
+    } else {
+      return null;
+    }
+  } else {
+    return null;
+  }
+
+  const cityName = props.tags?.city || props.tags?.instance_region_code || undefined;
+  const description = typeof props.text === "string" && props.text.trim().length > 0 ? props.text.trim() : undefined;
+  const imageUrl = typeof props.image_url === "string" && props.image_url.startsWith("http") ? props.image_url : undefined;
+
+  let verificationStatus: string | undefined = undefined;
+  if (props.status === "confirmed") {
+    verificationStatus = "Laporan Terverifikasi";
+  } else if (typeof props.status === "string" && props.status.trim().length > 0) {
+    verificationStatus = `Status: ${props.status.trim()}`;
+  }
+
+  const rawDepth = props.report_data?.flood_depth;
+  const depth = typeof rawDepth === "number" ? rawDepth : (rawDepth ? Number(rawDepth) : null);
+
+  return {
+    id: rawId,
+    lat,
+    lng,
+    title: props.title || (cityName ? `Laporan Banjir di ${cityName}` : "Laporan Banjir Lapangan (PetaBencana)"),
+    depth: isNaN(depth as any) ? null : depth,
+    imageUrl,
+    timestamp: props.created_at || new Date().toISOString(),
+    source: "PetaBencana",
+    locationName: cityName,
+    description,
+    verificationStatus,
+    geometryType,
+    polygonCoordinates,
+  };
+}
+
 export async function fetchPetabencanaReports(): Promise<PetabencanaResult> {
   const now = new Date().toISOString();
   try {
-    // We'll use a mocked fallback since Petabencana API structure might be complex
-    // Or we can try to fetch from their public API:
-    const res = await fetch("https://data.petabencana.id/reports", {
-      next: { revalidate: 300 },
-      headers: {
-        'Accept': 'application/json'
+    // Try 48-hour window first; if low count, fallback to 7 days for stable monitoring
+    const urls = [
+      "https://data.petabencana.id/reports?timeperiod=172800",
+      "https://data.petabencana.id/reports?timeperiod=604800",
+      "https://data.petabencana.id/reports",
+    ];
+
+    let items: any[] = [];
+
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          next: { revalidate: 300 },
+          headers: { Accept: "application/json" },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const geoms = data?.result?.objects?.output?.geometries || data?.result?.features || [];
+          if (Array.isArray(geoms) && geoms.length > 0) {
+            items = geoms;
+            break;
+          }
+        }
+      } catch {
+        // try next URL
       }
-    });
-    
-    if (!res.ok) {
-      throw new Error(`Petabencana API error: ${res.status}`);
     }
 
-    const data = await res.json();
     const reports: PetabencanaReport[] = [];
-    
-    // Petabencana returns TopoJSON format usually under result.objects.output.geometries
-    if (data?.result?.objects?.output?.geometries) {
-      for (const geom of data.result.objects.output.geometries) {
-        if (geom.properties && geom.properties.disaster_type === "flood") {
-          // In TopoJSON point geometries, coordinates might be direct
-          const coords = geom.coordinates || [0, 0];
-          reports.push({
-            id: geom.properties.pkey || Math.random().toString(),
-            lat: coords[1],
-            lng: coords[0],
-            title: geom.properties.title || "Laporan Banjir Lapangan (PetaBencana)",
-            depth: geom.properties.report_data?.flood_depth || null,
-            imageUrl: geom.properties.image_url,
-            timestamp: geom.properties.created_at || new Date().toISOString(),
-          });
-        }
-      }
-    } else if (data?.result?.features) {
-      // Fallback if it returns GeoJSON format directly
-      for (const feature of data.result.features) {
-        if (feature.properties && feature.properties.disaster_type === "flood") {
-          reports.push({
-            id: feature.properties.pkey || Math.random().toString(),
-            lat: feature.geometry.coordinates[1],
-            lng: feature.geometry.coordinates[0],
-            title: feature.properties.title || "Laporan Banjir Lapangan (PetaBencana)",
-            depth: feature.properties.report_data?.flood_depth || null,
-            imageUrl: feature.properties.image_url,
-            timestamp: feature.properties.created_at || new Date().toISOString(),
-          });
-        }
-      }
+    for (const item of items) {
+      const parsed = parseGeometryItem(item);
+      if (parsed) reports.push(parsed);
     }
-    
+
     return {
       reports,
       health: {
@@ -80,7 +164,6 @@ export async function fetchPetabencanaReports(): Promise<PetabencanaResult> {
     };
   } catch (error: any) {
     console.error("Petabencana fetch failed", error);
-    // Return empty array on failure but distinctly mark it as offline/unavailable
     return {
       reports: [],
       health: {

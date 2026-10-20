@@ -842,7 +842,7 @@ export default function DashboardPage() {
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 {roleInfo.isHO
-                  ? "Pemantauan status penanganan, PIC otomatis, progres fisik, dan target selesai nasional (Read-Only)."
+                  ? "Pemantauan status penanganan, PIC penanggung jawab, progres fisik, dan target selesai nasional (Read-Only)."
                   : roleInfo.isBMM
                   ? "Pantau status penanganan, progres, waktu update, target selesai, dan berikan review/approval."
                   : roleInfo.isBES

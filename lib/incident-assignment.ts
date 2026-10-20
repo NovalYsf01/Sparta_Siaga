@@ -5,26 +5,64 @@ export async function claimIncidentPic(input: {
   userId: string;
   branch: string | null;
   systemRole: string;
-}): Promise<{ claimed: boolean; currentPicUserId: string | null; status?: string; claimedAt?: string }> {
+  role?: string | null;
+}): Promise<{ claimed: boolean; currentPicUserId: string | null; status?: string; claimedAt?: string; error?: string }> {
   const client = await getDbPool().connect();
   try {
     await client.query("BEGIN");
-    const values: unknown[] = [input.incidentId, input.userId];
+    const values: unknown[] = [input.incidentId];
     let branchClause = "";
     if (input.systemRole !== "ADMIN") {
       values.push(input.branch);
       branchClause = ` AND branch = $${values.length}`;
     }
+
+    const checkRes = await client.query<{ primary_pic_user_id: string | null; location_kind: string | null; tkp_type: string | null; status: string }>(
+      `SELECT primary_pic_user_id, location_kind, tkp_type, status FROM incidents WHERE id = $1${branchClause} FOR UPDATE`,
+      values
+    );
+
+    if (!checkRes.rows[0]) {
+      await client.query("COMMIT");
+      return { claimed: false, currentPicUserId: null, error: "INCIDENT_NOT_FOUND" };
+    }
+
+    const row = checkRes.rows[0];
+
+    // Check role eligibility if not ADMIN
+    if (input.systemRole !== "ADMIN" && input.role) {
+      const isFacility = row.location_kind === "FACILITY" || row.tkp_type === "dc";
+      if (input.role === "bms" && isFacility) {
+        await client.query("COMMIT");
+        return { claimed: false, currentPicUserId: row.primary_pic_user_id, error: "BMS_STORE_ONLY" };
+      }
+      if (input.role === "bes" && !isFacility) {
+        await client.query("COMMIT");
+        return { claimed: false, currentPicUserId: row.primary_pic_user_id, error: "BES_FACILITY_ONLY" };
+      }
+    }
+
+    // Check if already claimed
+    if (row.primary_pic_user_id) {
+      await client.query("COMMIT");
+      return {
+        claimed: false,
+        currentPicUserId: row.primary_pic_user_id,
+        status: row.status,
+      };
+    }
+
     const result = await client.query<{ primary_pic_user_id: string; status: string; primary_pic_claimed_at: string }>(
       `UPDATE incidents
           SET primary_pic_user_id = $2,
               primary_pic_claimed_at = NOW(),
               status = CASE WHEN status IN ('pending_confirmation', 'verifying', 'confirmed_affected') THEN 'investigating' ELSE status END,
               updated_at = NOW()
-        WHERE id = $1 AND primary_pic_user_id IS NULL${branchClause}
+        WHERE id = $1 AND primary_pic_user_id IS NULL
         RETURNING primary_pic_user_id, status, primary_pic_claimed_at`,
-      values
+      [input.incidentId, input.userId]
     );
+
     if (result.rows[0]) {
       await client.query(
         `INSERT INTO incident_pic_history
@@ -40,15 +78,11 @@ export async function claimIncidentPic(input: {
         claimedAt: result.rows[0].primary_pic_claimed_at,
       };
     }
-    const current = await client.query<{ primary_pic_user_id: string | null; status: string }>(
-      `SELECT primary_pic_user_id, status FROM incidents WHERE id = $1${branchClause}`,
-      input.systemRole === "ADMIN" ? [input.incidentId] : [input.incidentId, input.userId, input.branch]
-    );
+
     await client.query("COMMIT");
     return {
       claimed: false,
-      currentPicUserId: current.rows[0]?.primary_pic_user_id ?? null,
-      status: current.rows[0]?.status,
+      currentPicUserId: null,
     };
   } catch (error) {
     await client.query("ROLLBACK");

@@ -25,6 +25,7 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     primaryPicName: (row.primary_pic_name as string) ?? undefined,
     status: row.status as IncidentRecord["status"],
     progress: row.progress as number,
+    completionApprovalStatus: (row.completion_approval_status as string) ?? undefined,
     disasterMetadata: (row.disaster_metadata as IncidentRecord["disasterMetadata"]) ?? undefined,
     affectedStores: (row.affected_stores as IncidentRecord["affectedStores"]) ?? undefined,
     affectedStoreCount: (row.affected_store_count as number) ?? undefined,
@@ -60,9 +61,11 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
 export async function dbGetAllIncidents(): Promise<IncidentRecord[]> {
   const pool = getDbPool();
   const { rows } = await pool.query(
-    `SELECT i.*, u.name AS primary_pic_name
+    `SELECT i.*, u.name AS primary_pic_name,
+            ca.status AS completion_approval_status
      FROM incidents i
      LEFT JOIN users u ON u.id = i.primary_pic_user_id
+     LEFT JOIN report_completion_approvals ca ON ca.report_id = i.id
      WHERE i.id NOT LIKE 'INC-TEST-%'
      ORDER BY i.created_at DESC`
   );
@@ -74,9 +77,11 @@ export async function dbGetIncidentById(
 ): Promise<IncidentRecord | null> {
   const pool = getDbPool();
   const { rows } = await pool.query(
-    `SELECT i.*, u.name AS primary_pic_name
+    `SELECT i.*, u.name AS primary_pic_name,
+            ca.status AS completion_approval_status
      FROM incidents i
      LEFT JOIN users u ON u.id = i.primary_pic_user_id
+     LEFT JOIN report_completion_approvals ca ON ca.report_id = i.id
      WHERE i.id = $1`,
     [id]
   );

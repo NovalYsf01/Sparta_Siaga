@@ -225,7 +225,7 @@ export function LocationListSheet({
                       </div>
 
                       <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 dark:text-slate-400 flex-wrap">
-                        <span>Cabang {loc.cabang || "-"}</span>
+                        <span>{loc.cabang === "Belum dipetakan" ? "Belum dipetakan ke cabang" : `Cabang ${loc.cabang || "-"}`}</span>
                         {loc.distanceFromDisasterKm !== undefined && (
                           <>
                             <span>•</span>
@@ -236,6 +236,11 @@ export function LocationListSheet({
 
                       {/* Status Badges */}
                       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                        {isFacility && loc.cabang === "Belum dipetakan" && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                            Perlu Pemetaan Cabang
+                          </span>
+                        )}
                         {isPriority && (
                           <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 text-[10px] font-bold">
                             Radius Prioritas

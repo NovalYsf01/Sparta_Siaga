@@ -60,6 +60,9 @@ async function runVerification() {
     fieldPhotos: [],
     timeline: [],
     reportOrigin: "automatic_earthquake",
+    locationCity: "Jakarta",
+    createdAt: "2026-10-19T00:00:00Z",
+    updatedAt: "2026-10-19T00:00:00Z",
   };
 
   // Status: Pending confirmation -> MUST BE GATED
@@ -142,7 +145,7 @@ async function runVerification() {
       id: "ms_1",
       reportId: closedReport.id,
       stageOrder: 1,
-      stageKey: "spk_wo_released",
+      stageKey: "spk_issued" as any,
       stageName: "Penerbitan SPK / WO",
       targetProgress: 10,
       status: "SUBMITTED",

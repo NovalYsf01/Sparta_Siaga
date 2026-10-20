@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
+import { getStandardizedOperationalStatus } from "@/lib/operational-status";
 
 interface ActiveIncidentsTableProps {
   incidents: IncidentRecord[];
@@ -70,7 +71,7 @@ export function ActiveIncidentsTable({
       const res = await fetch(`/api/incidents/${incId}/pic`, { method: "POST" });
       const data = await res.json();
       if (res.ok && data.claimed) {
-        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC otomatis.");
+        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC penanggung jawab.");
         onClaimSuccess?.();
       } else if (res.status === 409) {
         toast.error("Laporan sudah diambil oleh petugas lain.");
@@ -172,17 +173,7 @@ export function ActiveIncidentsTable({
   };
 
   const getHandlingStatus = (inc: IncidentRecord) => {
-    const st = (inc.status as string)?.toLowerCase();
-    if (st === "closed" || st === "resolved" || st === "confirmed_safe") {
-      return { label: "Selesai", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" };
-    }
-    if (st === "pending_bm_approval" || st === "pending_final_approval" || st === "awaiting_st" || st === "waiting_approval" || st === "verifying") {
-      return { label: "Menunggu Approval", color: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800" };
-    }
-    if (inc.primaryPicUserId || st === "in_maintenance" || st === "investigating" || st === "in_estimation" || (inc.progress ?? 0) > 0) {
-      return { label: "On Progress", color: "bg-blue-50 text-[#1D5AA6] dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800" };
-    }
-    return { label: "Belum Ditangani", color: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800" };
+    return getStandardizedOperationalStatus(inc);
   };
 
   const getProgressBarColor = (progress: number) => {
@@ -318,7 +309,7 @@ export function ActiveIncidentsTable({
               <th className="px-4 py-3">Lokasi & Cabang</th>
               <th className="px-4 py-3">Kejadian</th>
               <th className="px-4 py-3">Status Penanganan</th>
-              <th className="px-4 py-3">PIC Otomatis</th>
+              <th className="px-4 py-3">PIC Penanggung Jawab</th>
               <th className="px-4 py-3 min-w-[120px]">Progres Fisik</th>
               <th className="px-4 py-3">Target Selesai</th>
               {!hideAction && (
@@ -508,7 +499,7 @@ export function ActiveIncidentsTable({
 
                 <div className="grid grid-cols-2 gap-2 text-[11px] p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
                   <div>
-                    <span className="text-slate-400 text-[10px] block">PIC Otomatis:</span>
+                    <span className="text-slate-400 text-[10px] block">PIC Penanggung Jawab:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">{picName}</span>
                   </div>
                   <div>

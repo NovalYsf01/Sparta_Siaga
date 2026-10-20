@@ -277,6 +277,7 @@ export interface IncidentRecord {
   // === Status & Progress ===
   status: IncidentStatus;
   progress: number;
+  completionApprovalStatus?: string;
 
   // === Metadata Bencana ===
   disasterMetadata?: {

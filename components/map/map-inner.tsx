@@ -60,6 +60,12 @@ function MapFlyController({
     }
   }, [target, map]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__SPARTA_MAP__ = map;
+    }
+  }, [map]);
+
   return null;
 }
 
@@ -326,6 +332,201 @@ function ClusterMarkerItem({
           {cluster.count} Toko, klik untuk memperbesar
         </div>
       </Tooltip>
+    </Marker>
+  );
+}
+
+function formatWIBTime(iso: string) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return (
+      d.toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }).replace(/\./g, ":") + " WIB"
+    );
+  } catch {
+    return iso;
+  }
+}
+
+function FloodMarkerAndPopup({
+  report,
+  isDark,
+}: {
+  report: any;
+  isDark: boolean;
+}) {
+  const map = useMap();
+
+  const floodIcon = useMemo(() => {
+    return L.divIcon({
+      className: "custom-div-icon",
+      html: `
+        <div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 border-2 border-white shadow-lg z-50">
+          <span class="text-[11px]">🌊</span>
+        </div>
+      `,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+      popupAnchor: [0, -16],
+    });
+  }, []);
+
+  const isPolygon =
+    report.geometryType === "Polygon" &&
+    Array.isArray(report.polygonCoordinates) &&
+    report.polygonCoordinates.length >= 3;
+
+  const actionLabel = isPolygon ? "Fokus ke Area Genangan" : "Lihat Lokasi di Peta";
+
+  const handleNavigate = () => {
+    if (isPolygon) {
+      const bounds = L.latLngBounds(report.polygonCoordinates);
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+    } else {
+      map.flyTo([report.lat, report.lng], 15, { animate: true, duration: 1.2 });
+    }
+  };
+
+  const reportIdDisplay =
+    report.id && report.id.length > 8
+      ? "PB-" + report.id.substring(0, 4).toUpperCase()
+      : report.id;
+
+  return (
+    <Marker
+      position={[report.lat, report.lng]}
+      icon={floodIcon}
+      eventHandlers={{
+        click: (e) => {
+          e.target.openPopup();
+        },
+      }}
+    >
+      <Popup
+        className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}
+        maxWidth={320}
+      >
+        <div
+          className={`p-3 rounded-xl border w-72 space-y-2.5 text-xs transition-colors ${
+            isDark
+              ? "bg-slate-900 text-white border-slate-700 shadow-2xl"
+              : "bg-white text-slate-900 border-slate-200 shadow-xl"
+          }`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+              {reportIdDisplay}
+            </span>
+            {report.verificationStatus ? (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-600 text-white">
+                {report.verificationStatus}
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-600 text-white">
+                Laporan Warga
+              </span>
+            )}
+          </div>
+
+          {/* Title */}
+          <h3 className={`font-bold text-sm leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
+            {report.title || "Laporan Banjir Lapangan (PetaBencana)"}
+          </h3>
+
+          {/* Reported Depth - Accurately labeled community report */}
+          {report.depth != null && (
+            <div
+              className={`p-2 rounded-lg border text-xs ${
+                isDark
+                  ? "bg-blue-950/40 border-blue-800/60 text-blue-100"
+                  : "bg-blue-50/80 border-blue-200 text-blue-900"
+              }`}
+            >
+              <span className="block text-[10px] font-medium opacity-80 mb-0.5">
+                Ketinggian Air (Laporan Warga):
+              </span>
+              <strong className="text-sm font-bold text-red-600 dark:text-red-400">
+                {report.depth} cm
+              </strong>
+            </div>
+          )}
+
+          {/* Citizen Description / Text if provided */}
+          {report.description && (
+            <div
+              className={`p-2 rounded-lg border text-[11px] leading-relaxed ${
+                isDark
+                  ? "bg-slate-800/60 border-slate-700/60 text-slate-300"
+                  : "bg-slate-50 border-slate-200 text-slate-700"
+              }`}
+            >
+              <span className="block text-[10px] font-semibold text-slate-400 mb-0.5">
+                Catatan Lapangan:
+              </span>
+              <p className="line-clamp-3">{report.description}</p>
+            </div>
+          )}
+
+          {/* Photo if provided by API */}
+          {report.imageUrl && (
+            <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700">
+              <img
+                src={report.imageUrl}
+                alt="Foto Laporan Lapangan"
+                className="w-full h-28 object-cover hover:scale-105 transition-transform duration-300"
+                loading="lazy"
+              />
+            </div>
+          )}
+
+          {/* Metadata */}
+          <div
+            className={`text-[11px] space-y-1 pt-1.5 border-t ${
+              isDark ? "border-slate-800 text-slate-400" : "border-slate-100 text-slate-500"
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <span>Sumber:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {report.source || "PetaBencana"}
+              </span>
+            </div>
+            {report.locationName && (
+              <div className="flex justify-between items-center">
+                <span>Wilayah:</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {report.locationName}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center">
+              <span>Waktu:</span>
+              <span className="font-mono text-[10px] text-slate-700 dark:text-slate-300">
+                {formatWIBTime(report.timestamp)}
+              </span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            type="button"
+            onClick={handleNavigate}
+            className="w-full mt-2 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+          >
+            <span>{actionLabel}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </Popup>
     </Marker>
   );
 }
@@ -722,8 +923,11 @@ export default function MapInner({
             <Tooltip direction="top" offset={[0, -18]} opacity={0.95}>
               <div className="px-1 text-xs text-slate-900">
                 <span className="font-bold text-blue-700">DC {dc.kode_toko}</span>
-                <div>{dc.nama_toko}</div>
-                <span className="text-[10px] text-slate-500">Klik untuk melihat detail DC</span>
+                <div className="font-medium">{dc.nama_toko}</div>
+                <div className="text-[10px] text-slate-500">
+                  {dc.cabang === "Belum dipetakan" ? "Belum dipetakan ke cabang" : `Cabang ${dc.cabang}`}
+                </div>
+                <span className="text-[10px] text-blue-600 font-medium block mt-0.5">Klik untuk melihat detail DC</span>
               </div>
             </Tooltip>
           </Marker>
@@ -842,7 +1046,10 @@ export default function MapInner({
                 position={[store.latitude, store.longitude]}
                 icon={createStoreIcon(store, isSelected)}
                 eventHandlers={{
-                  click: () => onSelectStore(store),
+                  click: (e) => {
+                    onSelectStore(store);
+                    e.target.openPopup();
+                  },
                 }}
               >
                 <Tooltip direction="top" offset={[0, -18]} opacity={0.95}>
@@ -990,7 +1197,7 @@ export default function MapInner({
                       onClick={() => onSelectStore(store)}
                       className="w-full mt-2 py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors"
                     >
-                      <span>Detail & Aksi Laporan</span>
+                      <span>Lihat Detail</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
@@ -1001,68 +1208,9 @@ export default function MapInner({
 
         {/* 4. RENDER FLOOD REPORTS */}
         {(activeLayer === "all" || activeLayer === "weather" || activeLayer === "flood") &&
-          floodReports?.map((report) => {
-            const floodIcon = L.divIcon({
-              className: "custom-div-icon",
-              html: `
-                <div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 border-2 border-white shadow-lg z-50 pulse-beacon">
-                  <span class="text-[10px]">🌊</span>
-                </div>
-              `,
-              iconSize: [32, 32],
-              iconAnchor: [16, 16],
-            });
-
-            return (
-              <React.Fragment key={report.id}>
-                <Marker position={[report.lat, report.lng]} icon={floodIcon}>
-                  <Popup className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}>
-                    <div className={`p-3 rounded-xl border w-68 space-y-2 text-xs transition-colors ${
-                      isDark ? "bg-slate-900 text-white border-slate-700 shadow-2xl" : "bg-white text-slate-900 border-slate-200 shadow-xl"
-                    }`}>
-                      <div className="flex items-center justify-between">
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-600/20 text-blue-500 dark:text-blue-400 border border-blue-500/30">
-                          {report.id.length > 8 ? "PB-" + report.id.substring(0, 4).toUpperCase() : report.id}
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white animate-pulse">
-                          Laporan Lapangan
-                        </span>
-                      </div>
-
-                      <h3 className={`font-bold text-sm leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
-                        {report.title}
-                      </h3>
-
-                      <div className={`p-1.5 rounded border text-[11px] ${
-                        isDark ? "bg-blue-950/80 border-blue-600/60 text-blue-200" : "bg-blue-50 border-blue-200 text-blue-900"
-                      }`}>
-                        <span className="block mb-0.5 opacity-80">Estimasi Ketinggian Air:</span>
-                        <strong className="text-red-500 font-bold text-sm">
-                          {report.depth != null ? `${report.depth} cm` : "Data ketinggian air tidak tersedia"}
-                        </strong>
-                      </div>
-
-                      <div className={`text-[10px] space-y-0.5 mt-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                        <p>Source: PetaBencana</p>
-                        <p>Waktu: {new Date(report.timestamp).toLocaleString("id-ID")}</p>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          const map = document.querySelector('.leaflet-container');
-                          if (map) (map as any)._leaflet_map?.flyTo([report.lat, report.lng], 15);
-                        }}
-                        className="w-full mt-2 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors"
-                      >
-                        <span>Fokus ke Area Genangan</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </Popup>
-                </Marker>
-              </React.Fragment>
-            );
-          })}
+          floodReports?.map((report) => (
+            <FloodMarkerAndPopup key={report.id} report={report} isDark={isDark} />
+          ))}
 
         {/* 5. EXPLICIT SELECTED STORE PIN (Always visible even in Crisis Focus Mode!) */}
         {selectedStore &&
@@ -1072,7 +1220,10 @@ export default function MapInner({
               position={[selectedStore.latitude, selectedStore.longitude]}
               icon={createStoreIcon(selectedStore, true)}
               eventHandlers={{
-                click: () => onSelectStore(selectedStore),
+                click: (e) => {
+                  onSelectStore(selectedStore);
+                  e.target.openPopup();
+                },
               }}
             >
               <Tooltip direction="top" offset={[0, -18]} opacity={0.98} permanent>
@@ -1129,7 +1280,7 @@ export default function MapInner({
                     onClick={() => onSelectStore(selectedStore)}
                     className="w-full mt-2 py-1.5 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center justify-center gap-1 transition-colors shadow-sm"
                   >
-                    <span>Buka Detail Gerai</span>
+                    <span>Lihat Detail</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

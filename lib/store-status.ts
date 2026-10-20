@@ -45,10 +45,12 @@ export function deriveStoreStatuses(
         operationalStatus = "IN_PROGRESS";
         break;
       case "awaiting_st":
+      case "pending_final_approval":
         operationalStatus = "WORK_COMPLETED";
         break;
       case "confirmed_safe":
       case "resolved":
+      case "closed":
       case "archived":
         operationalStatus = "RESOLVED";
         break;
@@ -81,3 +83,6 @@ export function deriveStoreStatuses(
 
   return { operationalStatus, visualStatus };
 }
+
+export { getStandardizedOperationalStatus } from "./operational-status";
+export type { OperationalStatusBadge } from "./operational-status";

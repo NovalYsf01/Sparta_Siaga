@@ -31,7 +31,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     userId: user.id,
     branch: user.branch,
     systemRole: user.systemRole,
+    role: user.role,
   });
+  if (result.error === "BMS_STORE_ONLY") {
+    return NextResponse.json({ error: "BMS hanya berwenang menangani insiden gerai toko" }, { status: 403 });
+  }
+  if (result.error === "BES_FACILITY_ONLY") {
+    return NextResponse.json({ error: "BES hanya berwenang menangani insiden fasilitas / DC" }, { status: 403 });
+  }
+  if (result.error === "INCIDENT_NOT_FOUND") {
+    return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
+  }
   return NextResponse.json(result, { status: result.claimed ? 200 : 409 });
 }
 

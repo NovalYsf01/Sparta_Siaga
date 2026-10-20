@@ -19,6 +19,7 @@ import { SelectReportModal } from "../incident/select-report-modal";
 import { EstimationModal } from "../incident/estimation-modal";
 import { ProgressUpdateModal } from "../incident/progress-update-modal";
 import { HoReportMonitoring } from "./ho-report-monitoring";
+import { getStandardizedOperationalStatus } from "@/lib/operational-status";
 
 const DISASTER_ID_MAP: Record<string, string> = {
   earthquake: "Gempa Bumi",
@@ -48,48 +49,7 @@ export function formatIndonesianDate(raw?: string): string {
 }
 
 export function getOperationalHandlingStatus(inc: IncidentRecord) {
-  const s = (inc.status as string)?.toLowerCase() || "";
-  const progress = Number(inc.progress ?? 0);
-
-  if (s === "resolved" || s === "closed" || s === "confirmed_safe") {
-    return {
-      label: "Selesai",
-      cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800",
-    };
-  }
-  if (s === "awaiting_st" || s === "pending_final_approval") {
-    return {
-      label: "Menunggu Approval ST",
-      cls: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800",
-    };
-  }
-  if (
-    s === "waiting_approval" ||
-    s === "verifying" ||
-    s === "pending_bm_approval" ||
-    s === "pending_confirmation"
-  ) {
-    return {
-      label: "Menunggu Approval",
-      cls: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800",
-    };
-  }
-  if (
-    inc.primaryPicUserId ||
-    s === "in_maintenance" ||
-    s === "investigating" ||
-    s === "in_estimation" ||
-    progress > 0
-  ) {
-    return {
-      label: "On Progress",
-      cls: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800",
-    };
-  }
-  return {
-    label: "Belum Ditangani",
-    cls: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800",
-  };
+  return getStandardizedOperationalStatus(inc);
 }
 
 export function getOriginBadge(inc: IncidentRecord) {
@@ -349,7 +309,7 @@ export function OperationalReportCenter({
                     <th className="px-4 py-3">Toko / Cabang</th>
                     <th className="px-4 py-3">Kejadian</th>
                     <th className="px-4 py-3">Status Penanganan</th>
-                    <th className="px-4 py-3">PIC Otomatis</th>
+                    <th className="px-4 py-3">PIC Penanggung Jawab</th>
                     <th className="px-4 py-3">Progres Fisik</th>
                     <th className="px-4 py-3">Target Selesai</th>
                     <th className="px-4 py-3">Aksi</th>
@@ -520,7 +480,7 @@ export function OperationalReportCenter({
 
                   <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
                     <div>
-                      <span className="text-slate-400 text-[10px] block">PIC Otomatis:</span>
+                      <span className="text-slate-400 text-[10px] block">PIC Penanggung Jawab:</span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">
                         {inc.primaryPicName || "Belum Ditugaskan"}
                       </span>
