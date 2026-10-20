@@ -290,9 +290,11 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
   doc.addText("III. HASIL PEMERIKSAAN KONDISI LAPANGAN (BMS / BES)", 45, 480, { font: "bold", size: 9.5, color: [1, 1, 1] });
 
   const ver = report.verification;
-  const inspector = truncate(ver?.confirmedBy || "Belum Diverifikasi", 24);
+  const isAutoReport = report.reportOrigin === "automatic_earthquake";
+  const hasInspectionPhotos = Boolean((ver?.evidenceDetails?.length || 0) > 0 || (ver?.photos?.length || 0) > 0);
+  const inspector = truncate(ver?.confirmedBy || (isAutoReport ? "Menunggu Petugas Cabang" : "Belum Diverifikasi"), 24);
   const inspectTime = truncate(ver?.confirmedAt || "-", 24);
-  const condText = ver?.condition || (ver?.isDamaged === false ? "AMAN" : ver?.isDamaged === true ? "RUSAK / TERDAMPAK" : "MENUNGGU PEMERIKSAAN");
+  const condText = ver?.condition || (ver?.isDamaged === false ? "AMAN" : ver?.isDamaged === true ? "RUSAK / TERDAMPAK" : isAutoReport ? "MENUNGGU INSPEKSI FISIK" : "BELUM DIPERIKSA");
 
   doc.addText("Petugas Pemeriksa:", 45, 452, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
   doc.addText(inspector, 155, 452, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
@@ -300,14 +302,38 @@ export function generateInitialReportPdf(report: IncidentRecord): Buffer {
   doc.addText(inspectTime, 415, 452, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
   doc.addText("Status Kondisi Fisik:", 45, 432, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(condText, 155, 432, { font: "bold", size: 8.5, color: ver?.isDamaged === false ? [0.1, 0.55, 0.25] : [0.75, 0.15, 0.15] });
+  doc.addText(condText, 155, 432, {
+    font: "bold",
+    size: 8.5,
+    color: ver?.isDamaged === false ? [0.1, 0.55, 0.25] : ver?.isDamaged === true ? [0.75, 0.15, 0.15] : [0.65, 0.45, 0.05],
+  });
 
   doc.addText("Jumlah Bukti Foto:", 310, 432, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  doc.addText(`${ver?.evidenceDetails?.length || ver?.photos?.length || 0} berkas terverifikasi`, 415, 432, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
+  const photoCountText = hasInspectionPhotos
+    ? `${ver?.evidenceDetails?.length || ver?.photos?.length || 0} berkas terverifikasi`
+    : isAutoReport
+    ? "0 berkas (Menunggu inspeksi BMS/BES)"
+    : "0 berkas terlampir";
+  doc.addText(photoCountText, 415, 432, { font: "regular", size: 8.5, color: [0.1, 0.1, 0.1] });
 
   doc.addText("Catatan Pemeriksaan:", 45, 410, { font: "bold", size: 8.5, color: [0.25, 0.3, 0.35] });
-  const inspectNotes = truncate(ver?.notes || "Tidak ada catatan tambahan.", 80);
-  doc.addText(inspectNotes, 45, 395, { font: "regular", size: 8.5, color: [0.2, 0.2, 0.2] });
+  let inspectNotes = truncate(ver?.notes, 80);
+  let isWarning = false;
+  if (!ver || !ver.confirmedBy) {
+    if (isAutoReport) {
+      inspectNotes = "PERINGATAN: Laporan otomatis sistem. Bukti fisik inspeksi belum tersedia (menunggu kunjungan petugas).";
+      isWarning = true;
+    } else {
+      inspectNotes = "Laporan manual: Belum ada input pemeriksaan fisik oleh petugas BMS/BES cabang.";
+    }
+  } else if (!inspectNotes || inspectNotes === "-") {
+    inspectNotes = "Tidak ada catatan tambahan pemeriksaan fisik.";
+  }
+  doc.addText(inspectNotes, 45, 395, {
+    font: isWarning ? "bold" : "regular",
+    size: 8,
+    color: isWarning ? [0.7, 0.18, 0.1] : [0.2, 0.2, 0.2],
+  });
 
   // 6. Section IV: Status Persetujuan Awal BnM Manajer
   doc.addRect(35, 235, 525, 120, { fillColor: [1, 1, 1], strokeColor: [0.85, 0.88, 0.92] });

@@ -5,6 +5,7 @@ import { canViewReportAsync } from "@/lib/permission-service";
 import {
   getMilestones,
   submitMilestoneDocument,
+  checkOperationalProgressGating,
 } from "@/lib/milestone-service";
 import { MilestoneKey, MILESTONE_CONFIG } from "@/types/incident";
 
@@ -34,6 +35,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     const milestones = await getMilestones(id);
     const activeIndex = milestones.findIndex((m) => m.status !== "SUBMITTED");
     const activeMilestone = activeIndex !== -1 ? milestones[activeIndex] : null;
+    const gating = await checkOperationalProgressGating(incident);
 
     return NextResponse.json({
       data: {
@@ -43,6 +45,11 @@ export async function GET(request: Request, { params }: RouteContext) {
         milestones,
         activeMilestone,
         isCompleted: milestones.every((m) => m.status === "SUBMITTED"),
+        isProgressGated: gating.isProgressGated,
+        gatingReason: gating.gatingReason,
+        nextRequiredAction: gating.nextRequiredAction,
+        workStatus: gating.workStatus,
+        estimationStatus: gating.estimationStatus,
       },
     });
   } catch (err: unknown) {
@@ -62,6 +69,24 @@ export async function POST(request: Request, { params }: RouteContext) {
     }
 
     const { id } = await params;
+    const incident = await dbGetIncidentById(id);
+    if (!incident) {
+      return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
+    }
+
+    // Operational Progress Gating Guard
+    const gating = await checkOperationalProgressGating(incident);
+    if (gating.isProgressGated) {
+      return NextResponse.json(
+        {
+          error: `Progres operasional terkunci. ${gating.gatingReason} ${gating.nextRequiredAction ? `Tindakan: ${gating.nextRequiredAction}` : ""}`.trim(),
+          code: "PROGRESS_GATED",
+          gatingReason: gating.gatingReason,
+          nextRequiredAction: gating.nextRequiredAction,
+        },
+        { status: 422 }
+      );
+    }
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
       return NextResponse.json(

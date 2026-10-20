@@ -346,13 +346,8 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     return allActive.filter((eq) => now - eq.timestamp <= maxAgeMs);
   }, [disasterData, mapTimeFilter]);
 
-  // Requirement 7: Contextual earthquakes for spatial risk calculation (Event Focus Mode vs all active)
-  const effectiveEarthquakesForRisk = useMemo(() => {
-    if (selectedEarthquake) {
-      return [selectedEarthquake];
-    }
-    return timeFilteredEarthquakes;
-  }, [selectedEarthquake, timeFilteredEarthquakes]);
+  // Contextual earthquakes for spatial risk calculation across active time window (Requirement 2, 3 & 7)
+  const effectiveEarthquakesForRisk = timeFilteredEarthquakes;
 
   // Index incidents by store ID and affected stores for 2D operational status derivation (Requirement 9 & 10)
   const incidentByStoreCode = useMemo(() => {
@@ -577,6 +572,61 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       setFlyToTarget({ lat: store.latitude, lng: store.longitude, zoom: 15 });
     }
   };
+
+  const handleFlyToLocation = useCallback(async (loc: {
+    kode_toko?: string;
+    nama_toko?: string;
+    cabang?: string;
+    latitude?: number;
+    longitude?: number;
+    isFacility?: boolean;
+  }) => {
+    setIsNotificationCenterOpen(false);
+
+    // 1. Try to find store/facility from computedStores or rawStores
+    let targetStore = computedStores.find((s) => {
+      if (loc.kode_toko && s.id?.toLowerCase() === loc.kode_toko.toLowerCase()) return true;
+      if (loc.nama_toko && s.nama_toko?.toLowerCase() === loc.nama_toko.toLowerCase()) return true;
+      return false;
+    });
+
+    let lat = targetStore?.latitude ?? loc.latitude;
+    let lng = targetStore?.longitude ?? loc.longitude;
+
+    // 2. If not found and is DC/Facility or missing coordinates, try querying search API
+    if ((!lat || !lng || isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) && (loc.isFacility || loc.nama_toko)) {
+      try {
+        const queryTerm = loc.nama_toko || (loc.cabang ? `DC ${loc.cabang}` : "");
+        if (queryTerm) {
+          const res = await fetch(`/api/stores/search?q=${encodeURIComponent(queryTerm)}&type=${loc.isFacility ? "dc" : "all"}`);
+          if (res.ok) {
+            const data = await res.json();
+            const found = (data.stores || data.data || [])[0];
+            if (found && found.latitude && found.longitude) {
+              lat = found.latitude;
+              lng = found.longitude;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[Layout] Failed to query facility coordinates:", err);
+      }
+    }
+
+    if (!lat || !lng || isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      toast.warning(`Koordinat untuk lokasi ${loc.nama_toko || loc.kode_toko || "terpilih"} tidak tersedia di master data.`);
+      return;
+    }
+
+    router.push("/monitoring");
+
+    if (targetStore) {
+      setSelectedStore(targetStore);
+      setFlyToTarget({ lat: targetStore.latitude, lng: targetStore.longitude, zoom: 16 });
+    } else {
+      setFlyToTarget({ lat, lng, zoom: 16 });
+    }
+  }, [computedStores, router]);
 
   const handleFocusDisaster = (eqOrLat: Earthquake | number, maybeLng?: number) => {
     setIncidentOnly(true);
@@ -867,6 +917,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         theme={theme}
         activeIncidents={incidents}
         onFlyToIncident={handleFlyToIncident}
+        onFlyToLocation={handleFlyToLocation}
         onOpenReport={handleSelectIncidentForDetail}
         userRole={activeRole}
         userBranch={monitoredBranch}

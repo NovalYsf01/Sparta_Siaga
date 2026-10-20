@@ -27,36 +27,100 @@ export async function GET(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Akses dokumen laporan ditolak." }, { status: 403 });
     }
 
-    // Include the actual private inspection photos as PDF appendix pages.
-    // Never fetch arbitrary URLs: only the exact evidence endpoint of this report
-    // is accepted, then the authenticated file is read from private storage.
-    const photoCandidates = [
-      ...(report.verification?.photos || []),
-      ...(report.verification?.evidenceDetails?.map(e => e.photoUrl) || []),
-      ...(report.fieldPhotos || []),
-    ];
+    // Collect all valid initial evidence photos from fieldPhotos and verification
+    // Do NOT mix subsequent work/milestone photos into initial evidence
+    interface PhotoItem {
+      url: string;
+      label?: string;
+      subtitle?: string;
+    }
+
+    const photoItems: PhotoItem[] = [];
+
+    // 1. Initial field photos (from reporter)
+    if (report.fieldPhotos && Array.isArray(report.fieldPhotos)) {
+      report.fieldPhotos.forEach((item, idx) => {
+        if (!item) return;
+        if (typeof item === "string") {
+          photoItems.push({
+            url: item,
+            label: `Bukti Visual Awal Lapangan #${idx + 1}`,
+            subtitle: `Lampiran foto yang diunggah pada saat pelaporan kejadian`,
+          });
+        } else if (typeof item === "object" && item.url) {
+          const srcText = item.source === "gallery" ? "Unggahan Galeri HP" : "Foto Kamera Langsung";
+          const reasonText = item.galleryReason ? ` • Alasan: ${item.galleryReason}` : "";
+          const provText = item.sourceProvider ? ` • Dari: ${item.sourceProvider}` : "";
+          const timeText = item.capturedAt ? ` • Waktu: ${item.capturedAt}` : "";
+          photoItems.push({
+            url: item.url,
+            label: item.slotLabel || `Bukti Awal Pelapor #${idx + 1}`,
+            subtitle: `Sumber: ${srcText}${reasonText}${provText}${timeText}`,
+          });
+        }
+      });
+    }
+
+    // 2. Inspection verification photos (from BMS/BES inspection)
+    if (report.verification?.evidenceDetails && Array.isArray(report.verification.evidenceDetails)) {
+      report.verification.evidenceDetails.forEach((ev, idx) => {
+        if (ev?.photoUrl) {
+          photoItems.push({
+            url: ev.photoUrl,
+            label: ev.caption || `Pemeriksaan Fisik Cabang #${idx + 1}`,
+            subtitle: `Petugas: ${report.verification?.confirmedBy || "BMS/BES"} • Kondisi: ${report.verification?.isDamaged ? "Rusak / Terdampak" : "Aman"}`,
+          });
+        }
+      });
+    } else if (report.verification?.photos && Array.isArray(report.verification.photos)) {
+      report.verification.photos.forEach((url, idx) => {
+        if (url) {
+          photoItems.push({
+            url,
+            label: `Pemeriksaan Fisik Cabang #${idx + 1}`,
+            subtitle: `Petugas: ${report.verification?.confirmedBy || "BMS/BES"}`,
+          });
+        }
+      });
+    }
+
     const evidencePrefix =
       "/api/incidents/" + encodeURIComponent(id) + "/inspection/evidence/";
+    const sanitizedReportId = id.replace(/[^a-zA-Z0-9_-]/g, "_");
     const photoIds = new Set<string>();
-    const evidence: Array<{ buffer: Buffer }> = [];
+    const evidence: Array<{ buffer: Buffer; label?: string; subtitle?: string }> = [];
 
-    for (const url of photoCandidates) {
-      if (evidence.length >= 6) break;
-      if (typeof url !== "string" || !url.startsWith(evidencePrefix)) continue;
-      let key: string;
-      try {
-        key = decodeURIComponent(url.slice(evidencePrefix.length));
-      } catch {
-        continue;
-      }
-      if (!/^wm_[a-zA-Z0-9_-]+_\d+_[a-z0-9]+\.(jpe?g|png|webp)$/i.test(key) ||
-          photoIds.has(key) || !key.includes(id)) {
-        continue;
-      }
-      const photo = await getInspectionPhotoFile(key);
-      if (photo) {
-        photoIds.add(key);
-        evidence.push({ buffer: photo.buffer });
+    for (const item of photoItems) {
+      if (evidence.length >= 15) break;
+      const url = item.url;
+      if (typeof url !== "string") continue;
+
+      if (url.startsWith(evidencePrefix)) {
+        let key: string;
+        try {
+          key = decodeURIComponent(url.slice(evidencePrefix.length));
+        } catch {
+          continue;
+        }
+        if (!/^wm_[a-zA-Z0-9_-]+_\d+_[a-z0-9]+\.(jpe?g|png|webp)$/i.test(key) ||
+            photoIds.has(key) || (!key.includes(id) && !key.includes(sanitizedReportId))) {
+          continue;
+        }
+        const photo = await getInspectionPhotoFile(key);
+        if (photo) {
+          photoIds.add(key);
+          evidence.push({ buffer: photo.buffer, label: item.label, subtitle: item.subtitle });
+        }
+      } else if (url.startsWith("data:image/")) {
+        const parts = url.split(",");
+        if (parts[1]) {
+          try {
+            const buf = Buffer.from(parts[1], "base64");
+            evidence.push({ buffer: buf, label: item.label, subtitle: item.subtitle });
+          } catch {
+            // ignore malformed base64
+          }
+        }
       }
     }
 

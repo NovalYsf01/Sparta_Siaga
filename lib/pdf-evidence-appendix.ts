@@ -8,9 +8,25 @@ import sharp from "sharp";
 export interface PdfEvidencePhoto {
   buffer: Buffer;
   label?: string;
+  subtitle?: string;
 }
 
-type JpegImage = { data: Buffer; width: number; height: number };
+type JpegImage = {
+  data: Buffer;
+  width: number;
+  height: number;
+  label?: string;
+  subtitle?: string;
+};
+
+function escapePdfText(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/[^\x20-\x7E]/g, " ");
+}
 
 export async function appendInspectionEvidencePages(
   originalPdf: Buffer,
@@ -29,21 +45,27 @@ export async function appendInspectionEvidencePages(
   }
 
   const prepared: JpegImage[] = [];
-  for (const photo of photos.slice(0, 6)) {
-    const jpeg = await sharp(photo.buffer, { failOn: "error" })
-      .rotate()
-      .flatten({ background: "#ffffff" })
-      .resize({ width: 1500, height: 1500, fit: "inside", withoutEnlargement: true })
-      .jpeg({ quality: 76 })
-      .toBuffer({ resolveWithObject: true });
-    if (!jpeg.info.width || !jpeg.info.height || !jpeg.data.length) {
-      throw new Error("Foto pemeriksaan gagal diproses menjadi gambar PDF.");
+  for (const photo of photos.slice(0, 25)) {
+    try {
+      const jpeg = await sharp(photo.buffer, { failOn: "none" })
+        .rotate()
+        .flatten({ background: "#ffffff" })
+        .resize({ width: 1500, height: 1500, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 78 })
+        .toBuffer({ resolveWithObject: true });
+      if (jpeg.info.width && jpeg.info.height && jpeg.data.length) {
+        prepared.push({
+          data: jpeg.data,
+          width: jpeg.info.width,
+          height: jpeg.info.height,
+          label: photo.label,
+          subtitle: photo.subtitle,
+        });
+      }
+    } catch (e) {
+      console.warn("[pdf-evidence-appendix] Skipping unprocessable photo buffer:", e);
+      continue;
     }
-    prepared.push({
-      data: jpeg.data,
-      width: jpeg.info.width,
-      height: jpeg.info.height,
-    });
   }
   if (!prepared.length) return originalPdf;
 
@@ -80,12 +102,12 @@ export async function appendInspectionEvidencePages(
     const imageId = 9 + i * 3;
 
     const widthLimit = 515;
-    const heightLimit = 690;
+    const heightLimit = 680;
     const ratio = Math.min(widthLimit / photo.width, heightLimit / photo.height);
     const width = photo.width * ratio;
     const height = photo.height * ratio;
     const x = (595.28 - width) / 2;
-    const y = 63 + (heightLimit - height) / 2;
+    const y = 60 + (heightLimit - height) / 2;
 
     const pageBody =
       "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] " +
@@ -94,13 +116,16 @@ export async function appendInspectionEvidencePages(
       "/XObject << /Im0 " + String(imageId) + " 0 R >> >> >>";
     appendObject(pageId, [ascii(pageBody)]);
 
+    const rawTitle = photo.label || `LAMPIRAN BUKTI FISIK - HALAMAN ${i + 1}`;
+    const rawSubtitle = photo.subtitle || "Dokumentasi verifikasi lapangan resmi SPARTA SIAGA";
+    const title = escapePdfText(rawTitle);
+    const subtitle = escapePdfText(rawSubtitle);
+
     const contentText =
-      "BT /F2 13 Tf 0.07 0.23 0.43 rg " +
-      "1 0 0 1 42 791 Tm " +
-      "(LAMPIRAN FOTO BUKTI PEMERIKSAAN - " + String(i + 1) + ") Tj ET\n" +
-      "BT /F1 9 Tf 0.35 0.40 0.46 rg " +
-      "1 0 0 1 42 775 Tm " +
-      "(Dokumentasi pemeriksaan lapangan SPARTA SIAGA) Tj ET\n" +
+      "BT /F2 12 Tf 0.07 0.23 0.43 rg " +
+      "1 0 0 1 42 795 Tm (" + title + ") Tj ET\n" +
+      "BT /F1 8.5 Tf 0.35 0.40 0.46 rg " +
+      "1 0 0 1 42 780 Tm (" + subtitle + ") Tj ET\n" +
       "q " + fmt(width) + " 0 0 " + fmt(height) + " " +
       fmt(x) + " " + fmt(y) + " cm /Im0 Do Q\n";
     const data = ascii(contentText);

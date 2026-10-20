@@ -109,3 +109,47 @@ export async function dbGetEarthquakeEventById(id: string): Promise<EarthquakeEv
     return null;
   }
 }
+
+/**
+ * Retrieve recent earthquakes from persistent database within the specified hours window (default 72h / 3 days).
+ */
+export async function dbGetRecentEarthquakeEvents(hours: number = 72): Promise<Earthquake[]> {
+  try {
+    const pool = getDbPool();
+    const { rows } = await pool.query(
+      `SELECT * FROM earthquake_events 
+       WHERE occurred_at >= NOW() - ($1 || ' hours')::interval
+       ORDER BY occurred_at DESC`,
+      [hours]
+    );
+    return rows.map((r) => {
+      const timestamp = new Date(r.occurred_at).getTime();
+      return {
+        id: r.id,
+        source: r.source_primary || "BMKG",
+        sourcePrimary: r.source_primary,
+        canonicalEventKey: r.id,
+        informationType: "official_event",
+        verificationStatus: (r.source_primary === "BMKG" ? "official" : "official_external") as any,
+        title: r.title,
+        magnitude: parseFloat(r.magnitude),
+        depth: `${r.depth_km} km`,
+        depthKm: r.depth_km,
+        latitude: parseFloat(r.latitude),
+        longitude: parseFloat(r.longitude),
+        time: new Date(r.occurred_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB",
+        timestamp,
+        potensiTsunami: Boolean(r.potensi_tsunami),
+        potensiText: r.potensi_text || undefined,
+        feltArea: r.felt_area || undefined,
+        shakemapUrl: r.shakemap_url || undefined,
+        isSignificant: parseFloat(r.magnitude) >= 5.5,
+        priorityRadiusKm: r.priority_radius_km || 50,
+        monitoringRadiusKm: r.monitoring_radius_km || 110,
+      };
+    });
+  } catch (err) {
+    console.warn("[Earthquake DB] Warning fetching recent earthquake events from DB:", err);
+    return [];
+  }
+}

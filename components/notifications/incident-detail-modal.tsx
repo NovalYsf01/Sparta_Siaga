@@ -8,10 +8,9 @@ import {
   MapPin,
   Building,
   Info,
-  ShieldCheck,
-  FileText,
+  AlertTriangle,
+  Layers,
 } from "lucide-react";
-import { toast } from "sonner";
 import { NotificationLog } from "@/types/notification";
 
 interface IncidentDetailModalProps {
@@ -19,6 +18,14 @@ interface IncidentDetailModalProps {
   onClose: () => void;
   incident: NotificationLog | null;
   onFlyToIncident?: (incident: NotificationLog) => void;
+  onFlyToLocation?: (loc: {
+    kode_toko?: string;
+    nama_toko?: string;
+    cabang?: string;
+    latitude?: number;
+    longitude?: number;
+    isFacility?: boolean;
+  }) => void;
   onOpenReport?: (report: any) => void;
   relatedReport?: any;
   theme?: "dark" | "light";
@@ -29,181 +36,111 @@ export function IncidentDetailModal({
   onClose,
   incident,
   onFlyToIncident,
-  onOpenReport,
-  relatedReport,
+  onFlyToLocation,
   theme = "dark",
 }: IncidentDetailModalProps) {
-  const [currentUser, setCurrentUser] = React.useState<{
-    id: string;
-    name: string;
-    role?: string;
-    businessRole?: string;
-    systemRole?: string;
-    branch?: string;
-  } | null>(null);
-  const [isClaiming, setIsClaiming] = React.useState(false);
-  const [claimedPic, setClaimedPic] = React.useState<{ userId: string; name: string } | null>(null);
-  const [claimedAtTime, setClaimedAtTime] = React.useState<string | null>(null);
-  const [targetDateInput, setTargetDateInput] = React.useState<string>("");
-  const [currentTargetDate, setCurrentTargetDate] = React.useState<string | null>(null);
-  const [isSavingTarget, setIsSavingTarget] = React.useState(false);
-  const [isEditingTarget, setIsEditingTarget] = React.useState(false);
-
-  React.useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setCurrentUser(data.user || data);
-      })
-      .catch(() => {});
-  }, []);
-
-  React.useEffect(() => {
-    if (relatedReport?.maintenanceTicket?.completedAt) {
-      setCurrentTargetDate(relatedReport.maintenanceTicket.completedAt);
-    } else {
-      setCurrentTargetDate(null);
-    }
-    if (relatedReport?.primaryPicClaimedAt) {
-      setClaimedAtTime(relatedReport.primaryPicClaimedAt);
-    }
-  }, [relatedReport]);
-
   if (!isOpen || !incident) return null;
 
   const isDark = theme === "dark";
   const isEarthquake = incident.disaster_type === "earthquake";
   const stores = incident.affected_stores_sample || [];
-  const totalStores = stores.length;
+  const totalStores = incident.affected_stores_count || stores.length;
 
-  const effectiveHasPic = Boolean(claimedPic || relatedReport?.primaryPicUserId);
-  const userRoleStr = (currentUser?.businessRole || currentUser?.role || "").toLowerCase();
-  const canClaim = currentUser?.systemRole === "ADMIN" || ["bms", "bes"].includes(userRoleStr);
-
-  const targetRaw = currentTargetDate || relatedReport?.maintenanceTicket?.completedAt;
-  const isOverdue = Boolean(
-    targetRaw &&
-      new Date(targetRaw) < new Date() &&
-      relatedReport?.status !== "closed" &&
-      relatedReport?.status !== "resolved" &&
-      relatedReport?.status !== "confirmed_safe"
+  const isSimulation = Boolean(
+    (incident as any).is_simulation ||
+      incident.title?.toUpperCase().includes("[SIMULASI]") ||
+      incident.ticket_number?.toUpperCase().startsWith("SIM")
   );
 
-  const handleClaimPic = async () => {
-    if (!relatedReport?.id) return;
-    setIsClaiming(true);
-    try {
-      const res = await fetch(`/api/incidents/${relatedReport.id}/pic`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (res.ok && data.claimed) {
-        setClaimedPic({
-          userId: currentUser?.id || "",
-          name: currentUser?.name || "Saya",
-        });
-        if (data.claimedAt) {
-          setClaimedAtTime(data.claimedAt);
-        }
-        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC otomatis.");
-      } else if (res.status === 409) {
-        toast.error("Laporan sudah diambil oleh petugas lain.");
-      } else {
-        toast.error(data.error || "Gagal mengambil tugas laporan.");
-      }
-    } catch {
-      toast.error("Gagal terhubung ke server.");
-    } finally {
-      setIsClaiming(false);
-    }
-  };
+  const formattedDateTime = incident.sent_at
+    ? new Date(incident.sent_at).toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }) +
+      " • " +
+      new Date(incident.sent_at).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }) +
+      " WIB"
+    : "Baru saja";
 
-  const handleSaveTargetDate = async () => {
-    if (!relatedReport?.id || !targetDateInput) return;
-    setIsSavingTarget(true);
-    try {
-      const res = await fetch(`/api/incidents/${relatedReport.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetCompletionDate: targetDateInput }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setCurrentTargetDate(new Date(targetDateInput).toISOString());
-        setIsEditingTarget(false);
-        toast.success("Estimasi target selesai berhasil disimpan.");
-      } else {
-        toast.error(data.error || "Gagal menyimpan estimasi target selesai.");
-      }
-    } catch {
-      toast.error("Gagal terhubung ke server.");
-    } finally {
-      setIsSavingTarget(false);
-    }
-  };
-
-  const handleFlyToMap = () => {
+  const handleFlyToMapAll = () => {
     onClose();
     if (onFlyToIncident) {
       onFlyToIncident(incident);
     }
   };
 
-  // Honest Delivery Status Mapping (Requirement 25)
-  const deliveryStatus = incident.delivery_status || "not_configured";
-  const deliveryBadge = (() => {
-    switch (deliveryStatus) {
-      case "sent":
-      case "delivered":
-        return { text: "Terkirim", class: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" };
-      case "pending":
-      case "queued":
-        return { text: "Menunggu Pengiriman", class: "bg-amber-500/10 text-amber-400 border-amber-500/20" };
-      case "failed":
-        return { text: "Gagal Dikirim", class: "bg-red-500/10 text-red-400 border-red-500/20" };
-      case "not_configured":
-      default:
-        return { text: "Provider Belum Terhubung", class: "bg-slate-500/10 text-slate-400 border-slate-500/20" };
+  const handleFlyToSingleLocation = (loc: {
+    kode_toko?: string;
+    nama_toko?: string;
+    cabang?: string;
+    latitude?: number;
+    longitude?: number;
+    isFacility?: boolean;
+  }) => {
+    onClose();
+    if (onFlyToLocation) {
+      onFlyToLocation(loc);
     }
-  })();
+  };
 
   return (
-    <div className="fixed inset-0 z-[850] bg-black/50 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-5 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[850] bg-black/60 backdrop-blur-sm flex flex-col justify-end sm:items-center sm:justify-center p-0 sm:p-5 animate-in fade-in duration-200">
       <div
-        className={`w-full max-w-2xl flex flex-col overflow-hidden transition-colors ${
+        className={`w-full max-w-3xl flex flex-col overflow-hidden transition-colors ${
           isDark
             ? "bg-slate-900 border-slate-800 text-slate-100"
             : "bg-white border-slate-200 text-slate-900"
-        } rounded-t-2xl sm:rounded-xl sm:border shadow-2xl h-[90vh] sm:h-auto sm:max-h-[85vh]`}
+        } rounded-t-2xl sm:rounded-2xl sm:border shadow-2xl h-[92vh] sm:h-auto sm:max-h-[88vh]`}
       >
         {/* Header Bar */}
         <div
-          className={`px-5 py-4 flex items-start justify-between gap-4 ${
-            isDark ? "bg-slate-900 border-b border-slate-800" : "bg-white border-b border-slate-100"
+          className={`px-5 py-4 flex items-start justify-between gap-4 border-b ${
+            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-100"
           }`}
         >
           <div className="flex items-start gap-3 min-w-0">
-            <div className={`mt-0.5 shrink-0 ${isEarthquake ? "text-red-500" : "text-blue-500"}`}>
+            <div
+              className={`p-2 rounded-xl mt-0.5 shrink-0 ${
+                isEarthquake
+                  ? "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                  : "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+              }`}
+            >
               {isEarthquake ? <Flame className="w-5 h-5" /> : <CloudRain className="w-5 h-5" />}
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
+                {isSimulation ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-amber-500 text-slate-950 shadow-xs">
+                    <AlertTriangle className="w-3 h-3" />
+                    [SIMULASI] LATIHAN TANGGAP
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-red-600 text-white shadow-xs">
+                    PERINGATAN AWAS DINI
+                  </span>
+                )}
+
                 <span
                   className={`font-mono text-[11px] font-bold tracking-wider ${
                     isDark ? "text-slate-400" : "text-slate-500"
                   }`}
                 >
-                  {incident.ticket_number || "LOG-NOTIF"}
+                  {incident.ticket_number || "NOTIF-EARLY-ALERT"}
                 </span>
-                <span className="text-[11px] text-slate-400 font-medium">·</span>
+
+                <span className="text-[11px] text-slate-400">·</span>
+
                 <span className={`text-[11px] font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                  {incident.sent_at ? new Date(incident.sent_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB" : "Baru saja"}
-                </span>
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded border ${deliveryBadge.class}`}>
-                  {deliveryBadge.text}
+                  {formattedDateTime}
                 </span>
               </div>
-              <h2 className={`text-base font-bold leading-snug ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+
+              <h2 className={`text-base font-bold leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
                 {incident.title}
               </h2>
             </div>
@@ -211,266 +148,239 @@ export function IncidentDetailModal({
 
           <button
             onClick={onClose}
-            className={`p-1.5 rounded-lg shrink-0 transition-colors ${
+            className={`p-2 rounded-lg shrink-0 transition-colors ${
               isDark
                 ? "text-slate-400 hover:text-white hover:bg-slate-800"
                 : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
             }`}
+            aria-label="Tutup Detail"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Detailed Info Strip (POV BMS/BES Requirement) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-800 text-xs">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">No. Laporan</span>
-              <span className="font-mono font-bold text-blue-600 dark:text-blue-400 truncate block">
-                {relatedReport?.id || incident.ticket_number || "LOG-NOTIF"}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Kejadian</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                {incident.disaster_type === "earthquake" ? "Gempa Bumi" : "Cuaca & Banjir"}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lokasi</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                {relatedReport?.storeName || `Cabang ${incident.branch}`}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Waktu Mulai</span>
-              <span className="text-slate-600 dark:text-slate-300 truncate block font-medium">
-                {claimedAtTime
-                  ? new Date(claimedAtTime).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"
-                  : relatedReport?.primaryPicClaimedAt
-                  ? new Date(relatedReport.primaryPicClaimedAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"
-                  : effectiveHasPic
-                  ? "Baru saja"
-                  : "Belum Dimulai"}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status Penanganan</span>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                effectiveHasPic || relatedReport?.status === "in_maintenance" || relatedReport?.status === "investigating"
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-              }`}>
-                {effectiveHasPic || relatedReport?.status === "in_maintenance" || relatedReport?.status === "investigating"
-                  ? "On Progress"
-                  : "Belum Ditangani"}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">PIC Otomatis</span>
-              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                {claimedPic?.name || relatedReport?.primaryPicName || (effectiveHasPic ? "Petugas Cabang" : "Belum Ditugaskan")}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Progres Terakhir</span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="font-bold text-slate-800 dark:text-slate-200">
-                  {(relatedReport?.progress ?? 0) > 0 ? `${relatedReport?.progress}%` : "Belum dimulai"}
-                </span>
-                <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div
-                    className="h-full bg-blue-600 rounded-full"
-                    style={{ width: `${relatedReport?.progress ?? 0}%` }}
-                  />
-                </div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Simulation Notice Banner if Applicable */}
+          {isSimulation && (
+            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <strong className="block font-bold">Pemberitahuan Latihan & Simulasi Sistem</strong>
+                Notifikasi ini adalah bagian dari simulasi kesiapsiagaan internal SPARTA SIAGA. Tidak ada bencana fisik riil yang terjadi di lapangan.
               </div>
             </div>
-            <div className="col-span-2 sm:col-span-4 pt-1 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Selesai</span>
-                {canClaim && relatedReport && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingTarget(!isEditingTarget)}
-                    className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {isEditingTarget ? "Batal" : currentTargetDate ? "Ubah Target" : "+ Atur Target Selesai"}
-                  </button>
-                )}
-              </div>
-              {isEditingTarget ? (
-                <div className="mt-1 flex items-center gap-1.5">
-                  <input
-                    type="date"
-                    value={targetDateInput}
-                    onChange={(e) => setTargetDateInput(e.target.value)}
-                    className="text-xs p-1 border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveTargetDate}
-                    disabled={isSavingTarget || !targetDateInput}
-                    className="px-2.5 py-1 text-xs font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {isSavingTarget ? "Menyimpan..." : "Simpan Target"}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-slate-700 dark:text-slate-300 font-medium">
-                    {currentTargetDate
-                      ? new Date(currentTargetDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })
-                      : "Belum Ditentukan"}
-                  </span>
-                  {isOverdue && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
-                      Melewati Target
-                    </span>
-                  )}
-                </div>
-              )}
+          )}
+
+          {/* Awareness Info Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs">
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Jenis Kejadian</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
+                {isEarthquake ? "Gempa Bumi (BMKG)" : "Cuaca Ekstrem / Banjir"}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Cabang Utama</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
+                Cabang {incident.branch || "Nasional"}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Waktu Kejadian</span>
+              <span className="font-medium text-slate-700 dark:text-slate-300 truncate block mt-0.5">
+                {formattedDateTime}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lokasi Zona Pantau</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400 truncate block mt-0.5">
+                {totalStores} Toko & Fasilitas
+              </span>
             </div>
           </div>
 
-          {/* Incident Overview */}
-          <div>
-            <div className={`flex items-center gap-2 text-sm font-semibold mb-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-              <Building className="w-4 h-4 text-blue-500" />
-              <span>Wilayah Terdampak: DC Cabang {incident.branch}</span>
+          {/* Affected Branch DC & Description */}
+          <div className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/50 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+                <Building className="w-4 h-4 text-emerald-600" />
+                <span>Distribution Center (DC) Cabang {incident.branch}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  handleFlyToSingleLocation({
+                    nama_toko: `DC ${incident.branch}`,
+                    cabang: incident.branch,
+                    isFacility: true,
+                  })
+                }
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors w-fit"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Lihat DC di Peta</span>
+              </button>
             </div>
-            <p className={`text-sm leading-relaxed ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+            <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
               {incident.message}
             </p>
           </div>
 
-          {/* Store List (Read-Only) */}
+          {/* Structured Affected Stores & DC Table */}
           <div className="space-y-3">
-            <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-              Daftar {totalStores} Gerai di Zona Pantau
-            </h3>
-            
+            <div className="flex items-center justify-between">
+              <h3 className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                Daftar {stores.length > 0 ? stores.length : totalStores} Gerai & DC Terdampak
+              </h3>
+              <span className="text-[11px] text-slate-500">
+                Prioritas zona pantau berbasis radius getaran BMKG
+              </span>
+            </div>
+
             <div
-              className={`rounded-lg border overflow-hidden ${
+              className={`rounded-xl border overflow-hidden ${
                 isDark ? "border-slate-800" : "border-slate-200"
               }`}
             >
-              <table className="w-full text-left text-sm border-collapse">
-                <thead>
-                  <tr
-                    className={`border-b text-xs ${
-                      isDark
-                        ? "bg-slate-900/50 border-slate-800 text-slate-400"
-                        : "bg-slate-50 border-slate-200 text-slate-500"
-                    }`}
-                  >
-                    <th className="py-2.5 px-4 font-medium">Toko</th>
-                    <th className="py-2.5 px-4 text-center font-medium">Jarak</th>
-                    <th className="py-2.5 px-4 text-right font-medium">Zona</th>
-                  </tr>
-                </thead>
-                <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-100"}`}>
-                  {stores.length > 0 ? (
-                    stores.map((store) => (
-                      <tr
-                        key={store.kode_toko}
-                        className={isDark ? "bg-transparent hover:bg-slate-800/30 transition-colors" : "bg-transparent hover:bg-slate-50 transition-colors"}
-                      >
-                        <td className="py-3 px-4">
-                          <div className={`font-semibold text-xs flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                            <span className={`font-mono ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                              {store.kode_toko}
-                            </span>
-                            <span>{store.nama_toko}</span>
-                          </div>
-                          {store.alamat && (
-                            <div className={`text-[11px] mt-1 truncate max-w-[200px] sm:max-w-xs ${isDark ? "text-slate-500" : "text-slate-500"}`}>
-                              {store.alamat}
-                            </div>
-                          )}
-                        </td>
-                        <td className={`py-3 px-4 text-center font-mono text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                          {store.distance_km} km
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          {store.status === "PRIORITY_MONITOR" ? (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400">
-                              PRIORITAS PANTAU
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
-                              PANTAU
-                            </span>
-                          )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr
+                      className={`border-b text-[11px] uppercase tracking-wider font-semibold ${
+                        isDark
+                          ? "bg-slate-950/70 border-slate-800 text-slate-400"
+                          : "bg-slate-50 border-slate-200 text-slate-500"
+                      }`}
+                    >
+                      <th className="py-2.5 px-3 text-center w-10">No</th>
+                      <th className="py-2.5 px-3">Toko / Fasilitas</th>
+                      <th className="py-2.5 px-3 text-center">Jarak Episentrum</th>
+                      <th className="py-2.5 px-3 text-center">Status Pantau</th>
+                      <th className="py-2.5 px-3 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? "divide-slate-800/80" : "divide-slate-100"}`}>
+                    {stores.length > 0 ? (
+                      stores.map((store, idx) => {
+                        const isPriority = store.status === "PRIORITY_MONITOR";
+                        const isDc =
+                          store.fr_type === "dc" ||
+                          store.nama_toko?.toUpperCase().includes("DC") ||
+                          store.nama_toko?.toUpperCase().includes("WAREHOUSE");
+
+                        return (
+                          <tr
+                            key={store.kode_toko || idx}
+                            className={`transition-colors ${
+                              isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50"
+                            }`}
+                          >
+                            <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                                {isDc && (
+                                  <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                    DC
+                                  </span>
+                                )}
+                                <span className="font-mono text-blue-600 dark:text-blue-400">
+                                  {store.kode_toko}
+                                </span>
+                                <span>{store.nama_toko}</span>
+                              </div>
+                              {store.alamat && (
+                                <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                  {store.alamat}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center font-mono font-medium text-slate-600 dark:text-slate-400">
+                              {store.distance_km != null ? `${store.distance_km} km` : "—"}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isPriority ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-red-700 bg-red-100 dark:bg-red-950/60 dark:text-red-300 border border-red-200 dark:border-red-800">
+                                  PRIORITAS PANTAU
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                  ZONA WASPADA
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleFlyToSingleLocation({
+                                    kode_toko: store.kode_toko,
+                                    nama_toko: store.nama_toko,
+                                    cabang: store.cabang || incident.branch,
+                                    latitude: store.latitude,
+                                    longitude: store.longitude,
+                                    isFacility: isDc,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+                              >
+                                <MapPin className="w-3 h-3 text-[#1D5AA6]" />
+                                <span>Lihat di Peta</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="py-8 text-center text-xs text-slate-400 italic"
+                        >
+                          Daftar gerai terdampak sedang dalam proses kalkulasi radius atau tidak ada data gerai spesifik.
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className={`py-8 text-center text-sm ${isDark ? "text-slate-500" : "text-slate-400"}`}>
-                        Tidak ada data toko spesifik yang terdampak.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Footer (Requirements 21 & 24: Awareness actions only) */}
+        {/* Footer (Awareness Only: Pure Navigation, No Operational Mutations) */}
         <div
-          className={`p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 border-t ${
-            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"
+          className={`p-4 sm:px-5 sm:py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 border-t ${
+            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-100"
           }`}
         >
-          <div className={`flex items-center gap-2 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          <div className="flex items-center gap-2 text-[11px] text-slate-500">
             <Info className="w-4 h-4 text-blue-500 shrink-0" />
-            <span>Notifikasi ini bersifat awareness. Pengelolaan lifecycle dilakukan di menu <strong>Laporan Kejadian</strong>.</span>
+            <span>
+              Pusat notifikasi berfungsi sebagai <strong>deteksi dini (awareness)</strong>. Tindak lanjut operasional penanganan fisik dilakukan melalui menu Laporan.
+            </span>
           </div>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            {/* Mulai Menangani Action for BMS/BES */}
-            {relatedReport && !effectiveHasPic && canClaim && (
-              <button
-                type="button"
-                onClick={handleClaimPic}
-                disabled={isClaiming}
-                className="flex-1 sm:flex-none px-4 py-2 rounded-md text-xs font-bold flex items-center justify-center gap-2 transition-colors bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-50"
-              >
-                <span>{isClaiming ? "Memproses..." : "Mulai Menangani"}</span>
-              </button>
-            )}
-
-            {/* Requirement 24: Only show Lihat Laporan Terkait if report exists */}
-            {relatedReport && onOpenReport && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenReport(relatedReport);
-                }}
-                className="flex-1 sm:flex-none px-4 py-2 rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition-colors bg-blue-600 hover:bg-blue-500 text-white shadow-sm"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Lihat Laporan Terkait</span>
-              </button>
-            )}
+          <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+            <button
+              type="button"
+              onClick={handleFlyToMapAll}
+              className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#1D5AA6] hover:bg-[#164684] text-white transition-colors shadow-xs"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Lihat Seluruh Area di Peta</span>
+            </button>
 
             <button
-              onClick={handleFlyToMap}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-xs font-semibold flex items-center justify-center gap-2 transition-colors border ${
+              type="button"
+              onClick={onClose}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold transition-colors border ${
                 isDark
                   ? "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700"
-                  : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200"
               }`}
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              <span>Lihat di Peta</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="flex-1 sm:flex-none px-5 py-2 rounded-md text-xs font-bold text-white bg-slate-700 hover:bg-slate-600 transition-colors"
             >
               Tutup
             </button>

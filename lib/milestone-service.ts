@@ -10,8 +10,120 @@ import {
 } from "@/types/incident";
 import { UserContext } from "./report-permissions";
 import { saveMilestoneDocument, validateMilestoneDocumentMagicBytes } from "./milestone-storage";
+import { EstimationIntegrationService } from "./estimation-service";
 
 let tablesEnsured = false;
+
+export interface OperationalProgressGatingInfo {
+  isProgressGated: boolean;
+  gatingReason: string | null;
+  nextRequiredAction: string | null;
+  workStatus?: string;
+  estimationStatus?: string;
+}
+
+export async function checkOperationalProgressGating(
+  incident: IncidentRecord
+): Promise<OperationalProgressGatingInfo> {
+  // 1. Initial pre-handling lifecycle statuses
+  const preHandlingStatuses = [
+    "pending_confirmation",
+    "verifying",
+    "investigating",
+    "pending_bm_approval",
+    "clarification_requested",
+  ];
+
+  if (preHandlingStatuses.includes(incident.status)) {
+    return {
+      isProgressGated: true,
+      gatingReason: "Laporan baru masih dalam tahap verifikasi awal atau menunggu persetujuan BnM Manajer.",
+      nextRequiredAction: "Lakukan pemeriksaan kondisi fisik di lapangan, unggah bukti inspeksi, dan ajukan keputusan BnM Manajer.",
+    };
+  }
+
+  // 2. Terminal non-work statuses
+  if (incident.status === "confirmed_safe") {
+    return {
+      isProgressGated: true,
+      gatingReason: "Laporan dinyatakan Aman (confirmed_safe), tidak memerlukan penanganan pekerjaan fisik.",
+      nextRequiredAction: "Tidak ada tindakan operasional lebih lanjut yang diperlukan.",
+    };
+  }
+
+  if (incident.status === "rejected_invalid") {
+    return {
+      isProgressGated: true,
+      gatingReason: "Laporan dinyatakan Ditolak (rejected_invalid) oleh BnM Manajer.",
+      nextRequiredAction: "Tidak ada tindakan operasional lebih lanjut yang diperlukan.",
+    };
+  }
+
+  if (incident.status === "closed") {
+    return {
+      isProgressGated: true,
+      gatingReason: "Laporan telah resmi disetujui final BnM Manajer dan berstatus CLOSED.",
+      nextRequiredAction: "Seluruh tahapan pekerjaan dan dokumen telah selesai.",
+    };
+  }
+
+  // 3. Ongoing work with progress already registered
+  if ((incident.progress ?? 0) > 0 && incident.status === "in_maintenance") {
+    return {
+      isProgressGated: false,
+      gatingReason: null,
+      nextRequiredAction: null,
+      workStatus: "IN_PROGRESS",
+    };
+  }
+
+  // 4. Estimation & Work Readiness Gating
+  try {
+    const estimationRoute = await EstimationIntegrationService.getRouteByReportId(incident.id);
+    if (!estimationRoute) {
+      return {
+        isProgressGated: true,
+        gatingReason: "Tahap estimasi biaya dan penentuan rute penanganan (BMS/BES/Rekanan) belum dibuat.",
+        nextRequiredAction: "Buat rute estimasi pada bagian Estimasi & Approval untuk memulai proses pekerjaan.",
+      };
+    }
+
+    if (estimationRoute.workStatus === "NOT_READY") {
+      if (estimationRoute.status !== "ESTIMATION_COMPLETED") {
+        return {
+          isProgressGated: true,
+          gatingReason: "Proses estimasi masih berjalan (menunggu penyelesaian estimasi teknis).",
+          nextRequiredAction: "Selesaikan input rincian estimasi biaya hingga berstatus Estimasi Selesai (ESTIMATION_COMPLETED).",
+          workStatus: estimationRoute.workStatus,
+          estimationStatus: estimationRoute.status,
+        };
+      }
+
+      return {
+        isProgressGated: true,
+        gatingReason: "Pekerjaan belum dinyatakan Siap Dikerjakan (READY_FOR_WORK). Persyaratan kesiapan kerja operasional (approval/dokumen pendukung) belum terpenuhi.",
+        nextRequiredAction: "Lengkapi berkas kesiapan kerja pada tab Estimasi & Approval untuk mengonfirmasi status Siap Kerja (READY_FOR_WORK).",
+        workStatus: estimationRoute.workStatus,
+        estimationStatus: estimationRoute.status,
+      };
+    }
+
+    return {
+      isProgressGated: false,
+      gatingReason: null,
+      nextRequiredAction: null,
+      workStatus: estimationRoute.workStatus,
+      estimationStatus: estimationRoute.status,
+    };
+  } catch (err) {
+    console.warn("[checkOperationalProgressGating] Gagal memeriksa rute estimasi:", err);
+    return {
+      isProgressGated: true,
+      gatingReason: "Gagal memeriksa status kesiapan estimasi pekerjaan.",
+      nextRequiredAction: "Pastikan data estimasi valid dan coba kembali.",
+    };
+  }
+}
 
 export async function ensureMilestoneTables(): Promise<void> {
   if (tablesEnsured) return;
@@ -161,15 +273,12 @@ export async function submitMilestoneDocument({
     throw new Error("Laporan kejadian tidak ditemukan.");
   }
 
-  // 3. Rule 11: Reports that are safe or rejected cannot enter handling workflow
-  if (incident.status === "confirmed_safe") {
-    throw new Error("Laporan berstatus Aman (confirmed_safe) tidak dapat diproses dalam penanganan pekerjaan.");
-  }
-  if (incident.status === "rejected_invalid") {
-    throw new Error("Laporan berstatus Ditolak (rejected_invalid) tidak dapat diproses dalam penanganan pekerjaan.");
-  }
-  if (incident.status === "pending_confirmation" || incident.status === "pending_bm_approval") {
-    throw new Error("Laporan belum disetujui awal oleh BnM Manajer (status wajib confirmed_affected).");
+  // 3. Operational Progress Gating (Gated on new reports, pre-estimation, and non-ready work)
+  const gating = await checkOperationalProgressGating(incident);
+  if (gating.isProgressGated) {
+    throw new Error(
+      `Progres operasional terkunci. ${gating.gatingReason} ${gating.nextRequiredAction ? `Tindakan berikutnya: ${gating.nextRequiredAction}` : ""}`.trim()
+    );
   }
 
   // 4. Branch & Role isolation (Admin is not restricted to single branch or single tkp type)

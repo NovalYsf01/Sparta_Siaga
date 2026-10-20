@@ -22,7 +22,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Store as StoreType } from "@/types/store";
-import { RepairLinksCard } from "@/components/incident/repair-links-card";
 
 export type FacilityDetail = {
   id: string;

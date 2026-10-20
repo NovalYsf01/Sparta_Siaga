@@ -20,6 +20,98 @@ import { EstimationModal } from "../incident/estimation-modal";
 import { ProgressUpdateModal } from "../incident/progress-update-modal";
 import { HoReportMonitoring } from "./ho-report-monitoring";
 
+const DISASTER_ID_MAP: Record<string, string> = {
+  earthquake: "Gempa Bumi",
+  flood: "Banjir",
+  fire: "Kebakaran",
+  theft: "Kemalingan",
+  heavy_rain: "Hujan/Badai",
+  strong_wind: "Angin Kencang",
+  severe_building_damage: "Kerusakan Bangunan",
+  tsunami: "Tsunami",
+  volcano: "Gunung Meletus",
+};
+
+export function formatIndonesianDate(raw?: string): string {
+  if (!raw) return "-";
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return raw;
+  }
+}
+
+export function getOperationalHandlingStatus(inc: IncidentRecord) {
+  const s = (inc.status as string)?.toLowerCase() || "";
+  const progress = Number(inc.progress ?? 0);
+
+  if (s === "resolved" || s === "closed" || s === "confirmed_safe") {
+    return {
+      label: "Selesai",
+      cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800",
+    };
+  }
+  if (s === "awaiting_st" || s === "pending_final_approval") {
+    return {
+      label: "Menunggu Approval ST",
+      cls: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-200 dark:border-purple-800",
+    };
+  }
+  if (
+    s === "waiting_approval" ||
+    s === "verifying" ||
+    s === "pending_bm_approval" ||
+    s === "pending_confirmation"
+  ) {
+    return {
+      label: "Menunggu Approval",
+      cls: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800",
+    };
+  }
+  if (
+    inc.primaryPicUserId ||
+    s === "in_maintenance" ||
+    s === "investigating" ||
+    s === "in_estimation" ||
+    progress > 0
+  ) {
+    return {
+      label: "On Progress",
+      cls: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800",
+    };
+  }
+  return {
+    label: "Belum Ditangani",
+    cls: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800",
+  };
+}
+
+export function getOriginBadge(inc: IncidentRecord) {
+  const isAuto =
+    inc.reportOrigin === "automatic_earthquake" ||
+    inc.reportOrigin === "automatic_weather" ||
+    (inc.id && inc.id.startsWith("LAP-EQ-"));
+
+  if (isAuto) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap">
+        Laporan Otomatis
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
+      Laporan Manual
+    </span>
+  );
+}
+
 interface OperationalReportCenterProps {
   incidents: IncidentRecord[];
   onSelectIncident: (inc: IncidentRecord) => void;
@@ -265,27 +357,23 @@ export function OperationalReportCenter({
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {filteredIncidents.map((inc) => {
-                    const s = (inc.status as string)?.toLowerCase() || "";
-                    const handlingStatus = s === "resolved" || s === "closed"
-                      ? { label: "Selesai", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" }
-                      : s === "waiting_approval" || s === "verifying" || s === "pending_bm_approval"
-                      ? { label: "Menunggu Approval", cls: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300" }
-                      : inc.primaryPicUserId || s === "in_maintenance" || s === "investigating"
-                      ? { label: "On Progress", cls: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300" }
-                      : { label: "Belum Ditangani", cls: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" };
+                    const handlingStatus = getOperationalHandlingStatus(inc);
+                    const formattedDate = formatIndonesianDate(inc.date || inc.createdAt);
+                    const disasterLabel = DISASTER_ID_MAP[inc.disasterType?.toLowerCase()] || inc.disasterType;
+                    const originBadge = getOriginBadge(inc);
+                    const displayCity =
+                      inc.locationCity && inc.locationCity !== "Unknown"
+                        ? inc.locationCity
+                        : inc.branch || "Area Toko";
 
                     const targetDateStr = inc.maintenanceTicket?.completedAt
-                      ? new Date(inc.maintenanceTicket.completedAt).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })
+                      ? formatIndonesianDate(inc.maintenanceTicket.completedAt)
                       : "Belum Ditentukan";
 
                     const isOverdue =
                       Boolean(inc.maintenanceTicket?.completedAt) &&
-                      s !== "resolved" &&
-                      s !== "closed" &&
+                      inc.status !== "resolved" &&
+                      inc.status !== "closed" &&
                       new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
 
                     return (
@@ -293,8 +381,8 @@ export function OperationalReportCenter({
                         <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-blue-600 dark:text-blue-400">
                           {inc.maintenanceTicket?.ticketId || inc.id}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-[11px]">
-                          {inc.date}
+                        <td className="px-4 py-3 whitespace-nowrap text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                          {formattedDate}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -308,10 +396,15 @@ export function OperationalReportCenter({
                             </span>
                             <span>{inc.storeName}</span>
                           </div>
-                          <div className="text-[10px] text-slate-500">{inc.branch} • {inc.locationCity}</div>
+                          <div className="text-[10px] text-slate-500">{inc.branch} • {displayCity}</div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap capitalize font-medium">
-                          {inc.disasterType}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                            {disasterLabel}
+                          </div>
+                          <div className="mt-1">
+                            {originBadge}
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] ${handlingStatus.cls}`}>
@@ -372,27 +465,23 @@ export function OperationalReportCenter({
           {/* MOBILE VIEW */}
           <div className="md:hidden space-y-3">
             {filteredIncidents.map((inc) => {
-              const s = (inc.status as string)?.toLowerCase() || "";
-              const handlingStatus = s === "resolved" || s === "closed"
-                ? { label: "Selesai", cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" }
-                : s === "waiting_approval" || s === "verifying" || s === "pending_bm_approval"
-                ? { label: "Menunggu Approval", cls: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300" }
-                : inc.primaryPicUserId || s === "in_maintenance" || s === "investigating"
-                ? { label: "On Progress", cls: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300" }
-                : { label: "Belum Ditangani", cls: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300" };
+              const handlingStatus = getOperationalHandlingStatus(inc);
+              const formattedDate = formatIndonesianDate(inc.date || inc.createdAt);
+              const disasterLabel = DISASTER_ID_MAP[inc.disasterType?.toLowerCase()] || inc.disasterType;
+              const originBadge = getOriginBadge(inc);
+              const displayCity =
+                inc.locationCity && inc.locationCity !== "Unknown"
+                  ? inc.locationCity
+                  : inc.branch || "Area Toko";
 
               const targetDateStr = inc.maintenanceTicket?.completedAt
-                ? new Date(inc.maintenanceTicket.completedAt).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })
+                ? formatIndonesianDate(inc.maintenanceTicket.completedAt)
                 : "Belum Ditentukan";
 
               const isOverdue =
                 Boolean(inc.maintenanceTicket?.completedAt) &&
-                s !== "resolved" &&
-                s !== "closed" &&
+                inc.status !== "resolved" &&
+                inc.status !== "closed" &&
                 new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
 
               return (
@@ -403,14 +492,8 @@ export function OperationalReportCenter({
                         {inc.maintenanceTicket?.ticketId || inc.id}
                       </div>
                       <div className="font-bold text-sm text-slate-900 dark:text-white capitalize flex items-center gap-2">
-                        {inc.disasterType}
-                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
-                          inc.reportOrigin === "manual" 
-                            ? "bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
-                            : "bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-400"
-                        }`}>
-                          {inc.reportOrigin === "manual" ? "Manual" : "Auto"}
-                        </span>
+                        {disasterLabel}
+                        {originBadge}
                       </div>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${handlingStatus.cls}`}>
@@ -419,11 +502,19 @@ export function OperationalReportCenter({
                   </div>
                   
                   <div>
-                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                      {inc.storeName}
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                      {inc.locationKind === "FACILITY" && (
+                        <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded">
+                          DC
+                        </span>
+                      )}
+                      <span className="text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                        {inc.locationKind === "FACILITY" || inc.tkpType === "dc" ? "Tim BES" : "Tim BMS"}
+                      </span>
+                      <span>{inc.storeName}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500">
-                      {inc.branch} • {inc.locationCity}
+                    <div className="text-[11px] text-slate-500 mt-0.5">
+                      {inc.branch} • {displayCity}
                     </div>
                   </div>
 
@@ -448,7 +539,7 @@ export function OperationalReportCenter({
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
                     <div className="text-[10px] text-slate-400 flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {inc.date}{(inc.progress ?? 0) > 0 ? ` • Progres: ${inc.progress}%` : ""}
+                      {formattedDate}{(inc.progress ?? 0) > 0 ? ` • Progres: ${inc.progress}%` : ""}
                     </div>
                     <button
                       onClick={() => onSelectIncident(inc)}
@@ -458,6 +549,7 @@ export function OperationalReportCenter({
                           : "bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400"
                       }`}
                     >
+                      <Eye className="w-3.5 h-3.5" />
                       {inc.status === "pending_confirmation" || inc.status === "pending_bm_approval" ? "Review" : "Lihat Detail"}
                     </button>
                   </div>

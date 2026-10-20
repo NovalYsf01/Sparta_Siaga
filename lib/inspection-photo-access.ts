@@ -13,8 +13,8 @@ export function isEvidencePhotoLinked(
   const prefix = "/api/incidents/" + encodeURIComponent(reportId) + "/inspection/evidence/";
   const references = [
     ...(report.verification?.photos || []),
-    ...(report.fieldPhotos || []),
-    ...(report.verification?.evidenceDetails?.map(e => e.photoUrl) || []),
+    ...((report.fieldPhotos || []).map((p) => (typeof p === "string" ? p : p.url))),
+    ...(report.verification?.evidenceDetails?.map((e) => e.photoUrl) || []),
   ];
   return references.some(url => {
     if (typeof url !== "string" || !url.startsWith(prefix)) return false;

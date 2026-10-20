@@ -20,7 +20,9 @@ export type DisasterType =
  */
 export type ReportOrigin =
   | "manual"
-  | "automatic_earthquake";
+  | "automatic_earthquake"
+  | "automatic_weather"
+  | "automatic";
 
 /**
  * Status laporan dalam lifecycle
@@ -227,6 +229,17 @@ export interface IncidentReporter {
 
 export { getRoleDisplayLabel } from "@/lib/role-catalog";
 
+export interface IncidentPhotoDetail {
+  url: string;
+  source: "camera" | "gallery";
+  reporterRelation?: "self" | "received" | null;
+  galleryReason?: string | null;
+  sourceProvider?: string | null;
+  receiptContext?: string | null;
+  capturedAt?: string | null;
+  slotLabel?: string;
+}
+
 /**
  * Record laporan utama — anchor lifecycle sistem.
  * Nomor Laporan adalah anchor:
@@ -288,7 +301,7 @@ export interface IncidentRecord {
 
   // === Foto Lapangan ===
   // Manual: wajib (4 foto tampak). Auto-report: field ini null/empty pending konfirmasi.
-  fieldPhotos?: string[];
+  fieldPhotos?: (string | IncidentPhotoDetail)[];
 
   // === Sinkronisasi Ekosistem Eksternal (SPARTA Maintenance / Engineering Support) ===
   externalWorkId?: string;

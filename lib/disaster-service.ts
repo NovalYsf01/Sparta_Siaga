@@ -1,6 +1,6 @@
 import { Earthquake, DisasterFeedResponse, SourceHealth, DataFreshness } from "@/types/disaster";
 import { calculateHaversineDistance, calculateSpartaMonitoringZone } from "./haversine";
-import { dbUpsertEarthquakeEvent } from "./earthquake-db";
+import { dbUpsertEarthquakeEvent, dbGetRecentEarthquakeEvents } from "./earthquake-db";
 
 // Cache in-memory for 30 seconds
 let cachedDisasters: DisasterFeedResponse | null = null;
@@ -262,10 +262,10 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
 
   usgsHealth.lastAttemptAt = new Date().toISOString();
 
-  // 3. Fetch USGS Real-time Feed (M4.5+ in the past day or recent significant events)
+  // 3. Fetch USGS Real-time Feed (M4.5+ in the past 7 days to cover full 72h window)
   try {
     const usgsRes = await fetch(
-      "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson",
+      "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson",
       {
         next: { revalidate: 60 },
         headers: { "User-Agent": "SpartaSiaga/1.0" },
@@ -288,10 +288,6 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
           const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
 
           // CANONICAL CORRELATION: USGS vs BMKG (Requirement 6)
-          // Conservative matching criteria:
-          // 1. Time delta <= 15 minutes
-          // 2. Epicenter distance <= 100 km
-          // 3. Magnitude difference <= 0.6
           const matchingBmkg = earthquakes.find((e) => {
             if (e.source !== "BMKG") return false;
             const timeDeltaMin = Math.abs(e.timestamp - usgsTimestamp) / (60 * 1000);
@@ -308,7 +304,6 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
 
           if (matchingBmkg) {
             // Strong match -> Associate to canonical BMKG event, do not create duplicate
-            // We preserve BMKG as primary authority, optionally marking external corroboration
             matchingBmkg.verificationStatus = "official";
           } else {
             // Ambiguous or independent event -> Keep separate
@@ -350,17 +345,32 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
     usgsHealth.error = err.message || "Fetch failed";
   }
 
+  // 4. Merge persistent historical earthquakes from database (ensures past 72h events are preserved)
+  try {
+    const dbEvents = await dbGetRecentEarthquakeEvents(72);
+    for (const dbe of dbEvents) {
+      if (!earthquakes.some((e) => e.id === dbe.id)) {
+        earthquakes.push(dbe);
+      }
+    }
+  } catch (dbErr) {
+    console.warn("[Disaster Service] Warning merging DB earthquake events:", dbErr);
+  }
+
+  // Canonical deduplication and correlation
+  const canonicalEarthquakes = correlateEarthquakes(earthquakes);
+
   // Sort earthquakes by timestamp descending
-  earthquakes.sort((a, b) => b.timestamp - a.timestamp);
+  canonicalEarthquakes.sort((a, b) => b.timestamp - a.timestamp);
 
   // Requirement 4: Persist all processed earthquakes to persistent table asynchronously
-  for (const eq of earthquakes) {
+  for (const eq of canonicalEarthquakes) {
     dbUpsertEarthquakeEvent(eq).catch((err) =>
       console.warn("[Disaster Service] Warning persisting earthquake:", err)
     );
   }
 
-  if (earthquakes.length === 0) {
+  if (canonicalEarthquakes.length === 0) {
     if (cachedDisasters && cachedDisasters.recentEarthquakes.length > 0) {
       console.log("[Disaster Service] Providers degraded. Using stale cache as last-known-good.");
       bmkgHealth.freshness = "stale";
@@ -388,11 +398,11 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
 
   // Filter active earthquakes: Max 72 hours window for active map monitoring (Requirement 2 & 3)
   const activeWindowMs = 72 * 60 * 60 * 1000; // 72 hours
-  const activeEarthquakes = earthquakes.filter((eq) => now - eq.timestamp <= activeWindowMs);
+  const activeEarthquakes = canonicalEarthquakes.filter((eq) => now - eq.timestamp <= activeWindowMs);
 
   const response: DisasterFeedResponse = {
-    latestBmkgEarthquake: latestBmkgEarthquake || earthquakes[0],
-    recentEarthquakes: earthquakes, // all historical/provider context
+    latestBmkgEarthquake: latestBmkgEarthquake || canonicalEarthquakes[0],
+    recentEarthquakes: canonicalEarthquakes, // all historical/provider context
     activeEarthquakes, // strictly <= 72 hours for operational map and auto-reports
     lastUpdated: new Date().toISOString(),
     totalActive: activeEarthquakes.length,

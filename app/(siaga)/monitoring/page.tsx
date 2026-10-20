@@ -156,15 +156,9 @@ export default function MonitoringPage() {
     ? selectedEarthquake
     : activeQuakes[0] || disasterData?.latestBmkgEarthquake;
 
-  // Map earthquakes: In Event Focus Mode render focused event; otherwise render all active window quakes
-  const mapEarthquakes = useMemo(() => {
-    // A manually focused earthquake should only remain on the map if it
-    // falls within the selected time window.
-    if (selectedEarthquake && activeQuakes.some(eq => eq.id === selectedEarthquake.id)) {
-      return [selectedEarthquake];
-    }
-    return activeQuakes;
-  }, [selectedEarthquake, activeQuakes]);
+  // Map earthquakes: All earthquakes within the active time window (24h or 72h) are rendered.
+  // The focused earthquake is highlighted with a pulse ring via selectedEarthquakeId.
+  const mapEarthquakes = activeQuakes;
 
   // Convert facilities to Store-compatible format with evaluated earthquake risk
   const locationModeStores = useMemo<Store[]>(() => {
@@ -317,9 +311,10 @@ export default function MonitoringPage() {
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col bg-slate-900">
       {/* 1. FLOATING TOP CONTROL OVERLAY (NASA FIRMS Inspired, Task 1 & Task 5) */}
-      <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 z-[450] pointer-events-none flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      {/* 1. Floating Map Mode & Controls Toolbar with Safe Area & Responsive Layout */}
+      <div className="absolute top-2.5 left-2.5 right-2.5 sm:top-4 sm:left-4 sm:right-4 z-[450] pointer-events-none flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         {/* Left: Floating Mode Switcher Pill + Mobile Kontrol Peta Button */}
-        <div className="pointer-events-auto flex items-center gap-2 flex-wrap">
+        <div className="pointer-events-auto flex items-center justify-between sm:justify-start gap-1.5 flex-nowrap w-full sm:w-auto">
           {/* Floating Mode Switcher Pill: [ Kejadian | Toko | DC ] */}
           <div
             role="tablist"
@@ -344,7 +339,7 @@ export default function MonitoringPage() {
                   role="tab"
                   aria-selected={selected}
                   onClick={() => handleModeChange(tab.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all min-h-[38px] ${
+                  className={`inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg text-xs font-semibold transition-all min-h-[36px] sm:min-h-[38px] ${
                     selected
                       ? "bg-[#1D5AA6] text-white shadow-sm"
                       : isDark
@@ -352,7 +347,7 @@ export default function MonitoringPage() {
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                   }`}
                 >
-                  <Icon className="w-4 h-4 shrink-0" />
+                  <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                   <span>{tab.label}</span>
                 </button>
               );
@@ -363,7 +358,7 @@ export default function MonitoringPage() {
           <button
             type="button"
             onClick={() => setIsMobileControlsOpen(true)}
-            className={`lg:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl shadow-lg backdrop-blur-md border text-xs font-bold transition-all min-h-[38px] shrink-0 ${
+            className={`lg:hidden inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl shadow-lg backdrop-blur-md border text-xs font-bold transition-all min-h-[36px] sm:min-h-[38px] shrink-0 ${
               isDark
                 ? "bg-slate-900/90 hover:bg-slate-800 border-slate-700/80 text-cyan-400"
                 : "bg-white/95 hover:bg-slate-50 border-slate-200 text-[#123B6D] shadow-md"
@@ -371,14 +366,14 @@ export default function MonitoringPage() {
             aria-label="Buka Kontrol Peta"
             title="Buka Kontrol Peta"
           >
-            <Layers className="w-4 h-4 text-cyan-500 shrink-0" />
+            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-500 shrink-0" />
             <span>Kontrol Peta</span>
             {showRadar && <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />}
           </button>
         </div>
 
         {/* Right: Floating Mode Actions & Context Info */}
-        <div className="pointer-events-auto flex items-center gap-2 overflow-x-auto max-w-full pb-0.5 sm:pb-0">
+        <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5 sm:pb-0 scrollbar-none">
           {mapMode === "event" ? (
             <div
               className={`flex items-center gap-1.5 p-1.5 rounded-xl shadow-lg backdrop-blur-md border ${
@@ -526,6 +521,7 @@ export default function MonitoringPage() {
             stores={displayedLocations}
             locationMode={mapMode}
             earthquakes={mapMode === "event" ? mapEarthquakes : []}
+            selectedEarthquakeId={selectedEarthquake?.id}
             floodReports={mapMode === "event" ? disasterData?.floodReports || [] : []}
             basemap={basemap}
             incidentOnly={mapMode === "event" && incidentOnly}
@@ -563,6 +559,7 @@ export default function MonitoringPage() {
           )}
           {/* Map Controls (Desktop floating panel + Mobile bottom sheet) */}
           <MapControls
+            locationMode={mapMode}
             latestEarthquake={latestEq}
             incidentOnly={incidentOnly}
             onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}
@@ -577,7 +574,15 @@ export default function MonitoringPage() {
             activeLayer={activeLayer}
             onLayerChange={setActiveLayer}
             mapTimeFilter={mapTimeFilter}
-            onChangeMapTimeFilter={(value) => { setMapTimeFilter(value); clearEventFocus(); }}
+            onChangeMapTimeFilter={(value) => {
+              setMapTimeFilter(value);
+              if (selectedEarthquake) {
+                const maxAgeMs = (value === "24h" ? 24 : 72) * 60 * 60 * 1000;
+                if (Date.now() - selectedEarthquake.timestamp > maxAgeMs) {
+                  clearEventFocus();
+                }
+              }
+            }}
             selectedEarthquake={selectedEarthquake}
             onClearEventFocus={clearEventFocus}
             isMobileSheetOpen={isMobileControlsOpen}

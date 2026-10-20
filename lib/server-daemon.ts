@@ -31,12 +31,7 @@ let initialTimer: NodeJS.Timeout | null = null;
 let intervalTimer: NodeJS.Timeout | null = null;
 let isDaemonStopped = false;
 
-interface BranchCentroid {
-  cabang: string;
-  lat: number;
-  lon: number;
-  store_count: number;
-}
+import { getOrLoadMasterStores, getBranchCentroidsFromStores, BranchCentroid } from './store-master-loader';
 
 // In-memory cache for branch centroids
 let cachedBranchCentroids: BranchCentroid[] | null = null;
@@ -59,18 +54,23 @@ async function getBranchCentroids(): Promise<BranchCentroid[]> {
       ORDER BY store_count DESC;
     `);
 
-    cachedBranchCentroids = res.rows.map(r => ({
-      cabang: r.cabang,
-      lat: parseFloat(r.lat),
-      lon: parseFloat(r.lon),
-      store_count: r.store_count,
-    }));
-
-    return cachedBranchCentroids;
+    if (res.rows && res.rows.length > 0) {
+      cachedBranchCentroids = res.rows.map(r => ({
+        cabang: r.cabang,
+        lat: parseFloat(r.lat),
+        lon: parseFloat(r.lon),
+        store_count: r.store_count,
+      }));
+      return cachedBranchCentroids;
+    }
   } catch (error) {
-    console.error('[Autonomous Daemon] Error fetching branch centroids:', error);
-    return [];
+    console.warn('[Autonomous Daemon] DB branch centroids query not available, calculating from master stores:', error);
   }
+
+  // Calculate from master stores dataset (21,550 stores)
+  const masterStores = await getOrLoadMasterStores();
+  cachedBranchCentroids = getBranchCentroidsFromStores(masterStores);
+  return cachedBranchCentroids;
 }
 
 /**
@@ -104,12 +104,8 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
       }
     }
 
-    // 2. Fetch stores from Aiven PostgreSQL (or memory)
-    const storeRes = await pool.query(
-      `SELECT id, kode_toko, nama_toko, cabang, alamat, latitude, longitude, fr_type, branch_emergency_contact 
-       FROM stores LIMIT 25000`
-    );
-    const stores: Store[] = storeRes.rows;
+    // 2. Fetch stores from DB or Master CSV (21,550 stores)
+    const stores: Store[] = await getOrLoadMasterStores();
 
     let dispatchedEarthquakeAlerts = 0;
     let dispatchedRainAlerts = 0;

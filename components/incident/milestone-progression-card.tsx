@@ -46,6 +46,11 @@ export function MilestoneProgressionCard({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Operational Progress Gating State
+  const [isGated, setIsGated] = useState(false);
+  const [gatingReason, setGatingReason] = useState<string | null>(null);
+  const [nextAction, setNextAction] = useState<string | null>(null);
+
   // Expanded revisions
   const [expandedRevisions, setExpandedRevisions] = useState<Record<string, boolean>>({});
 
@@ -67,6 +72,12 @@ export function MilestoneProgressionCard({
           ? json.data.milestones
           : [];
         setMilestones(list);
+
+        if (json.data) {
+          setIsGated(Boolean(json.data.isProgressGated));
+          setGatingReason(json.data.gatingReason || null);
+          setNextAction(json.data.nextRequiredAction || null);
+        }
       }
     } catch (err) {
       console.error("[MilestoneProgressionCard] Gagal memuat milestones:", err);
@@ -307,8 +318,44 @@ export function MilestoneProgressionCard({
         </div>
       )}
 
-      {/* Upload & Submit Active Milestone (PIC only) */}
-      {activeMilestone && isPicUser && !isClosed && (
+      {/* Informative Lock Banner when Progress is Gated */}
+      {isGated && !isClosed && (
+        <div
+          id="operational-progress-gated-banner"
+          className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-5 shadow-sm space-y-3"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/60 flex items-center justify-center shrink-0 text-amber-700 dark:text-amber-300">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300 bg-amber-200/60 dark:bg-amber-900/80 px-2 py-0.5 rounded-md">
+                  Progres Operasional Terkunci
+                </span>
+                <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                  Prasyarat Operasional Belum Lengkap
+                </span>
+              </div>
+              <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed font-medium">
+                {gatingReason || "Laporan baru memerlukan tahap verifikasi awal dan estimasi selesai sebelum progres operasional dapat di-submit."}
+              </p>
+              {nextAction && (
+                <div className="pt-2 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60">
+                  <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
+                  <div>
+                    <span className="font-bold">Aksi Berikutnya: </span>
+                    <span>{nextAction}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload & Submit Active Milestone (PIC only - Unlocked when prerequisites met) */}
+      {!isGated && activeMilestone && isPicUser && !isClosed && (
         <div className="bg-white dark:bg-slate-900 border-2 border-blue-200 dark:border-blue-900/60 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

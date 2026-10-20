@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Compass,
   Eye,
@@ -18,6 +19,7 @@ import {
 import { Earthquake } from "@/types/disaster";
 
 interface MapControlsProps {
+  locationMode?: "event" | "store" | "dc";
   latestEarthquake?: Earthquake;
   incidentOnly: boolean;
   onToggleIncidentOnly: () => void;
@@ -48,6 +50,7 @@ interface MapControlsProps {
 }
 
 export function MapControls({
+  locationMode = "event",
   incidentOnly,
   onToggleIncidentOnly,
   basemap,
@@ -69,12 +72,72 @@ export function MapControls({
   onCloseMobileSheet,
 }: MapControlsProps) {
   const [isMinimized, setIsMinimized] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (hidden) return null;
 
   const isDark = theme === "dark";
+  const isLocationMode = locationMode === "store" || locationMode === "dc";
 
-  const controlContent = (
+  const controlContent = isLocationMode ? (
+    <div className="space-y-3">
+      {/* Basemap Selector */}
+      <div>
+        <div className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+          Pilihan Basemap
+        </div>
+        <div
+          className={`p-1 rounded-xl flex items-center gap-1 border ${
+            isDark ? "bg-slate-950/80 border-slate-800" : "bg-slate-100 border-slate-200"
+          }`}
+        >
+          {[
+            { id: "esri-dark", label: "Dark" },
+            { id: "esri-light", label: "Light" },
+            { id: "osm", label: "OSM" },
+          ].map((b) => {
+            const isSelected = basemap === b.id;
+            return (
+              <button
+                key={b.id}
+                onClick={() => onChangeBasemap(b.id as "esri-dark" | "esri-light" | "osm")}
+                aria-pressed={isSelected}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all text-center min-h-[34px] ${
+                  isSelected
+                    ? isDark
+                      ? "bg-slate-800 text-cyan-400 shadow-xs font-bold"
+                      : "bg-white text-blue-600 shadow-xs font-bold"
+                    : isDark
+                    ? "text-slate-400 hover:text-white"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {b.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Reset Tampilan Peta */}
+      <button
+        onClick={onResetView}
+        className={`w-full py-2 px-3 rounded-xl border font-semibold text-xs flex items-center justify-center gap-2 transition-all min-h-[40px] ${
+          isDark
+            ? "border-slate-700/80 hover:bg-slate-800 text-slate-300 hover:text-white"
+            : "border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900"
+        }`}
+      >
+        <Compass className="w-4 h-4 shrink-0 text-cyan-500" />
+        <span>Reset Tampilan Peta</span>
+      </button>
+    </div>
+  ) : (
+
     <div className="space-y-3">
       {/* Event Focus Mode Banner: Compact Fokus: M... [Reset] */}
       {selectedEarthquake && (
@@ -327,10 +390,10 @@ export function MapControls({
         )}
       </div>
 
-      {/* 2. MOBILE BOTTOM SHEET (Opens when user taps "Kontrol Peta" on mobile) */}
-      {isMobileSheetOpen && (
+      {/* 2. MOBILE BOTTOM SHEET (Opens when user taps "Kontrol Peta" on mobile, mounted in body portal) */}
+      {mounted && isMobileSheetOpen && typeof document !== "undefined" && createPortal(
         <div
-          className="lg:hidden fixed inset-0 z-[2500] flex flex-col justify-end"
+          className="lg:hidden fixed inset-0 z-[9999] flex flex-col justify-end"
           role="dialog"
           aria-modal="true"
           aria-label="Kontrol Peta"
@@ -382,7 +445,8 @@ export function MapControls({
             {/* Content */}
             {controlContent}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

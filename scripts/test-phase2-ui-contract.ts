@@ -15,6 +15,6 @@ assert.match(facility, /Riwayat perubahan/, "Master Fasilitas harus menampilkan 
 assert.match(facility, /\/audit/, "Master Fasilitas harus mengambil audit dari API protected");
 
 const tracking = read("components/incident/maintenance-tracking-modal.tsx");
-assert.match(tracking, /RepairLinksCard/, "Detail laporan harus menyediakan repair linking");
+assert.doesNotMatch(tracking, /<RepairLinksCard/, "Detail laporan harus menghapus repair linking per task 6");
 
 console.log("PASS Phase 2 operational UI contract");

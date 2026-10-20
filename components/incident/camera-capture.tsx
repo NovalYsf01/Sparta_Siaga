@@ -39,7 +39,6 @@ export function CameraCapture({
 }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraState, setCameraState] = useState<CameraState>("IDLE");
@@ -382,57 +381,6 @@ export function CameraCapture({
     toast.success("Foto bukti berhasil dilampirkan.");
   };
 
-  // Manual file upload fallback
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setCameraState("CAPTURING");
-    const img = new Image();
-    const tempUrl = URL.createObjectURL(file);
-
-    img.onload = () => {
-      const canvas = canvasRef.current || document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        setCameraState("IDLE");
-        toast.error("Gagal memproses gambar.");
-        URL.revokeObjectURL(tempUrl);
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0);
-      drawWatermark(ctx, canvas.width, canvas.height);
-
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            const watermarkedFile = new File([blob], `sparta_upload_${Date.now()}.jpg`, {
-              type: "image/jpeg",
-            });
-            const previewUrl = URL.createObjectURL(blob);
-            setCapturedPhoto({ file: watermarkedFile, previewUrl });
-            setCameraState("REVIEW");
-          }
-        },
-        "image/jpeg",
-        0.88
-      );
-
-      URL.revokeObjectURL(tempUrl);
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(tempUrl);
-      setCameraState("IDLE");
-      toast.error("Format file foto tidak valid.");
-    };
-
-    img.src = tempUrl;
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -477,15 +425,6 @@ export function CameraCapture({
           </button>
         </div>
       </div>
-
-      {/* Hidden file input for gallery fallback */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileUpload}
-      />
 
       {/* Center Viewport Container */}
       <div className="relative w-full h-full max-w-3xl flex flex-col items-center justify-center p-4">
@@ -537,12 +476,6 @@ export function CameraCapture({
               >
                 <CameraIcon className="w-4 h-4" /> Buka Kamera
               </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all border border-slate-800"
-              >
-                <ImageIcon className="w-4 h-4" /> Unggah Dari Galeri
-              </button>
             </div>
           </div>
         )}
@@ -585,10 +518,14 @@ export function CameraCapture({
                 <RefreshCw className="w-4 h-4" /> Coba Lagi
               </button>
               <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-slate-800"
+                onClick={() => {
+                  stopCamera();
+                  cleanupCapturedPhoto();
+                  onClose();
+                }}
+                className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-colors border border-slate-800 text-xs"
               >
-                <ImageIcon className="w-4 h-4" /> Unggah Dari File
+                Tutup (Gunakan Menu Sumber Foto)
               </button>
             </div>
           </div>

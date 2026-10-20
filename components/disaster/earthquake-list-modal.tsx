@@ -54,7 +54,12 @@ export function EarthquakeListModal({
   const isDark = theme === "dark";
 
   const modalContent = (
-    <div className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 ${isDark ? "bg-black/80" : "bg-slate-900/40"} backdrop-blur-sm`}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Daftar Gempa Bumi Terkini"
+      className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 ${isDark ? "bg-black/80" : "bg-slate-900/40"} backdrop-blur-sm`}
+    >
       <div className={`rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transition-colors border ${
         isDark ? "bg-slate-900 border-slate-700/80 text-slate-100" : "bg-white border-slate-200 text-slate-900"
       }`}>
@@ -233,6 +238,9 @@ export function EarthquakeListModal({
 
                     {/* Right Fly-To Action */}
                     <button
+                      type="button"
+                      data-testid="focus-earthquake-btn"
+                      aria-label={`Pusatkan peta ke ${eq.title || "gempa"}`}
                       onClick={() => {
                         onSelectEarthquake(eq);
                         onClose();

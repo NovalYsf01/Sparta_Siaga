@@ -10,6 +10,8 @@ export interface AffectedStoreSummary {
   status: 'PRIORITY_MONITOR' | 'MONITOR';
   alamat?: string;
   fr_type?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface NotificationLog {

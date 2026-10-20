@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, ArrowLeft, CalendarDays, ClipboardList, Download, Eye, FileText, Search, ShieldCheck, X } from "lucide-react";
 import type { DisasterType, IncidentRecord, IncidentStatus } from "@/types/incident";
 import { formatReportDate, getHoAttentionReasons, getReportTarget, isFinalPdfAvailable, isReportFinalized, reportStatusLabel } from "@/lib/ho-report-monitoring";
@@ -37,13 +38,14 @@ function ReportDetail({ incident, onClose }: { incident: IncidentRecord; onClose
   const target = getReportTarget(incident);
   const approval = incident.verification?.bmApproval;
   const photoPrefix = `/api/incidents/${encodeURIComponent(incident.id)}/inspection/evidence/`;
+  const rawFieldPhotos = (incident.fieldPhotos || []).map((p) => (typeof p === "string" ? p : p.url));
   const photos = Array.from(new Set([
     ...(incident.verification?.photos || []),
-    ...(incident.fieldPhotos || []),
+    ...rawFieldPhotos,
     ...(incident.verification?.evidenceDetails?.map(p => p.photoUrl) || []),
-  ])).filter(url => typeof url === "string" && url.startsWith(photoPrefix));
+  ])).filter((url): url is string => typeof url === "string" && url.startsWith(photoPrefix));
 
-  return (
+  const dialogContent = (
     <div className="fixed inset-0 z-[2700] flex flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white md:items-center md:justify-center md:bg-slate-950/65 md:p-5" role="dialog" aria-modal="true" aria-label={`Detail laporan ${incident.id}`}>
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900 md:max-h-[92dvh] md:max-w-5xl md:flex-none md:rounded-xl md:shadow-xl">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:px-6 sm:py-4">
@@ -143,6 +145,11 @@ function ReportDetail({ incident, onClose }: { incident: IncidentRecord; onClose
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return dialogContent;
+  }
+  return createPortal(dialogContent, document.body);
 }
 
 /** Read-only command view. No operational approve / edit / dispatch controls. */
@@ -168,7 +175,18 @@ export function HoReportMonitoring({ incidents }: { incidents: IncidentRecord[] 
     return true;
   }).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")), [incidents, activeTab, branch, status, kind, query, fromDate]);
 
-  const workingCount = incidents.filter(i => ["in_maintenance", "in_construction"].includes(i.status)).length;
+  const workingStatuses: IncidentStatus[] = [
+    "investigating",
+    "in_estimation",
+    "awaiting_spk",
+    "spk_issued",
+    "in_maintenance",
+    "in_construction",
+    "awaiting_st",
+    "pending_final_approval",
+    "revision_requested",
+  ];
+  const workingCount = incidents.filter(i => workingStatuses.includes(i.status)).length;
   const completedCount = incidents.filter(i => ["closed", "resolved", "archived", "confirmed_safe"].includes(i.status)).length;
 
   return (

@@ -34,6 +34,7 @@ interface MapViewProps {
   activeLayer?: "all" | "earthquake" | "stores" | "weather" | "flood";
   theme?: "dark" | "light";
   onViewportChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
+  selectedEarthquakeId?: string | null;
 }
 
 export function MapView(props: MapViewProps) {

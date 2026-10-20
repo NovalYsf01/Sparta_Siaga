@@ -212,8 +212,8 @@
 .dark .map-ux-action:hover { background: #243650; }
 @media (max-width: 639px) {
   .map-ux-action { min-height: 44px; }
-  /* Leaflet controls should stay clear of the mobile bottom navigation. */
-  .leaflet-bottom.leaflet-right { bottom: 9px; }
+  /* Leaflet controls should stay clear of the 64px mobile bottom navigation. */
+  .leaflet-bottom { bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px)); }
   .sparta-page-header { flex-wrap: wrap; }
   .sparta-page-header > * { min-width: 0; }
 }

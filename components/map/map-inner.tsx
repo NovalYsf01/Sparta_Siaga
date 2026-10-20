@@ -39,6 +39,7 @@ interface MapInnerProps {
   floodReports?: any[];
   theme?: "dark" | "light";
   onViewportChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
+  selectedEarthquakeId?: string | null;
 }
 
 // Controller component to smoothly fly to coordinates when requested
@@ -212,16 +213,17 @@ function createStoreIcon(store: Store, isSelected: boolean = false) {
 }
 
 // Function to generate dynamic epicenter earthquake marker
-function createEpicenterIcon(earthquake: Earthquake) {
+function createEpicenterIcon(earthquake: Earthquake, isFocused: boolean = false) {
   const isTsunami = earthquake.potensiTsunami;
   const isHigh = earthquake.magnitude >= 6.0;
 
   const html = `
     <div class="relative flex items-center justify-center cursor-pointer">
+      ${isFocused ? '<div class="absolute -inset-6 bg-cyan-400/35 rounded-full animate-ping"></div><div class="absolute -inset-2.5 ring-4 ring-cyan-400 rounded-full"></div>' : ''}
       <div class="absolute -inset-4 bg-red-600/30 rounded-full animate-ping"></div>
       <div class="absolute -inset-2 bg-red-500/50 rounded-full animate-pulse"></div>
       <div class="relative w-9 h-9 rounded-full ${isTsunami ? "bg-red-700" : isHigh ? "bg-red-600" : "bg-amber-600"
-    } border-2 border-white shadow-2xl flex items-center justify-center text-white">
+    } border-2 ${isFocused ? "border-cyan-300 ring-2 ring-cyan-400" : "border-white"} shadow-2xl flex items-center justify-center text-white">
         <span class="text-[10px] font-black font-mono">M${earthquake.magnitude}</span>
       </div>
     </div>
@@ -344,6 +346,7 @@ export default function MapInner({
   floodReports = [],
   theme = "dark",
   onViewportChange,
+  selectedEarthquakeId,
 }: MapInnerProps) {
   const isDark = theme === "dark";
   const [currentZoom, setCurrentZoom] = useState(5);
@@ -616,7 +619,7 @@ export default function MapInner({
                 {/* Epicenter Marker */}
                 <Marker
                   position={[eq.latitude, eq.longitude]}
-                  icon={createEpicenterIcon(eq)}
+                  icon={createEpicenterIcon(eq, eq.id === selectedEarthquakeId)}
                 >
                   <Popup className={`custom-leaflet-popup ${isDark ? "popup-dark" : "popup-light"}`}>
                     <div className={`p-3.5 rounded-xl border w-72 space-y-2 text-xs transition-colors ${

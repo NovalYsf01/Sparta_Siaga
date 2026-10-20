@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { getOrLoadMasterStores } from "@/lib/store-master-loader";
 
 // Known canonical branch alias mappings (e.g. testing codes / historical prefixes)
 const BRANCH_CANONICAL_MAP: Record<string, string> = {
@@ -77,17 +78,25 @@ export async function GET(request: Request) {
 
       // Role and Branch scoping for facilities
       if (!canSearchAllFacilities) {
-        // Operational branch roles (BES, BMM) can only search facilities mapped to their branch
+        // Operational branch roles (BES, BMM) can only search facilities mapped to their branch or matching branch name
         const aliases = resolveBranchAliases(sessionUser.branch);
+        const branchClauses: string[] = [];
         if (aliases.length > 0) {
-          conditions.push(`UPPER(branch_id) = ANY($${paramIndex}::text[])`);
-          values.push(aliases);
+          branchClauses.push(`UPPER(COALESCE(branch_id, '')) = ANY($${paramIndex}::text[])`);
+          values.push(aliases.map((a) => a.toUpperCase()));
           paramIndex++;
+
+          for (const alias of aliases) {
+            branchClauses.push(`name ILIKE $${paramIndex}`);
+            values.push(`%${alias}%`);
+            paramIndex++;
+          }
         } else {
-          conditions.push(`branch_id = $${paramIndex}`);
+          branchClauses.push(`branch_id = $${paramIndex}`);
           values.push(sessionUser.branch || "");
           paramIndex++;
         }
+        conditions.push(`(${branchClauses.join(" OR ")})`);
       }
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -106,7 +115,7 @@ export async function GET(request: Request) {
         id: `FACILITY:${row.id}`,
         kode_toko: row.code,
         nama_toko: row.name,
-        cabang: row.branch_id || "Belum dipetakan",
+        cabang: row.branch_id || sessionUser.branch || "Cabang Terkait",
         alamat: `${row.facility_type.replace(/_/g, " ")} (${row.operational_status === "ACTIVE" ? "Aktif" : "Non-aktif"})`,
         latitude: Number(row.latitude),
         longitude: Number(row.longitude),
@@ -146,64 +155,125 @@ export async function GET(request: Request) {
     }
 
     const canSearchAllStores = isAdmin || isHO;
-    const pool = getDbPool();
-    const conditions: string[] = [];
-    const values: unknown[] = [];
-    let paramIndex = 1;
+    let formattedStores: Array<{
+      id: string;
+      kode_toko: string;
+      nama_toko: string;
+      cabang: string;
+      alamat: string;
+      latitude: number;
+      longitude: number;
+      fr_type?: string;
+      branch_emergency_contact?: string;
+      locationKind: string;
+      locationId: string;
+    }> = [];
 
-    if (q.trim()) {
-      conditions.push(
-        `(nama_toko ILIKE $${paramIndex} OR kode_toko ILIKE $${paramIndex} OR alamat ILIKE $${paramIndex})`
-      );
-      values.push(`%${q.trim()}%`);
-      paramIndex++;
-    }
+    // 1. Try querying PostgreSQL stores table first
+    try {
+      const pool = getDbPool();
+      const conditions: string[] = [];
+      const values: unknown[] = [];
+      let paramIndex = 1;
 
-    // Server-side enforcement of branch scope with canonical aliases & case-insensitivity
-    if (!canSearchAllStores) {
-      const aliases = resolveBranchAliases(sessionUser.branch);
-      if (aliases.length > 0) {
-        conditions.push(`UPPER(cabang) = ANY($${paramIndex}::text[])`);
-        values.push(aliases);
-        paramIndex++;
-      } else {
-        conditions.push(`cabang = $${paramIndex}`);
-        values.push(sessionUser.branch || "");
+      if (q.trim()) {
+        conditions.push(
+          `(nama_toko ILIKE $${paramIndex} OR kode_toko ILIKE $${paramIndex} OR alamat ILIKE $${paramIndex})`
+        );
+        values.push(`%${q.trim()}%`);
         paramIndex++;
       }
+
+      // Server-side enforcement of branch scope with canonical aliases & case-insensitivity
+      if (!canSearchAllStores) {
+        const aliases = resolveBranchAliases(sessionUser.branch);
+        if (aliases.length > 0) {
+          conditions.push(`UPPER(cabang) = ANY($${paramIndex}::text[])`);
+          values.push(aliases);
+          paramIndex++;
+        } else {
+          conditions.push(`cabang = $${paramIndex}`);
+          values.push(sessionUser.branch || "");
+          paramIndex++;
+        }
+      }
+
+      const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const query = `
+        SELECT id, kode_toko, nama_toko, cabang, alamat, latitude, longitude, fr_type, branch_emergency_contact
+        FROM stores
+        ${whereClause}
+        ORDER BY nama_toko ASC
+        LIMIT $${paramIndex};
+      `;
+      values.push(limit);
+
+      const res = await pool.query(query, values);
+      if (res.rows && res.rows.length > 0) {
+        formattedStores = res.rows.map((row) => ({
+          ...row,
+          latitude: Number(row.latitude),
+          longitude: Number(row.longitude),
+          locationKind: "STORE",
+          locationId: row.kode_toko,
+        }));
+      }
+    } catch (dbErr) {
+      console.warn("[Search API] Direct DB store query failed or empty, falling back to master CSV stores:", dbErr);
     }
 
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    // 2. If DB returned 0 rows, use authoritative master stores dataset (21,550 stores)
+    if (formattedStores.length === 0) {
+      const masterStores = await getOrLoadMasterStores();
+      const aliases = resolveBranchAliases(sessionUser.branch).map((a) => a.toUpperCase());
 
-    const query = `
-      SELECT id, kode_toko, nama_toko, cabang, alamat, latitude, longitude, fr_type, branch_emergency_contact
-      FROM stores
-      ${whereClause}
-      ORDER BY nama_toko ASC
-      LIMIT $${paramIndex};
-    `;
-    values.push(limit);
+      let filtered = masterStores;
+      if (!canSearchAllStores) {
+        filtered = filtered.filter((s) => {
+          const b = (s.cabang || "").toUpperCase().trim();
+          return aliases.some((alias) => b === alias || b.includes(alias) || alias.includes(b));
+        });
+      }
 
-    const res = await pool.query(query, values);
-    const formattedStores = res.rows.map((row) => ({
-      ...row,
-      locationKind: "STORE",
-      locationId: row.kode_toko,
-    }));
+      if (q.trim()) {
+        const qLower = q.trim().toLowerCase();
+        filtered = filtered.filter(
+          (s) =>
+            s.nama_toko.toLowerCase().includes(qLower) ||
+            s.kode_toko.toLowerCase().includes(qLower) ||
+            (s.alamat && s.alamat.toLowerCase().includes(qLower))
+        );
+      }
+
+      formattedStores = filtered.slice(0, limit).map((s) => ({
+        id: s.id,
+        kode_toko: s.kode_toko,
+        nama_toko: s.nama_toko,
+        cabang: s.cabang,
+        alamat: s.alamat,
+        latitude: s.latitude,
+        longitude: s.longitude,
+        fr_type: s.fr_type,
+        branch_emergency_contact: s.branch_emergency_contact,
+        locationKind: "STORE",
+        locationId: s.kode_toko,
+      }));
+    }
 
     return NextResponse.json({
       data: formattedStores,
       count: formattedStores.length,
       type: "TOKO",
       masterAvailable: true,
-      source: "aiven-postgresql",
+      source: "aiven-postgresql-with-master-fallback",
     });
   } catch (error: unknown) {
-    console.error("[Search API] Error searching Aiven PostgreSQL:", error);
+    console.error("[Search API] Error searching locations:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Gagal mencari data toko di database", details: message },
+      { error: "Gagal mencari data lokasi", details: message },
       { status: 500 }
     );
   }

@@ -120,7 +120,7 @@ export function ActiveIncidentsTable({
     });
   }, [incidents, filterType, filterStatus, startDate, endDate, filterBranch]);
 
-  const getDisasterBadge = (type: DisasterType) => {
+  const getDisasterBadge = (type: DisasterType | string) => {
     switch (type) {
       case "flood":
         return { label: "Banjir", icon: Waves, color: "bg-blue-50 text-blue-700 border-blue-200" };
@@ -136,19 +136,50 @@ export function ActiveIncidentsTable({
         return { label: "Hujan/Badai", icon: Waves, color: "bg-indigo-50 text-indigo-700 border-indigo-200" };
       case "severe_building_damage":
         return { label: "Bangunan Rusak", icon: Pencil, color: "bg-orange-50 text-orange-700 border-orange-200" };
+      case "tornado":
+        return { label: "Puting Beliung", icon: Wind, color: "bg-teal-50 text-teal-700 border-teal-200" };
+      case "landslide":
+        return { label: "Tanah Longsor", icon: Pencil, color: "bg-amber-50 text-amber-900 border-amber-300" };
+      case "riot":
+        return { label: "Huru-Hara", icon: UserX, color: "bg-rose-50 text-rose-800 border-rose-200" };
       default:
         return { label: "Lainnya", icon: Pencil, color: "bg-slate-50 text-slate-600 border-slate-200" };
     }
   };
 
+  const formatIndonesianDate = (dateStr?: string | null): string => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getOriginBadge = (inc: IncidentRecord) => {
+    const isManual = (inc.reportOrigin as string) === "manual";
+    return isManual ? (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+        Laporan Manual
+      </span>
+    ) : (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
+        Laporan Otomatis
+      </span>
+    );
+  };
+
   const getHandlingStatus = (inc: IncidentRecord) => {
-    if (inc.status === "closed" || inc.status === "resolved" || inc.status === "confirmed_safe") {
+    const st = (inc.status as string)?.toLowerCase();
+    if (st === "closed" || st === "resolved" || st === "confirmed_safe") {
       return { label: "Selesai", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" };
     }
-    if (inc.status === "pending_bm_approval" || inc.status === "pending_final_approval" || inc.status === "awaiting_st") {
+    if (st === "pending_bm_approval" || st === "pending_final_approval" || st === "awaiting_st" || st === "waiting_approval" || st === "verifying") {
       return { label: "Menunggu Approval", color: "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800" };
     }
-    if (inc.primaryPicUserId || inc.status === "in_maintenance" || inc.status === "investigating" || inc.status === "in_estimation") {
+    if (inc.primaryPicUserId || st === "in_maintenance" || st === "investigating" || st === "in_estimation" || (inc.progress ?? 0) > 0) {
       return { label: "On Progress", color: "bg-blue-50 text-[#1D5AA6] dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800" };
     }
     return { label: "Belum Ditangani", color: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800" };
@@ -309,7 +340,7 @@ export function ActiveIncidentsTable({
                 const Icon = disaster.icon;
                 const hasPic = Boolean(inc.primaryPicUserId);
                 const picName = inc.primaryPicName || (hasPic ? "Petugas Ditugaskan" : "Belum Ditugaskan");
-                const targetDate = inc.maintenanceTicket?.completedAt || "Belum Ditentukan";
+                const targetDate = formatIndonesianDate(inc.maintenanceTicket?.completedAt);
                 const isOverdue = Boolean(inc.maintenanceTicket?.completedAt && new Date(inc.maintenanceTicket.completedAt) < new Date() && inc.status !== "closed" && inc.status !== "resolved");
 
                 return (
@@ -321,7 +352,7 @@ export function ActiveIncidentsTable({
                       {inc.maintenanceTicket?.ticketId || inc.id}
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
-                      {inc.date}
+                      {formatIndonesianDate(inc.date || inc.createdAt)}
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -338,10 +369,13 @@ export function ActiveIncidentsTable({
                       <div className="text-[10px] text-slate-500">{inc.branch} • {inc.locationCity}</div>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium ${disaster.color}`}>
-                        <Icon className="w-3 h-3 shrink-0" />
-                        <span>{disaster.label}</span>
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium ${disaster.color}`}>
+                          <Icon className="w-3 h-3 shrink-0" />
+                          <span>{disaster.label}</span>
+                        </span>
+                        {getOriginBadge(inc)}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${handling.color}`}>
@@ -429,7 +463,7 @@ export function ActiveIncidentsTable({
             const Icon = disaster.icon;
             const hasPic = Boolean(inc.primaryPicUserId);
             const picName = inc.primaryPicName || (hasPic ? "Petugas Ditugaskan" : "Belum Ditugaskan");
-            const targetDate = inc.maintenanceTicket?.completedAt || "Belum Ditentukan";
+            const targetDate = formatIndonesianDate(inc.maintenanceTicket?.completedAt);
             const isOverdue = Boolean(inc.maintenanceTicket?.completedAt && new Date(inc.maintenanceTicket.completedAt) < new Date() && inc.status !== "closed" && inc.status !== "resolved");
 
             return (
@@ -455,6 +489,16 @@ export function ActiveIncidentsTable({
                     </div>
                     <div className="text-[11px] text-slate-500 truncate">
                       {inc.locationCity} • {inc.branch}
+                    </div>
+                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${disaster.color}`}>
+                        <Icon className="w-2.5 h-2.5 shrink-0" />
+                        <span>{disaster.label}</span>
+                      </span>
+                      {getOriginBadge(inc)}
+                      <span className="text-[10px] text-slate-400">
+                        {formatIndonesianDate(inc.date || inc.createdAt)}
+                      </span>
                     </div>
                   </div>
                   <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${handling.color}`}>

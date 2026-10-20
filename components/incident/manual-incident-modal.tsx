@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, AlertTriangle, FileText, Building, User, ChevronRight, CheckCircle2, Eye, Activity } from "lucide-react";
 import { DisasterType, getRoleDisplayLabel } from "@/types/incident";
 import { Earthquake } from "@/types/disaster";
@@ -128,8 +128,11 @@ export function ManualIncidentModal({
 
   const isHOScope = identity?.scope === "HO";
 
+  const wasOpenRef = useRef(false);
+
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
+      wasOpenRef.current = true;
       const userRole = (identity?.businessRole || identity?.role || activeRole || "").toLowerCase();
       if (userRole === "bes") {
         setTkpType("DC");
@@ -158,6 +161,8 @@ export function ManualIncidentModal({
         setSearchQuery("");
       }
       setStep(1);
+    } else if (!isOpen) {
+      wasOpenRef.current = false;
     }
   }, [isOpen, isHOScope, identity, rawStores, activeRole]);
 
@@ -181,6 +186,33 @@ export function ManualIncidentModal({
         alert("Laporan manual WAJIB melampirkan seluruh sisi foto yang diminta.");
         return;
       }
+
+      // Validate that all gallery photos have mandatory reasons and provider identity
+      const allSlots = [
+        { name: "Foto Tampak 1 (Depan)", data: photos.depan },
+        { name: "Foto Tampak 2 (Dalam)", data: photos.dalam },
+        { name: "Foto Tampak 3 (Kiri)", data: photos.kiri },
+        { name: "Foto Tampak 4 (Kanan)", data: photos.kanan },
+      ];
+      if (tkpType === "DC") {
+        allSlots.push({ name: "Foto Titik Detail DC", data: photos.detailDC });
+      }
+
+      for (const slot of allSlots) {
+        if (slot.data.source === "gallery") {
+          if (!slot.data.galleryReason?.trim()) {
+            alert(`Slot ${slot.name} menggunakan foto galeri tetapi belum menyertakan alasan penggunaan.`);
+            return;
+          }
+          if (slot.data.reporterRelation === "received") {
+            if (!slot.data.sourceProvider?.trim() || !slot.data.receiptContext?.trim()) {
+              alert(`Slot ${slot.name} bersumber dari pihak lain tetapi belum menyertakan identitas pemberi dan konteks penerimaan.`);
+              return;
+            }
+          }
+        }
+      }
+
       setStep(3);
     }
   };
@@ -195,15 +227,60 @@ export function ManualIncidentModal({
       (s) => s.kode_toko === storeId || s.id === storeId
     );
 
-    // Generate dummy URLs or handle files in a real app
-    const dummyPhotos = [
-      photos.depan.previewUrl || "",
-      photos.dalam.previewUrl || "",
-      photos.kiri.previewUrl || "",
-      photos.kanan.previewUrl || ""
+    // Map photos to detailed metadata objects
+    const photoDetails = [
+      {
+        url: photos.depan.previewUrl || "",
+        source: photos.depan.source || "camera",
+        reporterRelation: photos.depan.reporterRelation,
+        galleryReason: photos.depan.galleryReason,
+        sourceProvider: photos.depan.sourceProvider,
+        receiptContext: photos.depan.receiptContext,
+        capturedAt: photos.depan.capturedAt,
+        slotLabel: "Foto Tampak 1",
+      },
+      {
+        url: photos.dalam.previewUrl || "",
+        source: photos.dalam.source || "camera",
+        reporterRelation: photos.dalam.reporterRelation,
+        galleryReason: photos.dalam.galleryReason,
+        sourceProvider: photos.dalam.sourceProvider,
+        receiptContext: photos.dalam.receiptContext,
+        capturedAt: photos.dalam.capturedAt,
+        slotLabel: "Foto Tampak 2",
+      },
+      {
+        url: photos.kiri.previewUrl || "",
+        source: photos.kiri.source || "camera",
+        reporterRelation: photos.kiri.reporterRelation,
+        galleryReason: photos.kiri.galleryReason,
+        sourceProvider: photos.kiri.sourceProvider,
+        receiptContext: photos.kiri.receiptContext,
+        capturedAt: photos.kiri.capturedAt,
+        slotLabel: "Foto Tampak 3",
+      },
+      {
+        url: photos.kanan.previewUrl || "",
+        source: photos.kanan.source || "camera",
+        reporterRelation: photos.kanan.reporterRelation,
+        galleryReason: photos.kanan.galleryReason,
+        sourceProvider: photos.kanan.sourceProvider,
+        receiptContext: photos.kanan.receiptContext,
+        capturedAt: photos.kanan.capturedAt,
+        slotLabel: "Foto Tampak 4",
+      },
     ];
     if (tkpType === "DC" && photos.detailDC.previewUrl) {
-      dummyPhotos.unshift(photos.detailDC.previewUrl);
+      photoDetails.unshift({
+        url: photos.detailDC.previewUrl,
+        source: photos.detailDC.source || "camera",
+        reporterRelation: photos.detailDC.reporterRelation,
+        galleryReason: photos.detailDC.galleryReason,
+        sourceProvider: photos.detailDC.sourceProvider,
+        receiptContext: photos.detailDC.receiptContext,
+        capturedAt: photos.detailDC.capturedAt,
+        slotLabel: "Foto Titik Detail DC",
+      });
     }
 
     const matchedEq = disasterType === "earthquake" && selectedEarthquakeEventId
@@ -215,6 +292,9 @@ export function ManualIncidentModal({
     const resolvedLocationCode = selectedStoreObj?.kode_toko || storeId;
     const resolvedLocationName = selectedStoreObj?.nama_toko || (tkpType === "DC" ? "Fasilitas Cabang" : "Lokasi Tidak Diketahui");
     const resolvedLocationType = selectedStoreObj?.facilityType || (tkpType === "DC" ? "DC" : "STORE");
+
+    const derivedBranch = store?.cabang || identity?.branch || "Nasional";
+    const derivedCity = (store as any)?.kab_kota || store?.cabang || identity?.branch || "Kota Cabang";
 
     onConfirm({
       disasterType,
@@ -235,8 +315,8 @@ export function ManualIncidentModal({
       tkpType,
       storeId,
       storeName: resolvedLocationName,
-      branch: store?.cabang || identity?.branch || "Unknown",
-      locationCity: store?.kab_kota || "Unknown",
+      branch: derivedBranch,
+      locationCity: derivedCity,
       locationKind: resolvedLocationKind,
       locationId: resolvedLocationId,
       locationCodeSnapshot: resolvedLocationCode,
@@ -247,7 +327,7 @@ export function ManualIncidentModal({
       severity,
       operationalStatus,
       notes,
-      photos: dummyPhotos
+      photos: photoDetails,
     });
 
     // Reset state after submit handled in parent, but clean up local urls

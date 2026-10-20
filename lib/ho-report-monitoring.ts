@@ -65,7 +65,7 @@ export function getHoAttentionReasons(report: IncidentRecord, now = Date.now()):
       break;
   }
   const target = getReportTarget(report);
-  const inWork = ["in_maintenance", "in_construction", "in_estimation", "awaiting_spk", "spk_issued"].includes(report.status);
+  const inWork = ["investigating", "in_maintenance", "in_construction", "in_estimation", "awaiting_spk", "spk_issued"].includes(report.status);
   if (inWork && !target) issues.push("Target penyelesaian belum ditentukan");
   // Target is a calendar deadline, not an hour-by-hour timer.
   // Do not mark a report overdue on the morning of its due date.
