@@ -46,7 +46,7 @@ import {
 } from "@/lib/completion-approval-service";
 import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { WorkReadinessCard } from "./work-readiness-card";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
 
@@ -151,7 +151,6 @@ export function MaintenanceTrackingModal({
   isReadOnly = false,
 }: MaintenanceTrackingModalProps) {
   // Lock background scroll when modal is open
-  useBodyScrollLock(isOpen);
 
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
 
@@ -652,7 +651,7 @@ export function MaintenanceTrackingModal({
   const steps = computeSteps();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
+    <AppDialog open={isOpen} onClose={onClose} title={"Detail Laporan"} className="sm:!max-w-4xl">
       <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] sm:max-h-[88dvh] min-h-0 overflow-hidden touch-auto select-text">
         {/* COMPACT SUMMARY HEADER */}
         <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0">
@@ -664,7 +663,7 @@ export function MaintenanceTrackingModal({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
-                    Detail Tracking Laporan
+                    Detail Laporan
                   </h3>
                   <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                     {incident.id}
@@ -1614,6 +1613,6 @@ export function MaintenanceTrackingModal({
           </button>
         </div>
       </div>
-    </div>
+    </AppDialog>
   );
 }
