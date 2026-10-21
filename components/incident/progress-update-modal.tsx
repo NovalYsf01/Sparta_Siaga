@@ -20,7 +20,7 @@ import { IncidentRecord } from "@/types/incident";
 import { UserIdentity } from "@/lib/identity";
 import { ProgressUpdateRecord, WorkStage } from "@/lib/progress-service";
 import { CameraCapture } from "./camera-capture";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
 import { StoreVerificationModal } from "./store-verification-modal";
 import { CompletionApprovalCard } from "./completion-approval-card";
@@ -48,7 +48,6 @@ export function ProgressUpdateModal({
   onUpdated,
 }: ProgressUpdateModalProps) {
   // Lock background scroll when modal is open
-  useBodyScrollLock(isOpen);
 
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
   const [progressValue, setProgressValue] = useState<number>(latestProgress || 0);
@@ -255,7 +254,8 @@ export function ProgressUpdateModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none touch-none select-none">
+    <>
+    <AppDialog open={isOpen} onClose={onClose} title={"Update Progress Pekerjaan"} className="sm:!max-w-2xl">
       <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header (Fixed) */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
@@ -735,6 +735,7 @@ export function ProgressUpdateModal({
         </div>
       </div>
 
+    </AppDialog>
       <CameraCapture
         isOpen={isCameraOpen}
         onClose={() => setIsCameraOpen(false)}
@@ -742,6 +743,6 @@ export function ProgressUpdateModal({
         storeName={incident.storeName}
         reporterName={identity?.name || "Petugas Lapangan"}
       />
-    </div>
+    </>
   );
 }
