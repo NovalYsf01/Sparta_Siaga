@@ -119,7 +119,9 @@ export function MilestoneProgressionCard({
     identity?.businessRole === "bms" ||
     identity?.role === "bms" ||
     identity?.businessRole === "bes" ||
-    identity?.role === "bes";
+    identity?.role === "bes" ||
+    identity?.businessRole === "bbs" ||
+    identity?.role === "bbs";
 
   const isClosed = incident.status === "closed" || incident.status === "resolved";
   const isAwaitingFinalBm =
