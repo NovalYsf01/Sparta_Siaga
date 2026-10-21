@@ -24,6 +24,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: HO reports, PDF, permissions and rendering smoke test
         run: pnpm exec tsx scripts/test-ho-report-pr7.ts
+      - name: National notification privacy and authorization
+        run: pnpm exec tsx scripts/test-notification-branch-isolation.ts
       - name: Typecheck
         run: pnpm typecheck
       - name: Production build
