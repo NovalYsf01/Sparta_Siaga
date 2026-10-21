@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { IncidentRecord } from "@/types/incident";
 import { UserIdentity } from "@/lib/identity";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { AppDialog } from "@/components/shared/app-dialog";
 
 interface SelectReportModalProps {
   isOpen: boolean;
@@ -55,7 +55,6 @@ export function SelectReportModal({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Lock background scrolling when modal is open
-  useBodyScrollLock(isOpen);
 
   const isEstimation = purpose === "ESTIMATION";
 
@@ -88,7 +87,7 @@ export function SelectReportModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none select-none">
+    <AppDialog open={isOpen} onClose={onClose} title={isEstimation ? "Pilih Laporan untuk Buat Estimasi" : "Pilih Laporan untuk Update Progress"} className="sm:!max-w-2xl">
       <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header (Fixed) */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
@@ -136,7 +135,7 @@ export function SelectReportModal({
           ) : (
             filteredReports.map((report) => {
               const isToko = (report.tkpType || "toko").toLowerCase() === "toko";
-              const isDc = !isToko;
+              const isDc = (report.tkpType || "toko").toLowerCase() === "dc";
 
               return (
                 <div
@@ -200,6 +199,6 @@ export function SelectReportModal({
           </button>
         </div>
       </div>
-    </div>
+    </AppDialog>
   );
 }
