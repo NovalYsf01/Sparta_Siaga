@@ -40,6 +40,8 @@ interface CompletionApprovalCardProps {
   canClose: boolean;
   closeReason?: string;
   onRefresh: () => void;
+  /** Detail Laporan can display status/history but never operational actions. */
+  readOnly?: boolean;
 }
 
 export function CompletionApprovalCard({
@@ -59,6 +61,7 @@ export function CompletionApprovalCard({
   canClose,
   closeReason,
   onRefresh,
+  readOnly = false,
 }: CompletionApprovalCardProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -320,7 +323,7 @@ export function CompletionApprovalCard({
       )}
 
       {/* Action Area based on Role and Stage */}
-      {!isResolved && (
+      {!readOnly && !isResolved && (
         <div className="bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
           {/* STAGE 1: WAITING_PIC_SUBMISSION or REVISION_REQUIRED */}
           {(status === "WAITING_PIC_SUBMISSION" || status === "REVISION_REQUIRED") && (
@@ -500,7 +503,7 @@ export function CompletionApprovalCard({
       </div>
 
       {/* Confirmation / Notes Dialog */}
-      {activeModal && (
+      {!readOnly && activeModal && (
         <div className="fixed inset-0 z-[7000] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
             <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
