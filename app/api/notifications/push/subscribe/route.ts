@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json({ error: "URL endpoint push tidak valid." }, { status: 400 });
     }
-    const host = endpointUrl.hostname.toLowerCase();
+    const host = endpointUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
     if (
       endpointUrl.protocol !== "https:" ||
       Boolean(endpointUrl.username || endpointUrl.password) ||
