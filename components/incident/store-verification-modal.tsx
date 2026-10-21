@@ -42,7 +42,7 @@ import { CameraCapture } from "./camera-capture";
 
 interface StoreVerificationModalProps {
   incident: IncidentRecord | null;
-  activeRole: RoleType;
+  activeRole?: RoleType;
   isOpen: boolean;
   onClose: () => void;
   onConfirmVerification: (
