@@ -519,19 +519,17 @@ export class CompletionApprovalService {
     const approval = await this.getOrCreateApproval(params.reportId);
 
     // 1. Scope and System Admin checks
-    if (params.actor.scope === "HO") {
+    if (params.actor.scope === "HO" || params.actor.systemRole === "ADMIN") {
       const err: any = new Error("Forbidden: User dengan scope Head Office tidak memiliki izin persetujuan koordinator.");
       err.status = 403;
       throw err;
     }
 
-    const isSystemAdmin = params.actor.systemRole === "ADMIN";
-
     // 2. Domain Routing Check
     const expectedRoute = resolveApprovalRoute(report, route);
-    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
+    const actorRole = (params.actor.role || "").toLowerCase();
 
-    if (!isSystemAdmin && actorRole !== expectedRoute.coordinatorRole) {
+    if (actorRole !== expectedRoute.coordinatorRole) {
       const err: any = new Error(
         `Laporan jalur ${expectedRoute.flowType} hanya dapat disetujui oleh ${expectedRoute.coordinatorRole.toUpperCase()}, bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
@@ -541,7 +539,7 @@ export class CompletionApprovalService {
     }
 
     // 3. Branch Scope Check (Admin is not restricted to single branch)
-    if (!isSystemAdmin) {
+    {
       const userBranch = cleanBranch(params.actor.branch);
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
@@ -662,18 +660,16 @@ export class CompletionApprovalService {
     const approval = await this.getOrCreateApproval(params.reportId);
 
     // 1. Scope and System Admin checks
-    if (params.actor.scope === "HO") {
+    if (params.actor.scope === "HO" || params.actor.systemRole === "ADMIN") {
       const err: any = new Error("Forbidden: User dengan scope Head Office tidak memiliki izin revisi koordinator.");
       err.status = 403;
       throw err;
     }
 
-    const isSystemAdmin = params.actor.systemRole === "ADMIN";
-
     // 2. Domain Routing Check
     const expectedRoute = resolveApprovalRoute(report, route);
-    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
-    if (!isSystemAdmin && actorRole !== expectedRoute.coordinatorRole) {
+    const actorRole = (params.actor.role || "").toLowerCase();
+    if (actorRole !== expectedRoute.coordinatorRole) {
       const err: any = new Error(
         `Laporan jalur ${expectedRoute.flowType} hanya dapat direvisi oleh ${expectedRoute.coordinatorRole.toUpperCase()}.`
       );
@@ -682,7 +678,7 @@ export class CompletionApprovalService {
     }
 
     // 3. Branch Scope Check (Admin is not restricted to single branch)
-    if (!isSystemAdmin) {
+    {
       const userBranch = cleanBranch(params.actor.branch);
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
@@ -798,8 +794,8 @@ export class CompletionApprovalService {
     const isSystemAdmin = params.actor.systemRole === "ADMIN";
 
     // 2. Role Check: BnM Manajer ('bm') or Admin
-    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
-    if (!isSystemAdmin && actorRole !== "bm") {
+    const actorRole = (params.actor.role || "").toLowerCase();
+    if (isSystemAdmin || actorRole !== "bm") {
       const err: any = new Error(
         `Persetujuan final dan penutupan laporan hanya dapat dilakukan oleh BnM Manajer, bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
@@ -809,7 +805,7 @@ export class CompletionApprovalService {
     }
 
     // 3. Branch Scope Isolation (Admin is not restricted to single branch)
-    if (!isSystemAdmin) {
+    {
       const userBranch = cleanBranch(params.actor.branch);
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
@@ -835,9 +831,7 @@ export class CompletionApprovalService {
     }
 
     // 5. Status Check: WAITING_MANAGER_APPROVAL or WAITING_COORDINATOR_APPROVAL for Admin
-    const isReadyForManager =
-      approval.status === "WAITING_MANAGER_APPROVAL" ||
-      (approval.status === "WAITING_COORDINATOR_APPROVAL" && isSystemAdmin);
+    const isReadyForManager = approval.status === "WAITING_MANAGER_APPROVAL";
 
     if (!isReadyForManager) {
       const err: any = new Error(
@@ -980,18 +974,16 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    const isSystemAdmin = params.actor.systemRole === "ADMIN";
-
     // 2. Role Check: BnM Manajer ('bm') or Admin
-    const actorRole = isSystemAdmin ? "admin" : (params.actor.role || "").toLowerCase();
-    if (!isSystemAdmin && actorRole !== "bm") {
+    const actorRole = (params.actor.role || "").toLowerCase();
+    if (params.actor.systemRole === "ADMIN" || actorRole !== "bm") {
       const err: any = new Error(`Hanya BnM Manajer yang dapat meminta revisi pada tahap ini.`);
       err.status = 403;
       throw err;
     }
 
     // 3. Branch Scope (Admin is not restricted to single branch)
-    if (!isSystemAdmin) {
+    {
       const userBranch = cleanBranch(params.actor.branch);
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
@@ -1004,7 +996,7 @@ export class CompletionApprovalService {
     }
 
     // 4. State Check
-    if (approval.status !== "WAITING_MANAGER_APPROVAL" && approval.status !== "WAITING_COORDINATOR_APPROVAL") {
+    if (approval.status !== "WAITING_MANAGER_APPROVAL") {
       const err: any = new Error(
         `Penolakan / permintaan revisi BnM Manajer ditolak: Status laporan saat ini adalah '${approval.status}'.`
       );

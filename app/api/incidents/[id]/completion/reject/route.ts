@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
+    if (sessionUser.scope === "HO" || sessionUser.systemRole === "ADMIN") {
       return NextResponse.json(
         { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
         { status: 403 }
@@ -39,9 +39,8 @@ export async function POST(request: Request, { params }: RouteContext) {
     };
 
     const role = (sessionUser.role || "").toLowerCase();
-    const isSysAdmin = sessionUser.systemRole === "ADMIN";
 
-    if (isSysAdmin || role === "bm") {
+    if (role === "bm") {
       const result = await CompletionApprovalService.rejectByManager({
         reportId: id,
         actor,

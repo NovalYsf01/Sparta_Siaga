@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   Store,
   Calendar,
-  Calculator,
   Lock,
   Layers,
   FileCheck,
@@ -35,7 +34,6 @@ import {
   DamageReport,
   IncidentPhotoDetail,
 } from "@/types/incident";
-import { EstimationStatusCard } from "./estimation-status-card";
 import { EstimationRouteRecord } from "@/lib/estimation-service";
 import { ProgressTimeline } from "./progress-timeline";
 import { CompletionApprovalCard } from "./completion-approval-card";
@@ -46,8 +44,7 @@ import {
 } from "@/lib/completion-approval-service";
 import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
-import { WorkReadinessCard } from "./work-readiness-card";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
 
 interface MaintenanceTrackingModalProps {
@@ -151,7 +148,6 @@ export function MaintenanceTrackingModal({
   isReadOnly = false,
 }: MaintenanceTrackingModalProps) {
   // Lock background scroll when modal is open
-  useBodyScrollLock(isOpen);
 
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
 
@@ -187,7 +183,7 @@ export function MaintenanceTrackingModal({
   const [approveCoordinatorReason, setApproveCoordinatorReason] = useState("");
 
   // 5 Logical Sections Tab State
-  const [activeTab, setActiveTab] = useState<"ringkasan" | "pemeriksaan" | "estimasi" | "progres" | "dokumen">("ringkasan");
+  const [activeTab, setActiveTab] = useState<"ringkasan" | "pemeriksaan" | "approval" | "progres" | "dokumen">("ringkasan");
 
   // Initial & Inspection Photo Preview Lightbox
   const [previewPhoto, setPreviewPhoto] = useState<{
@@ -652,7 +648,7 @@ export function MaintenanceTrackingModal({
   const steps = computeSteps();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
+    <AppDialog open={isOpen} onClose={onClose} title={"Detail Laporan"} className="sm:!max-w-4xl">
       <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] sm:max-h-[88dvh] min-h-0 overflow-hidden touch-auto select-text">
         {/* COMPACT SUMMARY HEADER */}
         <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0">
@@ -664,7 +660,7 @@ export function MaintenanceTrackingModal({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
-                    Detail Tracking Laporan
+                    Detail Laporan
                   </h3>
                   <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
                     {incident.id}
@@ -779,20 +775,15 @@ export function MaintenanceTrackingModal({
 
             <button
               type="button"
-              onClick={() => setActiveTab("estimasi")}
+              onClick={() => setActiveTab("approval")}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                activeTab === "estimasi"
+                activeTab === "approval"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
-              <Calculator className="w-3.5 h-3.5" />
-              <span>3. Estimasi & Approval</span>
-              {estimationRoute?.status === "ESTIMATION_COMPLETED" && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
-                  ✓
-                </span>
-              )}
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>3. Approval</span>
             </button>
 
             <button
@@ -1273,43 +1264,33 @@ export function MaintenanceTrackingModal({
             </div>
           )}
 
-          {/* TAB 3: ESTIMASI & APPROVAL */}
-          {activeTab === "estimasi" && (
+          {/* TAB 3: APPROVAL STATUS (DETAIL IS ALWAYS READ-ONLY) */}
+          {activeTab === "approval" && (
             <div className="space-y-4 animate-in fade-in">
-              <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-3">
-                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
                 <div className="space-y-1">
-                  <h6 className="font-bold text-xs">Ketentuan Estimasi Biaya SPARTA SIAGA</h6>
-                  <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
-                    Perhitungan dan pembuatan rincian estimasi biaya dikerjakan melalui aplikasi SPARTA terkait (di luar SIAGA). Petugas mengunggah dokumen hasil estimasi secara manual melalui menu <strong>Update Progress</strong> pada tahap <strong>Milestone Estimasi (25%)</strong>.
+                  <strong>Status & Riwayat Approval</strong>
+                  <p>
+                    Halaman Detail hanya untuk melihat persetujuan dan riwayatnya.
+                    Pemeriksaan, persetujuan koordinator, keputusan BnM Manajer, dan Case Close
+                    hanya dilakukan melalui menu Update Progress oleh akun yang berwenang.
                   </p>
                 </div>
               </div>
-
-              {estimationRoute ? (
-                <>
-                  <EstimationStatusCard route={estimationRoute} loading={loading} />
-                  <WorkReadinessCard
-                    incident={incident}
-                    estimationRoute={estimationRoute}
-                    canUpdate={false}
-                    updateReason="Kesiapan kerja dikelola melalui sistem SPARTA terkait."
-                    onReadinessUpdated={loadData}
-                  />
-                </>
-              ) : (
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-3">
-                  <Calculator className="w-10 h-10 text-slate-400 mx-auto" />
-                  <div>
-                    <h5 className="font-bold text-sm text-slate-900 dark:text-white">
-                      Dokumentasi Estimasi Biaya
-                    </h5>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
-                      Data laporan dapat digunakan pada proses aplikasi SPARTA terkait. Setelah dokumen estimasi selesai, unggah dokumen PDF/berkas hasil estimasi pada menu Update Progress untuk mencatat Milestone 25%.
-                    </p>
-                  </div>
-                </div>
-              )}
+              <CompletionApprovalCard
+                incident={incident}
+                approval={completionApproval}
+                route={completionRoute}
+                history={completionHistory}
+                latestProgress={latestProgress}
+                hasFinalEvidence={hasFinalEvidence}
+                canSubmitCompletion={false}
+                canApproveCoordinator={false}
+                canClose={false}
+                onRefresh={loadData}
+                readOnly
+              />
             </div>
           )}
 
@@ -1529,15 +1510,13 @@ export function MaintenanceTrackingModal({
 
         {/* LIGHTBOX PHOTO PREVIEW MODAL */}
         {previewPhoto && (
-          <div
-            id="initial-photo-preview-modal"
-            className="fixed inset-0 z-60 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
-            onClick={() => setPreviewPhoto(null)}
+          <AppDialog
+            open={!!previewPhoto}
+            onClose={() => setPreviewPhoto(null)}
+            title={previewPhoto.title || "Pratinjau Foto Bukti"}
+            className="sm:!max-w-3xl"
           >
-            <div
-              className="relative max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="relative w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]">
               {/* Preview Header */}
               <div className="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1597,7 +1576,7 @@ export function MaintenanceTrackingModal({
                 )}
               </div>
             </div>
-          </div>
+          </AppDialog>
         )}
         {/* MINIMAL FOOTER */}
         <div className="px-5 py-3 bg-slate-50/70 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
@@ -1614,6 +1593,6 @@ export function MaintenanceTrackingModal({
           </button>
         </div>
       </div>
-    </div>
+    </AppDialog>
   );
 }
