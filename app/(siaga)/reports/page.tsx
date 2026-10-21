@@ -7,7 +7,7 @@ import { MaintenanceTrackingModal } from "@/components/incident/maintenance-trac
 import { IncidentRecord } from "@/types/incident";
 
 export default function ReportsPage() {
-  const { incidents, handleSelectIncidentForDetail, handleOpenReportModal } = useSiaga();
+  const { incidents, handleSelectIncidentForDetail, handleOpenReportModal, refreshIncidents } = useSiaga();
 
   return (
     <>
@@ -15,6 +15,7 @@ export default function ReportsPage() {
         incidents={incidents}
         onSelectIncident={(inc) => handleSelectIncidentForDetail(inc)}
         onOpenReportModal={() => handleOpenReportModal()}
+        onReportUpdated={refreshIncidents}
       />
     </>
   );
