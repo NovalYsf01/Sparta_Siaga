@@ -85,7 +85,7 @@ export function ProgressUpdateModal({
   const [physicalProgress, setPhysicalProgress] = useState(latestProgress || 0);
   const [hasFinalEvidence, setHasFinalEvidence] = useState(false);
 
-  const refreshWorkflow = async () => {
+  const refreshWorkflow = async (selectInitialTab = false) => {
     if (!incident) return;
     try {
       const [permissionResponse, completionResponse, progressResponse] = await Promise.all([
@@ -104,6 +104,21 @@ export function ProgressUpdateModal({
       setApprovalHistory(completionJson?.data?.history || []);
       setPhysicalProgress(progressJson?.data?.latestProgress ?? incident.progress ?? 0);
       setHasFinalEvidence(Boolean(progressJson?.data?.hasFinalEvidence));
+      if (selectInitialTab) {
+        const access = permissionJson?.data;
+        if (
+          (incident.status === "pending_bm_approval" && access?.canBmApprove) ||
+          (["pending_confirmation", "verifying", "clarification_requested"].includes(incident.status) && access?.canConfirm)
+        ) {
+          setActiveTab("inspection");
+        } else if (
+          (incident.progress ?? 0) >= 100 ||
+          incident.status === "pending_final_approval" ||
+          incident.status === "revision_requested"
+        ) {
+          setActiveTab("approval");
+        }
+      }
     } catch (error) {
       console.error("[Update Progress] Gagal memuat alur tindakan laporan:", error);
       setWorkflowPermissions(null);
@@ -127,7 +142,7 @@ export function ProgressUpdateModal({
           if (data) setIdentity(data.user || data);
         })
         .catch(() => {});
-      void refreshWorkflow();
+      void refreshWorkflow(true);
     }
   }, [isOpen, incident?.id]);
 
