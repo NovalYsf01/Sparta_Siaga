@@ -433,10 +433,13 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           const alertKey = (alert: { id: string; disaster_id?: string; disaster_type?: string }) =>
             alert.disaster_id ? `${alert.disaster_type || "disaster"}:${alert.disaster_id}` : alert.id;
           const freshAlerts = activeAlerts.filter(
-            (alert: { id: string; disaster_id?: string; disaster_type?: string }) =>
-              !seenNotificationIdsRef.current.has(alertKey(alert))
+            (alert: { id: string; disaster_id?: string; disaster_type?: string }) => {
+              const key = alertKey(alert);
+              if (seenNotificationIdsRef.current.has(key)) return false;
+              seenNotificationIdsRef.current.add(key);
+              return true;
+            }
           );
-          for (const alert of activeAlerts) seenNotificationIdsRef.current.add(alertKey(alert));
 
           // First poll establishes the baseline; subsequent polls notify on new alerts.
           if (hasLoadedNotificationFeedRef.current && freshAlerts.length > 0) {
