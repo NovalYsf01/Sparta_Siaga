@@ -5,6 +5,7 @@ import {
   checkUserPermission,
   canSubmitInspectionAsync,
   canApproveAsBmAsync,
+  canViewReportAsync,
 } from "@/lib/permission-service";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -20,6 +21,10 @@ export async function GET(_: Request, { params }: RouteContext) {
     const incident = await dbGetIncidentById(id);
     if (!incident) {
       return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
+    }
+
+    if (!await canViewReportAsync(sessionUser, incident)) {
+      return NextResponse.json({ error: "Anda tidak memiliki akses ke laporan ini." }, { status: 403 });
     }
 
     const [
@@ -48,6 +53,13 @@ export async function GET(_: Request, { params }: RouteContext) {
       checkUserPermission({ user: sessionUser, permission: "COMPLETION_APPROVE_COORDINATOR", report: incident }),
     ]);
 
+    const sameBranch = Boolean(
+      sessionUser.branch && incident.branch &&
+      sessionUser.branch.trim().toLowerCase() === incident.branch.trim().toLowerCase()
+    );
+    const actorRole = (sessionUser.role || "").toLowerCase();
+    const operationalActor = sessionUser.systemRole !== "ADMIN" && sessionUser.scope !== "HO" && sameBranch;
+
     return NextResponse.json({
       data: {
         incidentId: incident.id,
@@ -60,7 +72,7 @@ export async function GET(_: Request, { params }: RouteContext) {
         followUpReason: followUpResult.reason || "",
         canUpdateProgress: updateProgressResult.authorized,
         updateProgressReason: updateProgressResult.reason || "",
-        canClose: closeResult.authorized,
+        canClose: operationalActor && actorRole === "bm" && closeResult.authorized,
         closeReason: closeResult.reason || "",
         canCreateInstruction: instructionResult.authorized,
         canTriggerEstimation: triggerEstimationResult.authorized,
@@ -68,9 +80,9 @@ export async function GET(_: Request, { params }: RouteContext) {
         canViewEstimation: viewEstimationResult.authorized,
         canUpdateReadiness: readinessResult.authorized,
         updateReadinessReason: readinessResult.reason || "",
-        canSubmitCompletion: submitCompletionResult.authorized,
+        canSubmitCompletion: operationalActor && ["bms", "bes", "bbs"].includes(actorRole) && submitCompletionResult.authorized,
         submitCompletionReason: submitCompletionResult.reason || "",
-        canApproveCoordinator: approveCoordinatorResult.authorized,
+        canApproveCoordinator: operationalActor && ["bmc", "bec", "bbc"].includes(actorRole) && approveCoordinatorResult.authorized,
         approveCoordinatorReason: approveCoordinatorResult.reason || "",
       },
     });
