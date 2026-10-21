@@ -22,6 +22,13 @@ import { ProgressUpdateRecord, WorkStage } from "@/lib/progress-service";
 import { CameraCapture } from "./camera-capture";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
+import { StoreVerificationModal } from "./store-verification-modal";
+import { CompletionApprovalCard } from "./completion-approval-card";
+import {
+  ApprovalRouteResolution,
+  CompletionApprovalRecord,
+  CompletionApprovalHistoryRecord,
+} from "@/lib/completion-approval-service";
 
 interface ProgressUpdateModalProps {
   isOpen: boolean;
@@ -29,6 +36,7 @@ interface ProgressUpdateModalProps {
   incident: IncidentRecord | null;
   latestProgress: number;
   onSuccess?: (updatedRecord: ProgressUpdateRecord) => void;
+  onUpdated?: () => void | Promise<void>;
 }
 
 export function ProgressUpdateModal({
@@ -37,6 +45,7 @@ export function ProgressUpdateModal({
   incident,
   latestProgress,
   onSuccess,
+  onUpdated,
 }: ProgressUpdateModalProps) {
   // Lock background scroll when modal is open
   useBodyScrollLock(isOpen);
@@ -57,11 +66,69 @@ export function ProgressUpdateModal({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<ProgressUpdateRecord | null>(null);
-  const [activeTab, setActiveTab] = useState<"progress" | "milestone">("progress");
+  const [activeTab, setActiveTab] = useState<"progress" | "milestone" | "inspection" | "approval">("progress");
+  const [workflowPermissions, setWorkflowPermissions] = useState<{
+    canConfirm: boolean;
+    canBmApprove: boolean;
+    canUpdateProgress: boolean;
+    updateProgressReason?: string;
+    canSubmitCompletion: boolean;
+    submitCompletionReason?: string;
+    canApproveCoordinator: boolean;
+    approveCoordinatorReason?: string;
+    canClose: boolean;
+    closeReason?: string;
+  } | null>(null);
+  const [approval, setApproval] = useState<CompletionApprovalRecord | null>(null);
+  const [approvalRoute, setApprovalRoute] = useState<ApprovalRouteResolution | null>(null);
+  const [approvalHistory, setApprovalHistory] = useState<CompletionApprovalHistoryRecord[]>([]);
+  const [physicalProgress, setPhysicalProgress] = useState(latestProgress || 0);
+  const [hasFinalEvidence, setHasFinalEvidence] = useState(false);
+
+  const refreshWorkflow = async (selectInitialTab = false) => {
+    if (!incident) return;
+    try {
+      const [permissionResponse, completionResponse, progressResponse] = await Promise.all([
+        fetch(`/api/incidents/${encodeURIComponent(incident.id)}/permissions`, { cache: "no-store" }),
+        fetch(`/api/incidents/${encodeURIComponent(incident.id)}/completion`, { cache: "no-store" }),
+        fetch(`/api/incidents/${encodeURIComponent(incident.id)}/progress`, { cache: "no-store" }),
+      ]);
+      const [permissionJson, completionJson, progressJson] = await Promise.all([
+        permissionResponse.ok ? permissionResponse.json() : Promise.resolve(null),
+        completionResponse.ok ? completionResponse.json() : Promise.resolve(null),
+        progressResponse.ok ? progressResponse.json() : Promise.resolve(null),
+      ]);
+      setWorkflowPermissions(permissionJson?.data || null);
+      setApproval(completionJson?.data?.approval || null);
+      setApprovalRoute(completionJson?.data?.route || null);
+      setApprovalHistory(completionJson?.data?.history || []);
+      setPhysicalProgress(progressJson?.data?.latestProgress ?? incident.progress ?? 0);
+      setHasFinalEvidence(Boolean(progressJson?.data?.hasFinalEvidence));
+      if (selectInitialTab) {
+        const access = permissionJson?.data;
+        if (
+          (incident.status === "pending_bm_approval" && access?.canBmApprove) ||
+          (["pending_confirmation", "verifying", "clarification_requested"].includes(incident.status) && access?.canConfirm)
+        ) {
+          setActiveTab("inspection");
+        } else if (
+          (incident.progress ?? 0) >= 100 ||
+          incident.status === "pending_final_approval" ||
+          incident.status === "revision_requested"
+        ) {
+          setActiveTab("approval");
+        }
+      }
+    } catch (error) {
+      console.error("[Update Progress] Gagal memuat alur tindakan laporan:", error);
+      setWorkflowPermissions(null);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && incident) {
       setActiveTab("progress");
+      setWorkflowPermissions(null);
       setProgressValue(Math.max(latestProgress || 0, incident.progress || 0));
       setDescription("");
       setSelectedFiles([]);
@@ -75,8 +142,13 @@ export function ProgressUpdateModal({
           if (data) setIdentity(data.user || data);
         })
         .catch(() => {});
+      void refreshWorkflow(true);
     }
-  }, [isOpen, incident, latestProgress]);
+  }, [isOpen, incident?.id]);
+
+  useEffect(() => {
+    setProgressValue((previous) => Math.max(previous, latestProgress || 0));
+  }, [latestProgress]);
 
   // Adjust photo type suggestion when progress reaches 100%
   useEffect(() => {
@@ -88,6 +160,21 @@ export function ProgressUpdateModal({
   }, [progressValue]);
 
   if (!isOpen || !incident) return null;
+
+  if (activeTab === "inspection") {
+    return (
+      <StoreVerificationModal
+        incident={incident}
+        isOpen={isOpen}
+        onClose={() => setActiveTab("progress")}
+        onConfirmVerification={() => {
+          void refreshWorkflow();
+          void onUpdated?.();
+          setActiveTab("progress");
+        }}
+      />
+    );
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -154,6 +241,8 @@ export function ProgressUpdateModal({
       if (res.ok) {
         setSuccessResult(json.data);
         if (onSuccess) onSuccess(json.data);
+        void refreshWorkflow();
+        void onUpdated?.();
       } else {
         setErrorMessage(json.error || "Gagal memperbarui progress.");
       }
@@ -189,12 +278,21 @@ export function ProgressUpdateModal({
           </button>
         </div>
 
-        {/* Tab Selector: Progres Lapangan vs Milestone */}
-        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center gap-2 shrink-0">
+        {/* Tindakan operasional tetap terpusat di Update Progress. */}
+        <div className="px-6 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2 shrink-0">
+          {Boolean(workflowPermissions?.canConfirm || workflowPermissions?.canBmApprove) && (
+            <button
+              type="button"
+              onClick={() => setActiveTab("inspection")}
+              className="flex-1 min-w-[135px] py-2 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
+            >
+              Pemeriksaan & Konfirmasi
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab("progress")}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 min-w-[135px] py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
               activeTab === "progress"
                 ? "bg-[#1D5AA6] text-white shadow-xs"
                 : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
@@ -213,24 +311,59 @@ export function ProgressUpdateModal({
             }`}
           >
             <FileCheck className="w-3.5 h-3.5" />
-            <span>2. Berkas Milestone (10%-100%)</span>
+            <span>Berkas Milestone (10%-100%)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("approval")}
+            className={`flex-1 min-w-[135px] py-2 px-3 rounded-xl text-xs font-bold transition-all ${activeTab === "approval"
+              ? "bg-[#1D5AA6] text-white shadow-xs"
+              : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700"
+            }`}
+          >
+            Persetujuan & Case Close
           </button>
         </div>
 
         {/* Modal Body (Scrollable Internal Only) */}
         <div className="p-6 overflow-y-auto overscroll-contain space-y-5 flex-1 min-h-0">
-          {activeTab === "milestone" ? (
+          {activeTab === "approval" ? (
+            <CompletionApprovalCard
+              incident={incident}
+              approval={approval}
+              route={approvalRoute}
+              history={approvalHistory}
+              latestProgress={physicalProgress}
+              hasFinalEvidence={hasFinalEvidence}
+              userRole={identity?.role}
+              userBranch={identity?.branch}
+              userSystemRole={identity?.systemRole}
+              canSubmitCompletion={Boolean(workflowPermissions?.canSubmitCompletion)}
+              submitCompletionReason={workflowPermissions?.submitCompletionReason}
+              canApproveCoordinator={Boolean(workflowPermissions?.canApproveCoordinator)}
+              approveCoordinatorReason={workflowPermissions?.approveCoordinatorReason}
+              canClose={Boolean(workflowPermissions?.canClose)}
+              closeReason={workflowPermissions?.closeReason}
+              onRefresh={() => {
+                void refreshWorkflow();
+                void onUpdated?.();
+              }}
+            />
+          ) : activeTab === "milestone" ? (
             <div className="space-y-4">
               <MilestoneProgressionCard
                 incident={incident}
                 identity={identity}
                 readOnly={false}
                 onMilestoneUpdated={() => {
-                  if (onSuccess) {
-                    onSuccess({} as any);
-                  }
+                  void refreshWorkflow();
+                  void onUpdated?.();
                 }}
               />
+            </div>
+          ) : !workflowPermissions?.canUpdateProgress ? (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-sm text-slate-600 dark:text-slate-300">
+              {workflowPermissions?.updateProgressReason || "Pembaruan progres fisik belum tersedia untuk akun atau tahap laporan ini."}
             </div>
           ) : successResult ? (
             /* SUKSES RESULT WITH WATERMARKED PHOTO PREVIEW */

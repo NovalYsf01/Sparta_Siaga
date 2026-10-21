@@ -46,6 +46,13 @@ export async function POST(request: Request, { params }: RouteContext) {
     const notes = (body.notes as string)?.trim() || "";
     const reason = (body.reason as string)?.trim() || notes;
 
+    if (decision === "rejected" && report.reportOrigin !== "manual") {
+      return NextResponse.json(
+        { error: "Tolak Laporan hanya berlaku untuk laporan manual yang tidak valid.", code: "REPORT_REJECTION_MANUAL_ONLY" },
+        { status: 400 }
+      );
+    }
+
     if ((decision === "rejected" || decision === "clarification_requested") && !reason) {
       return NextResponse.json(
         {

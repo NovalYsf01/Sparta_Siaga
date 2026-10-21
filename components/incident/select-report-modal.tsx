@@ -61,13 +61,9 @@ export function SelectReportModal({
 
   const filteredReports = useMemo(() => {
     return incidents.filter((inc) => {
-      // Exclude resolved/archived
-      if (inc.status === "resolved" || inc.status === "archived") return false;
-
-      // When purpose is PROGRESS, exclude reports already at 100% completion
-      if (purpose === "PROGRESS" && inc.progress === 100) {
-        return false;
-      }
+      // Case Close is distinct from reaching milestone 100%.
+      // Keep 100% reports selectable for Serah Terima revision and approval.
+      if (inc.status === "closed" || inc.status === "resolved" || inc.status === "archived") return false;
 
       // Strict branch isolation for branch scoped actors
       if (currentUser?.scope === "BRANCH" && currentUser?.branch) {

@@ -18,10 +18,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       registeredSubscriptionsCount: subsRes.rows.length,
+      pushSent: false,
+      testType: "subscription_inventory_only",
       user: sessionUser.name,
       message: subsRes.rows.length > 0
-        ? "Push subscription aktif ditemukan untuk pengguna ini."
-        : "Belum ada push subscription aktif dari browser ini.",
+        ? "Subscription terdaftar, tetapi belum ada pengiriman native Web Push pada pemeriksaan ini."
+        : "Belum ada push subscription aktif. Pemeriksaan ini tidak mengirim push ke perangkat.",
       subscriptions: subsRes.rows.map((r) => ({
         id: r.id,
         endpoint: r.endpoint.slice(0, 32) + "...",

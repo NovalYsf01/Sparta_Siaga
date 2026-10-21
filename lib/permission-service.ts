@@ -719,29 +719,13 @@ export async function canSubmitInspectionAsync(
     };
   }
 
-  // TKP Type vs Role segregation: Toko -> BMS, DC/Warehouse -> BES
   const tkp = report.tkpType || "toko";
-  if (tkp === "dc") {
-    if (user.role !== "bes") {
-      return {
-        authorized: false,
-        reason: "Laporan DC/Warehouse ditangani oleh BES cabang terkait.",
-      };
-    }
-  } else {
-    // tkp === "toko"
-    if (user.role === "bes") {
-      return {
-        authorized: false,
-        reason: "BES tidak berwenang mengambil alih pemeriksaan laporan toko. Laporan toko ditangani oleh BMS cabang terkait.",
-      };
-    }
-    if (user.role !== "bms") {
-      return {
-        authorized: false,
-        reason: "Laporan gerai toko hanya dapat diperiksa oleh BMS cabang terkait.",
-      };
-    }
+  const requiredRole = tkp === "dc" ? "bes" : tkp === "building" ? "bbs" : "bms";
+  if (user.role !== requiredRole) {
+    return {
+      authorized: false,
+      reason: `Pemeriksaan lokasi ${tkp} hanya dapat dilakukan oleh ${requiredRole.toUpperCase()} cabang terkait.`,
+    };
   }
 
   const permResult = await checkUserPermission({

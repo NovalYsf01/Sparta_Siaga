@@ -66,9 +66,8 @@ export function canInspectReport(
   if (userBranch !== reportBranch) return false;
 
   const tkp = report.tkpType || "toko";
-  if (tkp === "dc") {
-    return user.role === "bes";
-  }
+  if (tkp === "dc") return user.role === "bes";
+  if (tkp === "building") return user.role === "bbs";
   return user.role === "bms";
 }
 

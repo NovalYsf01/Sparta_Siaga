@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -80,7 +80,8 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [permissionState, setPermissionState] = useState<NotificationPermission>("default");
   const [monitoredBranch, setMonitoredBranch] = useState<string>("all");
-  const [notificationCount, setNotificationCount] = useState<number>(0);
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
+  const hasLoadedNotificationFeedRef = useRef(false);
   const [flyToTarget, setFlyToTarget] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
 
   // Load incidents from database API on mount
@@ -106,6 +107,13 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         if (json.data) setIncidents(json.data);
       })
       .catch((err) => console.error("[Sparta Siaga] Failed to load incidents from DB:", err));
+  }, []);
+
+  const refreshIncidents = useCallback(async () => {
+    const response = await fetch("/api/incidents", { cache: "no-store" });
+    if (!response.ok) throw new Error("Gagal memuat ulang laporan.");
+    const json = await response.json();
+    if (Array.isArray(json.data)) setIncidents(json.data);
   }, []);
 
   // Sync incidents: POST new, PATCH existing
@@ -415,61 +423,52 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
           const nowMs = Date.now();
           const MAX_ACTIVE_WINDOW_MS = 72 * 60 * 60 * 1000;
 
-          const lastRead = typeof window !== "undefined"
-            ? localStorage.getItem("sparta_last_read_at")
-            : null;
-          const lastReadTime = lastRead ? new Date(lastRead).getTime() : 0;
-
-          let readIds = new Set<string>();
-          if (typeof window !== "undefined") {
-            try {
-              const raw = localStorage.getItem("sparta_read_notif_ids");
-              if (raw) readIds = new Set(JSON.parse(raw));
-            } catch (e) {}
-          }
-
-          // Requirements: Bell count counts strictly UNREAD + ACTIVE (<=72h) notifications
-          // Disaster notifications are global informational alerts available to all authenticated users
-          const activeUnreadLogs = (logsJson.logs || []).filter((l: any) => {
-            const sentTime = new Date(l.sent_at).getTime();
-            const isActive = (nowMs - sentTime) <= MAX_ACTIVE_WINDOW_MS;
-            const isRead = readIds.has(l.id) || sentTime <= lastReadTime;
-
-            return isActive && !isRead;
+          const activeAlerts = (logsJson.logs || []).filter((alert: { sent_at: string }) => {
+            const sentTime = new Date(alert.sent_at).getTime();
+            return Number.isFinite(sentTime) && sentTime <= nowMs &&
+              nowMs - sentTime <= MAX_ACTIVE_WINDOW_MS;
           });
-          
-          if (activeUnreadLogs.length > notificationCount) {
-             playEmergencyChime(); // Play sound if new notification arrived
-          }
-          
-          // Trigger popups for all unread logs (triggerDesktopPopup handles deduplication internally)
-          activeUnreadLogs.forEach((l: any) => {
-            let sourceLabel = "SPARTA Siaga";
-            if (l.disaster_id?.includes("bmkg")) sourceLabel = "BMKG";
-            else if (l.disaster_id?.includes("usgs")) sourceLabel = "USGS";
-            else if (l.disaster_id?.includes("open-meteo") || l.disaster_type === "heavy_rain") sourceLabel = "Open-Meteo";
+          // One alert per disaster event across branches; each branch entry
+          // remains available in the informational notification center.
+          const alertKey = (alert: { id: string; disaster_id?: string; disaster_type?: string }) =>
+            alert.disaster_id ? `${alert.disaster_type || "disaster"}:${alert.disaster_id}` : alert.id;
+          const freshAlerts = activeAlerts.filter(
+            (alert: { id: string; disaster_id?: string; disaster_type?: string }) => {
+              const key = alertKey(alert);
+              if (seenNotificationIdsRef.current.has(key)) return false;
+              seenNotificationIdsRef.current.add(key);
+              return true;
+            }
+          );
 
-            triggerDesktopPopup({
-              id: l.id,
-              title: l.title,
-              body: l.message,
-              disasterType: l.disaster_type,
-              ticketNumber: l.ticket_number,
-              branch: l.branch,
-              source: sourceLabel,
-              forceBypassBranchFilter: true, // Disaster notifications are global informational alerts
-              timestamp: new Date(l.sent_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
-              isSimulation: l.disaster_id?.includes("sim"),
-              onClickDetail: () => {
-                setSelectedNotificationId(l.id);
-                setIsNotificationCenterOpen(true);
-              },
-              onClickMap: () => {
-                handleFlyToIncident(l);
-              }
+          // First poll establishes the baseline; subsequent polls notify on new alerts.
+          if (hasLoadedNotificationFeedRef.current && freshAlerts.length > 0) {
+            playEmergencyChime();
+            freshAlerts.forEach((alert: any) => {
+              let sourceLabel = "SPARTA Siaga";
+              if (alert.disaster_id?.includes("bmkg")) sourceLabel = "BMKG";
+              else if (alert.disaster_id?.includes("usgs")) sourceLabel = "USGS";
+              else if (alert.disaster_id?.includes("open-meteo") || alert.disaster_type === "heavy_rain") sourceLabel = "Open-Meteo";
+              triggerDesktopPopup({
+                id: alert.id,
+                title: alert.title,
+                body: alert.message,
+                disasterType: alert.disaster_type,
+                ticketNumber: alert.ticket_number,
+                branch: alert.branch,
+                source: sourceLabel,
+                forceBypassBranchFilter: true,
+                timestamp: new Date(alert.sent_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+                isSimulation: alert.disaster_id?.includes("sim"),
+                onClickDetail: () => {
+                  setSelectedNotificationId(alert.id);
+                  setIsNotificationCenterOpen(true);
+                },
+                onClickMap: () => handleFlyToIncident(alert),
+              });
             });
-          });
-          setNotificationCount(activeUnreadLogs.length);
+          }
+          hasLoadedNotificationFeedRef.current = true;
         }
 
         const disastersRes = await fetch("/api/disasters/earthquakes?refresh=true");
@@ -530,7 +529,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       clearInterval(floodInterval);
       clearInterval(radarInterval);
     };
-  }, [playEmergencyChime, notificationCount]);
+  }, [playEmergencyChime]);
 
   // Risk metrics calculation (Requirement 7: Danger / Monitor counts in focus context)
   const { dangerCount, warningCount, affectedStores } = useMemo(() => {
@@ -654,8 +653,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   };
 
   const handleSelectIncidentForDetail = (inc: IncidentRecord) => {
-    setSelectedIncidentForAction(inc);
-    setIsMaintenanceModalOpen(true);
+    setSelectedReadOnlyIncident(inc);
   };
 
   // Inspection and BnM approval are persisted by dedicated backend endpoints.
@@ -737,7 +735,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     rawStores, computedStores, disasterData, loading, isRefreshing,
     activeRole, setActiveRole, activeLayer, setActiveLayer,
     incidents, activeIncidents, archivedIncidents, incidentStats,
-    handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal,
+    handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal, refreshIncidents,
     incidentOnly, setIncidentOnly, statusFilter, setStatusFilter,
     basemap, setBasemap, theme, handleToggleTheme,
     showRadar, setShowRadar, radarData, selectedStore, setSelectedStore,
@@ -753,7 +751,6 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       <IncidentAppShell
         activeRole={activeRole}
         onRoleChange={setActiveRole}
-        unreadCount={notificationCount}
         activeIncidentCount={activeIncidents.length}
         onOpenNotifications={() => setIsNotificationCenterOpen(true)}
         onSearchClick={() => setIsSearchOpen(true)}
@@ -921,16 +918,6 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         onOpenReport={handleSelectIncidentForDetail}
         userRole={activeRole}
         userBranch={monitoredBranch}
-        onUnreadCountChange={setNotificationCount}
-        onMarkAllAsRead={() => {
-          setNotificationCount(0);
-        }}
-        onNotificationRead={() => {
-          setNotificationCount((prev) => Math.max(0, prev - 1));
-        }}
-        onWorkerDispatched={() => {
-          setNotificationCount(0);
-        }}
       />
 
       {/* Notification Permission Dialog */}

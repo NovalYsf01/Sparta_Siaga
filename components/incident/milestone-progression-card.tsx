@@ -59,12 +59,6 @@ export function MilestoneProgressionCard({
   // Expanded revisions
   const [expandedRevisions, setExpandedRevisions] = useState<Record<string, boolean>>({});
 
-  // BM Final Decision State
-  const [isBmDecisionLoading, setIsBmDecisionLoading] = useState(false);
-  const [bmDecisionNotes, setBmDecisionNotes] = useState("");
-  const [bmActionType, setBmActionType] = useState<"approve" | "revise" | null>(null);
-  const [isSubmittingToBm, setIsSubmittingToBm] = useState(false);
-
   const loadMilestones = async () => {
     setLoading(true);
     try {
@@ -114,19 +108,15 @@ export function MilestoneProgressionCard({
   const allCompleted = isDocComplete || (safeMilestones.length === 5 && safeMilestones.every((m) => m.status === "SUBMITTED"));
   const currentProgress = incident.progress ?? 0;
 
-  const isBmUser = identity?.businessRole === "bm" || identity?.role === "bm";
   const isPicUser =
     identity?.businessRole === "bms" ||
     identity?.role === "bms" ||
     identity?.businessRole === "bes" ||
-    identity?.role === "bes";
+    identity?.role === "bes" ||
+    identity?.businessRole === "bbs" ||
+    identity?.role === "bbs";
 
   const isClosed = incident.status === "closed" || incident.status === "resolved";
-  const isAwaitingFinalBm =
-    incident.status === "pending_final_approval" ||
-    incident.status === "awaiting_st" ||
-    (currentProgress === 100 && !isClosed);
-
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetMilestone || !selectedFile) return;
@@ -164,79 +154,6 @@ export function MilestoneProgressionCard({
       setErrorMessage("Terjadi kesalahan jaringan saat mengunggah dokumen.");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleBmFinalDecision = async (decision: "approve" | "revise") => {
-    if (decision === "revise" && !bmDecisionNotes.trim()) {
-      setErrorMessage("Alasan permintaan revisi wajib diisi.");
-      return;
-    }
-
-    setIsBmDecisionLoading(true);
-    setErrorMessage(null);
-
-    try {
-      const action = decision === "approve" ? "APPROVE_MANAGER" : "REJECT_MANAGER";
-      const res = await fetch(`/api/incidents/${incident.id}/completion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          notes: bmDecisionNotes.trim() || undefined,
-          reason: bmDecisionNotes.trim() || undefined,
-        }),
-      });
-
-      const json = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setSuccessMessage(
-          decision === "approve"
-            ? "Laporan resmi disetujui dan berstatus CLOSED."
-            : "Permintaan revisi berhasil dikirim kepada pelaksana pekerjaan."
-        );
-        setBmActionType(null);
-        setBmDecisionNotes("");
-        await loadMilestones();
-        if (onMilestoneUpdated) onMilestoneUpdated();
-      } else {
-        setErrorMessage(json.error || "Gagal memproses keputusan final BnM Manajer.");
-      }
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("Terjadi kesalahan saat memproses approval final.");
-    } finally {
-      setIsBmDecisionLoading(false);
-    }
-  };
-
-  const handleSubmitToBm = async () => {
-    setIsSubmittingToBm(true);
-    setErrorMessage(null);
-
-    try {
-      const res = await fetch(`/api/incidents/${incident.id}/completion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "SUBMIT_COMPLETION",
-          notes: "Pekerjaan fisik telah 100% selesai (Serah Terima) dan diajukan ke BnM Manajer.",
-        }),
-      });
-
-      const json = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setSuccessMessage("Penyelesaian pekerjaan berhasil diajukan kepada BnM Manajer.");
-        await loadMilestones();
-        if (onMilestoneUpdated) onMilestoneUpdated();
-      } else {
-        setErrorMessage(json.error || "Gagal mengajukan penyelesaian ke BnM Manajer.");
-      }
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("Terjadi kesalahan jaringan saat mengajukan penyelesaian.");
-    } finally {
-      setIsSubmittingToBm(false);
     }
   };
 
@@ -551,93 +468,11 @@ export function MilestoneProgressionCard({
         </div>
       )}
 
-      {/* Ready for Final BM Submission (100% reached, pending BM submit) */}
-      {!readOnly && allCompleted && !isClosed && isPicUser && incident.status !== "pending_final_approval" && (
-        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            <h4 className="text-sm font-bold text-emerald-950 dark:text-emerald-200">
-              Seluruh 5 Milestone Telah Selesai (100%)
-            </h4>
-          </div>
-          <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
-            Tahap Serah Terima telah diverifikasi. Silakan ajukan penyelesaian pekerjaan kepada BnM Manajer untuk mendapatkan peninjauan dan persetujuan resmi (CLOSED).
-          </p>
-          <div className="pt-1">
-            <button
-              onClick={handleSubmitToBm}
-              disabled={isSubmittingToBm}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {isSubmittingToBm ? (
-                <span>Mengajukan...</span>
-              ) : (
-                <>
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Ajukan Penyelesaian ke BnM Manajer</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Building & Maintenance Manager Final Review Card */}
-      {!readOnly && isAwaitingFinalBm && isBmUser && (
-        <div className="bg-white dark:bg-slate-900 border-2 border-purple-200 dark:border-purple-900/60 rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Persetujuan Final BnM Manajer (Penutupan Laporan)
-                </h4>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Periksa seluruh 5 bukti fisik milestone sebelum memutuskan penyelesaian.
-                </p>
-              </div>
-            </div>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-              Wewenang BnM Manajer
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Catatan Persetujuan / Alasan Revisi:
-              </label>
-              <textarea
-                value={bmDecisionNotes}
-                onChange={(e) => setBmDecisionNotes(e.target.value)}
-                rows={2}
-                placeholder="Tuliskan catatan persetujuan atau alasan detail jika meminta perbaikan..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => handleBmFinalDecision("revise")}
-                disabled={isBmDecisionLoading}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 hover:bg-amber-100 transition-colors flex items-center gap-1.5"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Minta Revisi Dokumen</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleBmFinalDecision("approve")}
-                disabled={isBmDecisionLoading}
-                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Setujui & Tutup (CLOSED)</span>
-              </button>
-            </div>
-          </div>
+      {!readOnly && allCompleted && !isClosed && (
+        <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-xs text-emerald-900 dark:text-emerald-200">
+          Lima dokumen milestone telah lengkap. Pengajuan Serah Terima, persetujuan koordinator,
+          dan keputusan akhir BnM Manajer dilanjutkan pada tab
+          <strong> Persetujuan &amp; Case Close</strong> di Update Progress.
         </div>
       )}
 

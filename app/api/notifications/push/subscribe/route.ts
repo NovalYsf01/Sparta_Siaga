@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { getDbPool } from "@/lib/db";
+import { isIP } from "node:net";
 
 let tableEnsured = false;
 
@@ -35,9 +36,44 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { endpoint, keys } = body;
 
-    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    if (
+      typeof endpoint !== "string" ||
+      typeof keys?.p256dh !== "string" ||
+      typeof keys?.auth !== "string" ||
+      endpoint.length > 4096
+    ) {
       return NextResponse.json(
         { error: "Payload push subscription tidak valid (endpoint, p256dh, auth wajib ada)." },
+        { status: 400 }
+      );
+    }
+
+    // Endpoints come from the browser Push API and must not target local/private hosts.
+    let endpointUrl: URL;
+    try {
+      endpointUrl = new URL(endpoint);
+    } catch {
+      return NextResponse.json({ error: "URL endpoint push tidak valid." }, { status: 400 });
+    }
+    const host = endpointUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (
+      endpointUrl.protocol !== "https:" ||
+      Boolean(endpointUrl.username || endpointUrl.password) ||
+      isIP(host) !== 0 ||
+      host === "localhost" ||
+      host.endsWith(".localhost") ||
+      host.endsWith(".local") ||
+      !host.includes(".")
+    ) {
+      return NextResponse.json({ error: "Endpoint push harus berupa layanan HTTPS publik yang valid." }, { status: 400 });
+    }
+    const decodedKey = (value: string) => {
+      if (!/^[A-Za-z0-9_-]+={0,2}$/.test(value)) return null;
+      return Buffer.from(value, "base64url");
+    };
+    if (decodedKey(keys.p256dh)?.length !== 65 || decodedKey(keys.auth)?.length !== 16) {
+      return NextResponse.json(
+        { error: "Kunci subscription push tidak valid (p256dh/auth)." },
         { status: 400 }
       );
     }

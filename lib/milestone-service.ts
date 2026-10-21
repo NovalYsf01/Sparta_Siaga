@@ -311,17 +311,11 @@ export async function submitMilestoneDocument(params: SubmitMilestoneParams): Pr
     }
 
     const tkp = incident.tkpType || "toko";
-    if (tkp === "dc") {
-      if (actor.role !== "bes") {
-        throw new Error("Laporan Warehouse/DC hanya dapat ditangani oleh petugas BES cabang terkait.");
-      }
-    } else {
-      if (actor.role === "bes") {
-        throw new Error("Petugas BES tidak berwenang menangani laporan gerai Toko. Laporan Toko ditangani oleh BMS.");
-      }
-      if (actor.role !== "bms") {
-        throw new Error("Laporan gerai Toko hanya dapat ditangani oleh petugas BMS cabang terkait.");
-      }
+    const requiredRole = tkp === "dc" ? "bes" : tkp === "building" ? "bbs" : "bms";
+    if (actor.role !== requiredRole) {
+      throw new Error(
+        `Unggah dokumen milestone untuk ${tkp} hanya dapat dilakukan oleh ${requiredRole.toUpperCase()} cabang terkait.`
+      );
     }
   }
 

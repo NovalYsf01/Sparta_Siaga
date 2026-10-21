@@ -76,12 +76,14 @@ interface OperationalReportCenterProps {
   incidents: IncidentRecord[];
   onSelectIncident: (inc: IncidentRecord) => void;
   onOpenReportModal: () => void;
+  onReportUpdated?: () => void | Promise<void>;
 }
 
 export function OperationalReportCenter({
   incidents,
   onSelectIncident,
   onOpenReportModal,
+  onReportUpdated,
 }: OperationalReportCenterProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<IncidentStatus | "all">("all");
@@ -103,13 +105,26 @@ export function OperationalReportCenter({
   const isSystemAdmin = identity?.systemRole === "ADMIN";
   const isHoViewer = identity?.scope === "HO" && !isSystemAdmin;
   const canTriggerEstimation = !isSystemAdmin && Boolean(identity?.effectivePermissions?.ESTIMATION_TRIGGER);
-  const canUpdateProgress = isSystemAdmin || Boolean(identity?.effectivePermissions?.REPORT_UPDATE_PROGRESS);
+  const canUpdateProgress = !isHoViewer && (
+    isSystemAdmin ||
+    Boolean(identity?.effectivePermissions?.REPORT_UPDATE_PROGRESS) ||
+    Boolean(identity?.effectivePermissions?.REPORT_CONFIRM) ||
+    Boolean(identity?.effectivePermissions?.REPORT_CLOSE) ||
+    Boolean(identity?.effectivePermissions?.COMPLETION_SUBMIT) ||
+    Boolean(identity?.effectivePermissions?.COMPLETION_APPROVE_COORDINATOR)
+  );
   const canCreateReport = Boolean(identity) && !isHoViewer;
 
   // Entry Point D2 & O states
   const [selectReportPurpose, setSelectReportPurpose] = useState<"ESTIMATION" | "PROGRESS" | null>(null);
   const [selectedEstimationReport, setSelectedEstimationReport] = useState<IncidentRecord | null>(null);
   const [selectedProgressReport, setSelectedProgressReport] = useState<IncidentRecord | null>(null);
+
+  useEffect(() => {
+    setSelectedProgressReport((previous) =>
+      previous ? incidents.find((item) => item.id === previous.id) || previous : previous
+    );
+  }, [incidents]);
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {
@@ -402,7 +417,7 @@ export function OperationalReportCenter({
                             }`}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {inc.status === "pending_confirmation" || inc.status === "pending_bm_approval" ? "Review" : "Detail"}
+                            Detail
                           </button>
                         </td>
                       </tr>
@@ -501,7 +516,7 @@ export function OperationalReportCenter({
                       }`}
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      {inc.status === "pending_confirmation" || inc.status === "pending_bm_approval" ? "Review" : "Lihat Detail"}
+                      Lihat Detail
                     </button>
                   </div>
                 </div>
@@ -534,7 +549,7 @@ export function OperationalReportCenter({
         onClose={() => setSelectedProgressReport(null)}
         incident={selectedProgressReport}
         latestProgress={selectedProgressReport?.progress || 0}
-        onSuccess={() => {}}
+        onUpdated={onReportUpdated}
       />
     </div>
   );

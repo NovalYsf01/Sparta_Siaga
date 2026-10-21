@@ -21,6 +21,7 @@ export interface SiagaContextType {
   incidentStats: any;
   handleUpdateIncidents: (inc: IncidentRecord[]) => void;
   handleSelectIncidentForDetail: (inc: IncidentRecord) => void;
+  refreshIncidents: () => Promise<void>;
   handleOpenReportModal: (storeId?: string, incId?: string, reportOrigin?: "manual" | "automatic_earthquake") => void;
   incidentOnly: boolean;
   setIncidentOnly: React.Dispatch<React.SetStateAction<boolean>>;

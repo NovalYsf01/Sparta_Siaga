@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getRecentNotificationLogs, generateEmergencyEmailHtml } from '@/lib/notification-service';
+import { getRecentNotificationLogs } from '@/lib/notification-service';
 import { getSessionUser } from '@/lib/auth';
 import { checkUserPermission } from '@/lib/permission-service';
 import { UserContext } from '@/lib/report-permissions';
@@ -61,31 +61,21 @@ export function createNotificationLogsHandler(
 
     const logs = await dependencies.getNotificationLogs(limit, scope.branch);
 
-    // Attach email preview generator if email_and_pwa channel
-    const enrichedLogs = logs.map(log => {
-      if (log.channel === 'email_and_pwa') {
-        const emailHtml = generateEmergencyEmailHtml({
-          ticketNumber: log.ticket_number,
-          branch: log.branch,
-          disasterTitle: log.title,
-          disasterDetail: log.message,
-          affectedCount: log.affected_stores_count,
-          stores: log.affected_stores_sample || [],
-          instructions: [
-            'Duty Officer DC Cabang segera melakukan panggilan radio/telepon siaga ke Area Coordinator (AC) terkait.',
-            'Instruksikan personil toko melakukan evakuasi pelanggan dan kru jika struktur bangunan menunjukkan keretakan.',
-            'Matikan aliran listrik utama (MCB) dan amankan tabung gas jika tercium bau kebocoran.',
-            'Laporkan status operasional (Buka / Tutup Sementara / Kerusakan) melalui Command Center SPARTA.'
-          ],
-          sentAt: new Date(log.sent_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB'
-        });
-        return {
-          ...log,
-          email_html_preview: emailHtml
-        };
-      }
-      return log;
-    });
+    // Never expose recipient contact, delivery/audit metadata, acknowledgement state,
+    // or internal inspection findings in the nationwide informational feed.
+    // Viewing operational incident details still requires the incident API's permissions.
+    const enrichedLogs = logs.map((log) => ({
+      id: log.id,
+      disaster_id: log.disaster_id,
+      disaster_type: log.disaster_type,
+      branch: log.branch,
+      title: log.title,
+      message: log.message,
+      affected_stores_count: log.affected_stores_count,
+      affected_stores_sample: log.affected_stores_sample,
+      ticket_number: log.ticket_number,
+      sent_at: log.sent_at,
+    }));
 
     return NextResponse.json({
       success: true,

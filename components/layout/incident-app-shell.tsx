@@ -34,7 +34,6 @@ import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt";
 export interface IncidentAppShellProps {
   activeRole: RoleType;
   onRoleChange: (role: RoleType) => void;
-  unreadCount?: number;
   activeIncidentCount?: number;
   onOpenNotifications?: () => void;
   onSearchClick?: () => void;
@@ -47,7 +46,6 @@ export interface IncidentAppShellProps {
 export function IncidentAppShell({
   activeRole,
   onRoleChange,
-  unreadCount = 3,
   activeIncidentCount = 0,
   onOpenNotifications,
   onSearchClick,
@@ -578,11 +576,6 @@ export function IncidentAppShell({
                 aria-label="Notifikasi"
               >
                 <Bell className="w-5 h-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] font-bold flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
               </button>
             </div>
           </header>
