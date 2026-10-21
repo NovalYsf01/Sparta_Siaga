@@ -255,7 +255,7 @@ export function ProgressUpdateModal({
 
   return (
     <>
-    <AppDialog open={isOpen} onClose={onClose} title={"Update Progress Pekerjaan"} className="sm:!max-w-2xl">
+    <AppDialog open={isOpen && !isCameraOpen} onClose={onClose} title={"Update Progress Pekerjaan"} className="sm:!max-w-2xl">
       <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header (Fixed) */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
