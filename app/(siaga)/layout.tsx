@@ -108,6 +108,13 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       .catch((err) => console.error("[Sparta Siaga] Failed to load incidents from DB:", err));
   }, []);
 
+  const refreshIncidents = useCallback(async () => {
+    const response = await fetch("/api/incidents", { cache: "no-store" });
+    if (!response.ok) throw new Error("Gagal memuat ulang laporan.");
+    const json = await response.json();
+    if (Array.isArray(json.data)) setIncidents(json.data);
+  }, []);
+
   // Sync incidents: POST new, PATCH existing
   const handleUpdateIncidents = useCallback(async (newIncidents: IncidentRecord[]) => {
     setIncidents(newIncidents);
@@ -736,7 +743,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     rawStores, computedStores, disasterData, loading, isRefreshing,
     activeRole, setActiveRole, activeLayer, setActiveLayer,
     incidents, activeIncidents, archivedIncidents, incidentStats,
-    handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal,
+    handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal, refreshIncidents,
     incidentOnly, setIncidentOnly, statusFilter, setStatusFilter,
     basemap, setBasemap, theme, handleToggleTheme,
     showRadar, setShowRadar, radarData, selectedStore, setSelectedStore,
