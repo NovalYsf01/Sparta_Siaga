@@ -24,23 +24,12 @@ export function resolveNotificationReadScope(
   user: UserContext,
   requestedBranch?: string | null
 ): NotificationReadScope {
-  const isGlobalUser = user.systemRole === "ADMIN" || user.scope === "HO";
-  const normalizedRequested = normalizeBranch(requestedBranch);
-
-  // Notifikasi peringatan bencana bersifat informasi siaga nasional
-  // Seluruh peran operasional dapat melihat feed notifikasi tanpa error blokir 403
-  if (isGlobalUser) {
-    return {
-      branch: normalizedRequested,
-      canViewAllBranches: true,
-    };
-  }
-
-  // Pengguna cabang: jika filter spesifik diminta, gunakan filter tersebut.
-  // Jika tidak, tampilkan peringatan cabang atau feed bencana nasional secara aman.
+  // Disaster notifications are national read-only information for every authenticated
+  // user who has NOTIFICATION_VIEW. Operational incident access remains branch-scoped.
+  void user;
   return {
-    branch: normalizedRequested || normalizeBranch(user.branch),
-    canViewAllBranches: !normalizedRequested,
+    branch: normalizeBranch(requestedBranch),
+    canViewAllBranches: true,
   };
 }
 
