@@ -106,6 +106,7 @@ export function MilestoneProgressionCard({
   // Active milestone based on selectedStageKey or unsubmitted
   const targetMilestone = safeMilestones.find((m) => m.stageKey === selectedStageKey) || safeMilestones.find((m) => m.status !== "SUBMITTED");
   const allCompleted = isDocComplete || (safeMilestones.length === 5 && safeMilestones.every((m) => m.status === "SUBMITTED"));
+  const currentProgress = incident.progress ?? 0;
 
   const isPicUser =
     identity?.businessRole === "bms" ||
