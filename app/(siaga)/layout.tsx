@@ -654,8 +654,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   };
 
   const handleSelectIncidentForDetail = (inc: IncidentRecord) => {
-    setSelectedIncidentForAction(inc);
-    setIsMaintenanceModalOpen(true);
+    setSelectedReadOnlyIncident(inc);
   };
 
   // Inspection and BnM approval are persisted by dedicated backend endpoints.
