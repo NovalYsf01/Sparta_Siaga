@@ -128,8 +128,8 @@ self.addEventListener("push", (event) => {
         badge: json.badge || data.badge,
         tag: json.tag || "sparta-disaster-alert",
         data: {
-          url: json.url || (json.reportId ? `/?selectedReport=${json.reportId}` : "/"),
-          reportId: json.reportId,
+          url: typeof json.url === "string" && json.url.startsWith("/") &&
+            !json.url.startsWith("//") ? json.url : "/",
         },
       };
     } catch {
@@ -145,7 +145,7 @@ self.addEventListener("push", (event) => {
     renotify: true,
     data: data.data,
     actions: [
-      { action: "open_report", title: "Buka Laporan" },
+      { action: "open_app", title: "Buka Aplikasi" },
       { action: "dismiss", title: "Tutup" },
     ],
   };
@@ -160,7 +160,14 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  const targetUrl = event.notification.data?.url || "/";
+  const candidate = event.notification.data?.url || "/";
+  let targetUrl;
+  try {
+    const parsed = new URL(candidate, self.location.origin);
+    targetUrl = parsed.origin === self.location.origin ? parsed.href : self.location.origin + "/";
+  } catch {
+    targetUrl = self.location.origin + "/";
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
