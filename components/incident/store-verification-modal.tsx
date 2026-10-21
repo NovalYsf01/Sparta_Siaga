@@ -101,6 +101,7 @@ export function StoreVerificationModal({
       setFilePreviews([]);
       setNotes("");
       setBmNotes("");
+      setPermissionData(null);
 
       Promise.all([
         fetch("/api/auth/me").then((res) => (res.ok ? res.json() : null)),
