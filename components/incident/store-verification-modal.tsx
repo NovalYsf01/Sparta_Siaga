@@ -335,7 +335,7 @@ export function StoreVerificationModal({
                   {isBmView ? "Review & Keputusan BnM Manajer" : "Pemeriksaan Lapangan Kondisi Lokasi"}
                 </h3>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-                  {incident.tkpType === "dc" ? "Warehouse / DC" : "Toko"}
+                  {incident.tkpType === "dc" ? "Warehouse / DC" : incident.tkpType === "building" ? "Gedung" : "Toko"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -363,7 +363,7 @@ export function StoreVerificationModal({
                 Anda tidak memiliki wewenang untuk memeriksa atau menyetujui laporan ini.
               </p>
               <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                Pemeriksaan gerai toko hanya untuk BMS cabang terkait. Laporan DC untuk BES cabang terkait. Persetujuan untuk BnM Manajer atau Administrator.
+                Pemeriksaan Toko dilakukan BMS, DC/Warehouse oleh BES, dan Gedung oleh BBS cabang terkait. Keputusan laporan oleh BnM Manajer.
               </p>
             </div>
 
