@@ -131,6 +131,10 @@ export function ProgressUpdateModal({
     }
   }, [isOpen, incident?.id]);
 
+  useEffect(() => {
+    setProgressValue((previous) => Math.max(previous, latestProgress || 0));
+  }, [latestProgress]);
+
   // Adjust photo type suggestion when progress reaches 100%
   useEffect(() => {
     if (progressValue === 100 && photoType === "PROGRESS") {
