@@ -428,10 +428,15 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
             return Number.isFinite(sentTime) && sentTime <= nowMs &&
               nowMs - sentTime <= MAX_ACTIVE_WINDOW_MS;
           });
+          // One alert per disaster event across branches; each branch entry
+          // remains available in the informational notification center.
+          const alertKey = (alert: { id: string; disaster_id?: string; disaster_type?: string }) =>
+            alert.disaster_id ? `${alert.disaster_type || "disaster"}:${alert.disaster_id}` : alert.id;
           const freshAlerts = activeAlerts.filter(
-            (alert: { id: string }) => !seenNotificationIdsRef.current.has(alert.id)
+            (alert: { id: string; disaster_id?: string; disaster_type?: string }) =>
+              !seenNotificationIdsRef.current.has(alertKey(alert))
           );
-          for (const alert of activeAlerts) seenNotificationIdsRef.current.add(alert.id);
+          for (const alert of activeAlerts) seenNotificationIdsRef.current.add(alertKey(alert));
 
           // First poll establishes the baseline; subsequent polls notify on new alerts.
           if (hasLoadedNotificationFeedRef.current && freshAlerts.length > 0) {
