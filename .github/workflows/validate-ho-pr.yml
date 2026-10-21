@@ -28,6 +28,8 @@ jobs:
         run: pnpm exec tsx scripts/test-notification-branch-isolation.ts
       - name: PWA push architecture smoke checks
         run: pnpm exec tsx scripts/test-pwa-push-architecture.ts
+      - name: Mira modal and approval contract
+        run: pnpm exec tsx scripts/test-mira-modal-approval-contract.ts
       - name: Typecheck
         run: pnpm typecheck
       - name: Production build
