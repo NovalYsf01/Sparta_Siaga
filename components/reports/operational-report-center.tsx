@@ -402,7 +402,7 @@ export function OperationalReportCenter({
                             }`}
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {inc.status === "pending_confirmation" || inc.status === "pending_bm_approval" ? "Review" : "Detail"}
+                            Detail
                           </button>
                         </td>
                       </tr>
@@ -501,7 +501,7 @@ export function OperationalReportCenter({
                       }`}
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      {inc.status === "pending_confirmation" || inc.status === "pending_bm_approval" ? "Review" : "Lihat Detail"}
+                      Lihat Detail
                     </button>
                   </div>
                 </div>
