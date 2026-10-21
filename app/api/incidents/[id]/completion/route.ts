@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
+import { canViewReportAsync } from "@/lib/permission-service";
 import { EstimationIntegrationService } from "@/lib/estimation-service";
 import {
   CompletionApprovalService,
@@ -20,6 +21,10 @@ export async function GET(_: Request, { params }: RouteContext) {
     const report = await dbGetIncidentById(id);
     if (!report) {
       return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
+    }
+
+    if (!await canViewReportAsync(sessionUser, report)) {
+      return NextResponse.json({ error: "Anda tidak memiliki akses ke laporan ini." }, { status: 403 });
     }
 
     const route = await EstimationIntegrationService.getRouteByReportId(id);
