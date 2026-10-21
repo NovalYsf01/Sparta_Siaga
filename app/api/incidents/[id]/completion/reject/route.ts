@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: RouteContext) {
 
     const role = (sessionUser.role || "").toLowerCase();
 
-    if (sessionUser.systemRole !== "ADMIN" && role === "bm") {
+    if (role === "bm") {
       const result = await CompletionApprovalService.rejectByManager({
         reportId: id,
         actor,
@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
     }
 
-    if (sessionUser.systemRole !== "ADMIN" && ["bmc", "bec", "bbc"].includes(role)) {
+    if (["bmc", "bec", "bbc"].includes(role)) {
       const result = await CompletionApprovalService.rejectByCoordinator({
         reportId: id,
         actor,
