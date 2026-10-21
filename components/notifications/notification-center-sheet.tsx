@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   ChevronRight,
   ChevronDown,
-  CheckCircle2,
   FileText,
   MapPin,
   Building,
@@ -23,7 +22,6 @@ import { toast } from "sonner";
 import { NotificationLog } from "@/types/notification";
 import { RoleType } from "@/types/incident";
 import {
-  getNotificationPermission,
   requestDesktopNotificationPermission,
   triggerDesktopPopup,
 } from "@/lib/desktop-notification";
@@ -35,8 +33,6 @@ interface NotificationCenterSheetProps {
   onClose: () => void;
   onWorkerDispatched?: () => void;
   onOpenPermissionDialog?: () => void;
-  onMarkAllAsRead?: () => void;
-  onNotificationRead?: (id: string) => void;
   onFlyToIncident?: (incident: NotificationLog) => void;
   onFlyToLocation?: (loc: {
     kode_toko?: string;
@@ -53,7 +49,6 @@ interface NotificationCenterSheetProps {
   activeIncidents?: any[];
   userRole?: RoleType;
   userBranch?: string;
-  onUnreadCountChange?: (count: number) => void;
 }
 
 const ACTIVE_WINDOW_MS = 72 * 60 * 60 * 1000; // 72 Hours max active awareness window
@@ -62,8 +57,6 @@ export function NotificationCenterSheet({
   isOpen,
   onClose,
   onOpenPermissionDialog,
-  onMarkAllAsRead,
-  onNotificationRead,
   onFlyToIncident,
   onFlyToLocation,
   onOpenReport,
@@ -73,139 +66,19 @@ export function NotificationCenterSheet({
   activeIncidents = [],
   userRole = "ho_admin",
   userBranch = "all",
-  onUnreadCountChange,
 }: NotificationCenterSheetProps) {
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [runningWorker, setRunningWorker] = useState(false);
   const [selectedIncidentForDetail, setSelectedIncidentForDetail] = useState<NotificationLog | null>(null);
   const [activeTab, setActiveTab] = useState<"recent" | "history">("recent");
   const [filterType, setFilterType] = useState<"all" | "earthquake" | "heavy_rain" | "flood">("all");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
-  const [permissionState, setPermissionState] = useState<NotificationPermission>("default");
-
-  // Read state stored locally (Personal UI state - Requirement 5 & 6)
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
-  const [lastReadTimestamp, setLastReadTimestamp] = useState<number>(0);
 
   // Group expansion state for HO canonical events
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  // Current authenticated user and PIC claim state
-  const [currentUser, setCurrentUser] = useState<{
-    id: string;
-    name: string;
-    role?: string;
-    businessRole?: string;
-    systemRole?: string;
-    branch?: string;
-  } | null>(null);
-  const [claimedReports, setClaimedReports] = useState<Record<string, { picUserId: string; picName: string }>>({});
-  const [isClaimingMap, setIsClaimingMap] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data) setCurrentUser(data.user || data);
-      })
-      .catch(() => {});
-  }, []);
-
-  const handleClaimReport = async (reportId: string) => {
-    setIsClaimingMap((prev) => ({ ...prev, [reportId]: true }));
-    try {
-      const res = await fetch(`/api/incidents/${reportId}/pic`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (res.ok && data.claimed) {
-        setClaimedReports((prev) => ({
-          ...prev,
-          [reportId]: {
-            picUserId: currentUser?.id || "",
-            picName: currentUser?.name || "Saya",
-          },
-        }));
-        toast.success("Berhasil mengambil tugas. Anda telah ditugaskan sebagai PIC Penanggung Jawab.");
-      } else if (res.status === 409) {
-        toast.error("Laporan sudah diambil oleh petugas lain.");
-      } else {
-        toast.error(data.error || "Gagal mengambil tugas laporan.");
-      }
-    } catch {
-      toast.error("Gagal terhubung ke server.");
-    } finally {
-      setIsClaimingMap((prev) => ({ ...prev, [reportId]: false }));
-    }
-  };
-
   const isDark = theme === "dark";
   const isHoUser = userBranch === "all" || !userRole || userRole.startsWith("ho_");
-
-  // Load read state from localStorage
-  const refreshReadState = useCallback(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const rawIds = localStorage.getItem("sparta_read_notif_ids");
-        if (rawIds) {
-          setReadIds(new Set(JSON.parse(rawIds)));
-        }
-        const lastRead = localStorage.getItem("sparta_last_read_at");
-        if (lastRead) {
-          setLastReadTimestamp(new Date(lastRead).getTime());
-        }
-      } catch (e) {
-        console.warn("[Notification Center] Error reading local state:", e);
-      }
-    }
-  }, []);
-
-  const markItemAsRead = useCallback((id: string) => {
-    setReadIds((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("sparta_read_notif_ids", JSON.stringify(Array.from(next)));
-        } catch (e) {}
-      }
-      return next;
-    });
-    if (onNotificationRead) {
-      onNotificationRead(id);
-    }
-  }, [onNotificationRead]);
-
-  const handleMarkAllAsRead = () => {
-    const nowIso = new Date().toISOString();
-    const nowMs = Date.now();
-    if (typeof window !== "undefined") {
-      localStorage.setItem("sparta_last_read_at", nowIso);
-      // Mark all existing loaded log ids as read
-      const allIds = logs.map((l) => l.id);
-      localStorage.setItem("sparta_read_notif_ids", JSON.stringify(allIds));
-    }
-    setLastReadTimestamp(nowMs);
-    setReadIds(new Set(logs.map((l) => l.id)));
-
-    if (onMarkAllAsRead) {
-      onMarkAllAsRead();
-    }
-    toast.custom(() => (
-      <div className="flex items-center gap-2 bg-slate-900 dark:bg-slate-800 text-white px-3 py-2 rounded-full shadow-md text-[11px] font-medium pointer-events-auto">
-        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-        Semua notifikasi ditandai dibaca
-      </div>
-    ), { duration: 2500, position: "top-center" });
-  };
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setPermissionState(getNotificationPermission());
-    }
-    refreshReadState();
-  }, [isOpen, refreshReadState]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -222,48 +95,33 @@ export function NotificationCenterSheet({
     }
   };
 
-  // Fetch logs on mount and when sheet opens
   useEffect(() => {
-    fetchLogs();
-  }, []);
-
-  // Note: Requirement 6 - Do NOT automatically mark all as read upon opening the sheet!
-  useEffect(() => {
-    if (isOpen) {
-      fetchLogs();
-      refreshReadState();
-    }
-  }, [isOpen, refreshReadState]);
+    if (isOpen) void fetchLogs();
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen && selectedNotificationId && logs.length > 0) {
       const targetLog = logs.find((l) => l.id === selectedNotificationId);
       if (targetLog) {
         setSelectedIncidentForDetail(targetLog);
-        markItemAsRead(targetLog.id);
       }
       if (onClearSelectedNotification) {
         onClearSelectedNotification();
       }
     }
-  }, [isOpen, selectedNotificationId, logs, onClearSelectedNotification, markItemAsRead]);
+  }, [isOpen, selectedNotificationId, logs, onClearSelectedNotification]);
 
   const handleRefreshData = async () => {
-    setRunningWorker(true);
     try {
       await fetchLogs();
-      refreshReadState();
       toast.success("Data notifikasi berhasil dimutakhirkan.");
     } catch (err) {
       toast.error("Gagal memperbarui notifikasi.");
-    } finally {
-      setRunningWorker(false);
     }
   };
 
   const handleRequestPermission = async () => {
     const res = await requestDesktopNotificationPermission();
-    setPermissionState(res);
     if (res === "granted") {
       triggerDesktopPopup({
         id: "perm-granted",
@@ -298,16 +156,6 @@ export function NotificationCenterSheet({
       return next;
     });
   };
-
-  // Helper to determine unread status per personal UI state
-  const isItemUnread = useCallback(
-    (log: NotificationLog) => {
-      if (readIds.has(log.id)) return false;
-      const sentTime = new Date(log.sent_at).getTime();
-      return sentTime > lastReadTimestamp;
-    },
-    [readIds, lastReadTimestamp]
-  );
 
   // Partition logs into TERBARU (<=72h) and RIWAYAT (>72h)
   const now = Date.now();
@@ -406,15 +254,6 @@ export function NotificationCenterSheet({
     [activeIncidents]
   );
 
-  // Active unread count badge (only <= 72h recent logs)
-  const activeUnreadCount = useMemo(() => {
-    return recentLogs.filter((l) => isItemUnread(l)).length;
-  }, [recentLogs, isItemUnread]);
-
-  useEffect(() => {
-    onUnreadCountChange?.(activeUnreadCount);
-  }, [activeUnreadCount, onUnreadCountChange]);
-
   if (!isOpen) return null;
 
   return (
@@ -440,11 +279,6 @@ export function NotificationCenterSheet({
             <h2 className={`text-base font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
               Pusat Notifikasi
             </h2>
-            {activeUnreadCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-600 text-white">
-                {activeUnreadCount} baru
-              </span>
-            )}
           </div>
           <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             Awareness kejadian & peringatan dini bencana
@@ -585,7 +419,6 @@ export function NotificationCenterSheet({
                     priorityStores += samples.filter((s) => s.status === "PRIORITY_MONITOR").length;
                   });
 
-                  const isAnyUnread = groupLogs.some((l) => isItemUnread(l));
 
                   const dateStr = new Date(firstLog.sent_at).toLocaleDateString("id-ID", {
                     day: "2-digit",
@@ -596,15 +429,7 @@ export function NotificationCenterSheet({
                   return (
                     <div
                       key={canonicalKey}
-                      className={`rounded-2xl p-4 border transition-all ${
-                        isDark
-                          ? isAnyUnread
-                            ? "bg-slate-800/90 border-slate-700 shadow-md"
-                            : "bg-slate-900/60 border-slate-800"
-                          : isAnyUnread
-                          ? "bg-white border-slate-300 shadow-md ring-1 ring-blue-500/10"
-                          : "bg-slate-50/80 border-slate-200"
-                      }`}
+                      className={`rounded-2xl p-4 border transition-all ${isDark ? "bg-slate-900/60 border-slate-800" : "bg-slate-50/80 border-slate-200"}`}
                     >
                       {/* Group Header */}
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -617,9 +442,6 @@ export function NotificationCenterSheet({
                           }`}>
                             {totalBranches} Cabang Terimbas
                           </span>
-                          {isAnyUnread && (
-                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                          )}
                         </div>
                         <span className={`text-[10px] font-medium whitespace-nowrap ${isDark ? "text-slate-500" : "text-slate-400"}`}>
                           {dateStr}
@@ -649,7 +471,6 @@ export function NotificationCenterSheet({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => {
-                            groupLogs.forEach((l) => markItemAsRead(l.id));
                             setSelectedIncidentForDetail(firstLog);
                           }}
                           className="w-full py-2 px-3 rounded-xl text-xs font-semibold bg-[#1D5AA6] hover:bg-[#164684] text-white flex items-center justify-center gap-1.5 transition-colors shadow-xs"
@@ -691,7 +512,6 @@ export function NotificationCenterSheet({
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   <button
                                     onClick={() => {
-                                      markItemAsRead(bLog.id);
                                       setSelectedIncidentForDetail(bLog);
                                     }}
                                     className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
@@ -756,7 +576,6 @@ export function NotificationCenterSheet({
       year: "numeric",
     }) + " • " + new Date(log.sent_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB";
 
-    const isUnread = isItemUnread(log);
     const isSimulation = Boolean(
       (log as any).is_simulation ||
         log.title?.toUpperCase().includes("[SIMULASI]") ||
@@ -766,15 +585,7 @@ export function NotificationCenterSheet({
     return (
       <div
         key={log.id}
-        className={`rounded-2xl p-4 border transition-all ${
-          isDark
-            ? isUnread
-              ? "bg-slate-800/90 border-slate-700 shadow-md"
-              : "bg-slate-900/60 border-slate-800"
-            : isUnread
-            ? "bg-white border-slate-300 shadow-md ring-1 ring-blue-500/10"
-            : "bg-slate-50/80 border-slate-200"
-        }`}
+        className={`rounded-2xl p-4 border transition-all ${isDark ? "bg-slate-900/60 border-slate-800" : "bg-slate-50/80 border-slate-200"}`}
       >
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -791,9 +602,6 @@ export function NotificationCenterSheet({
               {log.ticket_number || "NOTIF-EARLY-ALERT"}
             </span>
 
-            {isUnread && (
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            )}
           </div>
 
           <span className={`text-[10px] font-medium whitespace-nowrap ${isDark ? "text-slate-500" : "text-slate-400"}`}>
@@ -801,7 +609,7 @@ export function NotificationCenterSheet({
           </span>
         </div>
 
-        <h3 className={`text-sm leading-snug mb-1.5 ${isUnread ? "font-bold" : "font-semibold"} ${
+        <h3 className={`text-sm leading-snug mb-1.5 font-semibold ${
           isDark ? "text-white" : "text-slate-900"
         }`}>
           {cleanDisplayTitle(log.title)}
@@ -833,7 +641,6 @@ export function NotificationCenterSheet({
         <button
           type="button"
           onClick={() => {
-            markItemAsRead(log.id);
             setSelectedIncidentForDetail(log);
           }}
           className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold bg-[#1D5AA6] hover:bg-[#164684] text-white flex items-center justify-center gap-1.5 transition-colors shadow-xs"
