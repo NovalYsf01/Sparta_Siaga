@@ -33,6 +33,7 @@ export async function POST(request: Request, { params }: RouteContext) {
         branch: sessionUser.branch,
       },
       notes,
+      attachments: body.attachments,
     });
 
     return NextResponse.json({

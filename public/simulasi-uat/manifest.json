@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-10-20T06:49:26.394Z",
+  "totalFiles": 14,
+  "watermark": "SIMULASI UAT - BUKAN DOKUMEN RESMI",
+  "files": [
+    {
+      "filename": "01_foto_kejadian_awal_toko.jpg",
+      "type": "image",
+      "label": "Foto Kejadian Awal Toko Cicaheum (UAT)"
+    },
+    {
+      "filename": "02_foto_pemeriksaan_lapangan_toko.jpg",
+      "type": "image",
+      "label": "Foto Hasil Pemeriksaan Plafon Rusak (UAT)"
+    },
+    {
+      "filename": "03_dokumen_ceklis_10_toko.pdf",
+      "type": "pdf",
+      "title": "FORMULIR CEKLIS KERUSAKAN TOKO - 10%",
+      "subtitle": "Inspeksi Kerusakan Fisik Plafon & Atap Toko Cicaheum",
+      "category": "Milestone Ceklis 10%"
+    },
+    {
+      "filename": "04_dokumen_estimasi_25_eksternal_sparta.pdf",
+      "type": "pdf",
+      "title": "HASIL PERHITUNGAN ESTIMASI APLIKASI SPARTA - 25%",
+      "subtitle": "Lampiran Dokumen Estimasi Biaya Pemeliharaan dari Portal SPARTA",
+      "category": "Milestone Estimasi 25% (Aplikasi Eksternal SPARTA)"
+    },
+    {
+      "filename": "05_dokumen_approve_proxy_30.pdf",
+      "type": "pdf",
+      "title": "FORMULIR PERSETUJUAN PROXY BnM - 30%",
+      "subtitle": "Approval Proxy Perbaikan Fasilitas Toko oleh BnM Cabang",
+      "category": "Milestone Approve Proxy 30%"
+    },
+    {
+      "filename": "06_dokumen_spk_50_toko.pdf",
+      "type": "pdf",
+      "title": "SURAT PERINTAH KERJA (SPK) KONTRAKTOR - 50%",
+      "subtitle": "Pekerjaan Penggantian Plafon Gypsum & Waterproofing Atap",
+      "category": "Milestone SPK 50%"
+    },
+    {
+      "filename": "07_dokumen_serah_terima_100_toko.pdf",
+      "type": "pdf",
+      "title": "BERITA ACARA SERAH TERIMA PEKERJAAN (BAST) - 100%",
+      "subtitle": "Pernyataan Selesai Pekerjaan Perbaikan Toko Cicaheum",
+      "category": "Milestone Serah Terima 100%"
+    },
+    {
+      "filename": "08_foto_pekerjaan_selesai_toko.jpg",
+      "type": "image",
+      "label": "Foto Plafon Baru Selesai Terpasang Rapi (UAT)"
+    },
+    {
+      "filename": "09_foto_before_after_toko.jpg",
+      "type": "image",
+      "label": "Foto Komparasi Plafon Before vs After (UAT)"
+    },
+    {
+      "filename": "10_foto_revisi_tes_siram_atap.jpg",
+      "type": "image",
+      "label": "Foto Tambahan: Bukti Uji Tes Siram Air Atap Bebas Bocor (UAT)"
+    },
+    {
+      "filename": "11_foto_kejadian_awal_dc.jpg",
+      "type": "image",
+      "label": "Foto Kejadian Benturan Rolling Door DC Bandung (UAT)"
+    },
+    {
+      "filename": "12_foto_pemeriksaan_lapangan_dc.jpg",
+      "type": "image",
+      "label": "Foto Hasil Inspeksi Rel & Motor Rolling Door (UAT)"
+    },
+    {
+      "filename": "13_dokumen_serah_terima_dc.pdf",
+      "type": "pdf",
+      "title": "BERITA ACARA SERAH TERIMA FASILITAS DC BANDUNG - 100%",
+      "subtitle": "Perbaikan Rolling Door Bay 4 DC Bandung Siap Beroperasi",
+      "category": "Serah Terima DC/Warehouse"
+    },
+    {
+      "filename": "14_foto_pekerjaan_selesai_dc.jpg",
+      "type": "image",
+      "label": "Foto Rolling Door DC Berfungsi Normal & Terkalibrasi (UAT)"
+    }
+  ]
+}

@@ -23,13 +23,25 @@ import { ReportAffectedStore } from '@/types/incident';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
 
+import { 
+  syncStoresFromGoogleSheets, 
+  getLastStoreSyncHistory, 
+  StoreSyncHistoryRecord 
+} from './google-sheets-sync';
+
 export const AUTO_EARTHQUAKE_MAX_AGE_MINUTES = parseInt(process.env.AUTO_EARTHQUAKE_MAX_AGE_MINUTES || '60', 10);
 export const MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES = parseInt(process.env.MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES || '120', 10);
+export const STORE_SYNC_INTERVAL_HOURS = parseInt(process.env.STORE_SYNC_INTERVAL_HOURS || '24', 10);
+export const STORE_SYNC_INTERVAL_MS = STORE_SYNC_INTERVAL_HOURS * 60 * 60 * 1000;
 
 let isCycleRunning = false;
 let initialTimer: NodeJS.Timeout | null = null;
 let intervalTimer: NodeJS.Timeout | null = null;
 let isDaemonStopped = false;
+
+let isStoreSyncRunning = false;
+let storeSyncInitialTimer: NodeJS.Timeout | null = null;
+let storeSyncIntervalTimer: NodeJS.Timeout | null = null;
 
 import { getOrLoadMasterStores, getBranchCentroidsFromStores, BranchCentroid } from './store-master-loader';
 
@@ -202,36 +214,121 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
 }
 
 /**
+ * Checks if a store sync is due based on STORE_SYNC_INTERVAL_HOURS
+ */
+export async function isStoreSyncDue(): Promise<boolean> {
+  try {
+    const lastSync = await getLastStoreSyncHistory();
+    if (!lastSync || !lastSync.completed_at) return true;
+    const elapsedMs = Date.now() - new Date(lastSync.completed_at).getTime();
+    return elapsedMs >= STORE_SYNC_INTERVAL_MS;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Executes an autonomous background store sync cycle
+ */
+export async function runAutonomousStoreSyncCycle(force: boolean = false): Promise<{
+  success: boolean;
+  status: string;
+  record?: StoreSyncHistoryRecord;
+  error?: string;
+}> {
+  if (isStoreSyncRunning) {
+    return { success: false, status: "ALREADY_RUNNING", error: "Store sync cycle already in progress" };
+  }
+
+  const due = force || (await isStoreSyncDue());
+  if (!due) {
+    return { success: true, status: "NOT_DUE" };
+  }
+
+  isStoreSyncRunning = true;
+  console.log("[Autonomous Store Sync] Starting periodic store sync cycle...");
+  try {
+    const record = await syncStoresFromGoogleSheets();
+    console.log(
+      `[Autonomous Store Sync] Cycle completed with status: ${record.status} (${record.records_added} added, ${record.records_updated} updated)`
+    );
+    return { success: true, status: record.status, record };
+  } catch (err: any) {
+    console.error("[Autonomous Store Sync] Cycle failed with error:", err);
+    return { success: false, status: "FAILED", error: err.message };
+  } finally {
+    isStoreSyncRunning = false;
+  }
+}
+
+/**
+ * Returns the current daemon store sync status
+ */
+export async function getStoreSyncStatus(): Promise<{
+  isRunning: boolean;
+  intervalHours: number;
+  lastSyncAt: string | null;
+  lastSyncStatus: string | null;
+  sourceType: string | null;
+}> {
+  const lastSync = await getLastStoreSyncHistory();
+  return {
+    isRunning: isStoreSyncRunning,
+    intervalHours: STORE_SYNC_INTERVAL_HOURS,
+    lastSyncAt: lastSync?.completed_at || lastSync?.started_at || null,
+    lastSyncStatus: lastSync?.status || null,
+    sourceType: lastSync?.sourceType || null,
+  };
+}
+
+/**
  * Start the autonomous daemon (Ensures single runner in Node.js server process)
  */
 export function startServerDaemon(): void {
-  if (typeof window !== 'undefined') return; // Server only
+  if (typeof window !== "undefined") return; // Server only
 
   const globalScope = globalThis as any;
   if (globalScope.__sparta_daemon_started) {
-    console.log('[Autonomous Daemon] Daemon already active in this Node.js process.');
+    console.log("[Autonomous Daemon] Daemon already active in this Node.js process.");
     return;
   }
 
   globalScope.__sparta_daemon_started = true;
   isDaemonStopped = false;
-  console.log('------------------------------------------------------------');
-  console.log('🚀 [SPARTA SIAGA] 24/7 AUTONOMOUS SERVER DAEMON ACTIVATED');
-  console.log('   Continuous monitoring: BMKG Quakes (60s), RainViewer & Open-Meteo');
-  console.log('   Auto-dispatching: Email to DC Cabang + PWA Push Notifications');
-  console.log('------------------------------------------------------------');
+  console.log("------------------------------------------------------------");
+  console.log("🚀 [SPARTA SIAGA] 24/7 AUTONOMOUS SERVER DAEMON ACTIVATED");
+  console.log("   Continuous monitoring: BMKG Quakes (60s), RainViewer & Open-Meteo");
+  console.log(`   Periodic store sync: Scheduled every ${STORE_SYNC_INTERVAL_HOURS}h (Google Sheets / Master Toko)`);
+  console.log("   Auto-dispatching: Email to DC Cabang + PWA Push Notifications");
+  console.log("------------------------------------------------------------");
 
-  // Initial trigger after 4 seconds
+  // Initial disaster trigger after 4 seconds
   initialTimer = setTimeout(() => {
     if (isDaemonStopped) return;
-    runAutonomousDisasterCycle().catch(err => console.error('[Autonomous Daemon] Initial run failed:', err));
+    runAutonomousDisasterCycle().catch((err) => console.error("[Autonomous Daemon] Initial run failed:", err));
   }, 4000);
 
-  // Interval trigger every 60 seconds (1 minute) 24/7
+  // Interval disaster trigger every 60 seconds (1 minute) 24/7
   intervalTimer = setInterval(() => {
     if (isDaemonStopped) return;
-    runAutonomousDisasterCycle().catch(err => console.error('[Autonomous Daemon] Interval run failed:', err));
+    runAutonomousDisasterCycle().catch((err) => console.error("[Autonomous Daemon] Interval run failed:", err));
   }, 60000);
+
+  // Initial store sync check after 10 seconds
+  storeSyncInitialTimer = setTimeout(() => {
+    if (isDaemonStopped) return;
+    runAutonomousStoreSyncCycle().catch((err) =>
+      console.error("[Autonomous Store Sync] Initial check failed:", err)
+    );
+  }, 10000);
+
+  // Periodic store sync check every 1 hour (evaluates if 24 hours elapsed)
+  storeSyncIntervalTimer = setInterval(() => {
+    if (isDaemonStopped) return;
+    runAutonomousStoreSyncCycle().catch((err) =>
+      console.error("[Autonomous Store Sync] Periodic interval check failed:", err)
+    );
+  }, 60 * 60 * 1000);
 }
 
 export async function stopServerDaemon(gracePeriodMs: number = 5000): Promise<void> {
@@ -244,14 +341,22 @@ export async function stopServerDaemon(gracePeriodMs: number = 5000): Promise<vo
     clearInterval(intervalTimer);
     intervalTimer = null;
   }
+  if (storeSyncInitialTimer) {
+    clearTimeout(storeSyncInitialTimer);
+    storeSyncInitialTimer = null;
+  }
+  if (storeSyncIntervalTimer) {
+    clearInterval(storeSyncIntervalTimer);
+    storeSyncIntervalTimer = null;
+  }
   const globalScope = globalThis as any;
   globalScope.__sparta_daemon_started = false;
 
   const start = Date.now();
-  while (isCycleRunning && Date.now() - start < gracePeriodMs) {
+  while ((isCycleRunning || isStoreSyncRunning) && Date.now() - start < gracePeriodMs) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
-  console.log('[Autonomous Daemon] Daemon stopped.');
+  console.log("[Autonomous Daemon] Daemon stopped.");
 }
 
 /**

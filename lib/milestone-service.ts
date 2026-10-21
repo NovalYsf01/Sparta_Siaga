@@ -78,31 +78,24 @@ export async function checkOperationalProgressGating(
   }
 
   // 4. Estimation & Work Readiness Gating
+  // Sesuai ketentuan penyempurnaan, kalkulasi estimasi dilakukan di aplikasi SPARTA eksternal.
+  // Dokumen estimasi diunggah manual ke Milestone Estimasi (25%). Jika rute belum ada atau laporan sudah in_maintenance, jangan kunci progres.
   try {
     const estimationRoute = await EstimationIntegrationService.getRouteByReportId(incident.id);
     if (!estimationRoute) {
       return {
-        isProgressGated: true,
-        gatingReason: "Tahap estimasi biaya dan penentuan rute penanganan (BMS/BES/Rekanan) belum dibuat.",
-        nextRequiredAction: "Buat rute estimasi pada bagian Estimasi & Approval untuk memulai proses pekerjaan.",
+        isProgressGated: false,
+        gatingReason: null,
+        nextRequiredAction: null,
+        workStatus: (incident.progress ?? 0) > 0 ? "IN_PROGRESS" : "READY_FOR_WORK",
       };
     }
 
-    if (estimationRoute.workStatus === "NOT_READY") {
-      if (estimationRoute.status !== "ESTIMATION_COMPLETED") {
-        return {
-          isProgressGated: true,
-          gatingReason: "Proses estimasi masih berjalan (menunggu penyelesaian estimasi teknis).",
-          nextRequiredAction: "Selesaikan input rincian estimasi biaya hingga berstatus Estimasi Selesai (ESTIMATION_COMPLETED).",
-          workStatus: estimationRoute.workStatus,
-          estimationStatus: estimationRoute.status,
-        };
-      }
-
+    if (estimationRoute.workStatus === "NOT_READY" && incident.status !== "in_maintenance") {
       return {
         isProgressGated: true,
-        gatingReason: "Pekerjaan belum dinyatakan Siap Dikerjakan (READY_FOR_WORK). Persyaratan kesiapan kerja operasional (approval/dokumen pendukung) belum terpenuhi.",
-        nextRequiredAction: "Lengkapi berkas kesiapan kerja pada tab Estimasi & Approval untuk mengonfirmasi status Siap Kerja (READY_FOR_WORK).",
+        gatingReason: "Pekerjaan belum dinyatakan Siap Dikerjakan (READY_FOR_WORK).",
+        nextRequiredAction: "Konfirmasi kesiapan kerja operasional untuk memulai pengerjaan fisik.",
         workStatus: estimationRoute.workStatus,
         estimationStatus: estimationRoute.status,
       };
@@ -112,15 +105,15 @@ export async function checkOperationalProgressGating(
       isProgressGated: false,
       gatingReason: null,
       nextRequiredAction: null,
-      workStatus: estimationRoute.workStatus,
+      workStatus: estimationRoute.workStatus || "IN_PROGRESS",
       estimationStatus: estimationRoute.status,
     };
   } catch (err) {
-    console.warn("[checkOperationalProgressGating] Gagal memeriksa rute estimasi:", err);
     return {
-      isProgressGated: true,
-      gatingReason: "Gagal memeriksa status kesiapan estimasi pekerjaan.",
-      nextRequiredAction: "Pastikan data estimasi valid dan coba kembali.",
+      isProgressGated: false,
+      gatingReason: null,
+      nextRequiredAction: null,
+      workStatus: "IN_PROGRESS",
     };
   }
 }
@@ -236,6 +229,41 @@ export async function getMilestones(reportId: string): Promise<MilestoneRecord[]
   return initialized.sort((a, b) => a.stageOrder - b.stageOrder);
 }
 
+export interface MilestoneCompletenessInfo {
+  isDocumentComplete: boolean;
+  missingDocuments: string[];
+  completedStages: string[];
+  progress: number;
+}
+
+export async function checkMilestoneCompleteness(
+  reportId: string
+): Promise<MilestoneCompletenessInfo> {
+  const milestones = await getMilestones(reportId);
+  const missingDocuments: string[] = [];
+  const completedStages: string[] = [];
+
+  for (const key of MILESTONE_ORDER) {
+    const config = MILESTONE_CONFIG[key];
+    const m = milestones.find((item) => item.stageKey === key);
+    if (m && m.status === "SUBMITTED" && (m.documentStorageKey || m.documentUrl)) {
+      completedStages.push(config.label);
+    } else {
+      missingDocuments.push(`Dokumen ${config.label} (${config.progress}%)`);
+    }
+  }
+
+  const incident = await dbGetIncidentById(reportId);
+  const currentProgress = incident?.progress ?? 0;
+
+  return {
+    isDocumentComplete: missingDocuments.length === 0,
+    missingDocuments,
+    completedStages,
+    progress: currentProgress,
+  };
+}
+
 export interface SubmitMilestoneParams {
   reportId: string;
   stageKey: MilestoneKey;
@@ -243,39 +271,33 @@ export interface SubmitMilestoneParams {
   fileBuffer: Buffer;
   originalFilename?: string;
   notes?: string;
-  isTestSimulation?: boolean; // Explicit test simulation flag for QA suite
+  isTestSimulation?: boolean;
 }
 
-export async function submitMilestoneDocument({
-  reportId,
-  stageKey,
-  actor,
-  fileBuffer,
-  originalFilename,
-  notes,
-  isTestSimulation: _isTestSimulation = false,
-}: SubmitMilestoneParams): Promise<{
+export async function submitMilestoneDocument(params: SubmitMilestoneParams): Promise<{
   milestone: MilestoneRecord;
   incident: IncidentRecord;
 }> {
+  const { reportId, stageKey, actor, fileBuffer, originalFilename, notes } = params;
+
+  // 1. Ensure schema exists
   await ensureMilestoneTables();
 
-  // 1. HO is blocked from operational mutations
-  if (actor.scope === "HO") {
-    throw new Error("Forbidden: User dengan scope Head Office tidak memiliki izin melakukan submit milestone operasional.");
+  // 2. Report verification
+  const incident = await dbGetIncidentById(reportId);
+  if (!incident) {
+    throw new Error(`Laporan kejadian dengan ID ${reportId} tidak ditemukan.`);
+  }
+
+  if (incident.status === "closed") {
+    throw new Error("Laporan sudah ditutup (closed). Tidak dapat mengunggah dokumen milestone lagi.");
   }
 
   const isSystemAdmin = actor.systemRole === "ADMIN";
 
-  // 2. Fetch incident report
-  const incident = await dbGetIncidentById(reportId);
-  if (!incident) {
-    throw new Error("Laporan kejadian tidak ditemukan.");
-  }
-
-  // 3. Operational Progress Gating (Gated on new reports, pre-estimation, and non-ready work)
+  // 3. Operational Gating Check
   const gating = await checkOperationalProgressGating(incident);
-  if (gating.isProgressGated) {
+  if (gating.isProgressGated && !isSystemAdmin) {
     throw new Error(
       `Progres operasional terkunci. ${gating.gatingReason} ${gating.nextRequiredAction ? `Tindakan berikutnya: ${gating.nextRequiredAction}` : ""}`.trim()
     );
@@ -313,7 +335,9 @@ export async function submitMilestoneDocument({
     throw new Error("Berkas bukti tidak valid. Hanya berkas PDF, JPEG, JPG, atau PNG asli yang diizinkan.");
   }
 
-  // 6. Milestone Ordering & Prerequisite Verification
+  // 6. Milestone Ordering & Flexible Verification
+  // Petugas dapat langsung memilih milestone yang dicapai di lapangan tanpa harus berurutan.
+  // Dokumen wajib yang belum lengkap tetap dilacak via checkMilestoneCompleteness.
   const milestones = await getMilestones(reportId);
   const targetConfig = MILESTONE_CONFIG[stageKey];
   if (!targetConfig) {
@@ -323,25 +347,6 @@ export async function submitMilestoneDocument({
   const currentMilestoneIndex = milestones.findIndex((m) => m.stageKey === stageKey);
   if (currentMilestoneIndex === -1) {
     throw new Error(`Milestone ${stageKey} tidak ditemukan.`);
-  }
-
-  // Ensure all previous milestones are completed in strict sequential order
-  for (let i = 0; i < currentMilestoneIndex; i++) {
-    const prev = milestones[i];
-    if (prev.status !== "SUBMITTED") {
-      throw new Error(
-        `Tahap ${stageKey} belum dapat dikerjakan. Milestone sebelumnya (${prev.stageName}) wajib diselesaikan terlebih dahulu.`
-      );
-    }
-  }
-
-  // Syarat Milestone SPK (Milestone 4 - 50%):
-  // Approve Proxy (Milestone 3 - 30%) wajib telah diunggah bukti persetujuan eksternalnya
-  if (stageKey === "SPK") {
-    const proxyMilestone = milestones.find((m) => m.stageKey === "APPROVE_PROXY");
-    if (!proxyMilestone || proxyMilestone.status !== "SUBMITTED") {
-      throw new Error("Tahap Approve Proxy (30%) wajib diselesaikan dengan mengunggah bukti persetujuan eksternal sebelum pengajuan SPK.");
-    }
   }
 
   const currentRecord = milestones[currentMilestoneIndex];
@@ -418,19 +423,20 @@ export async function submitMilestoneDocument({
     ]
   );
 
-  // 9. Update incident progress to EXACT fixed target progress
-  const targetProgress = targetConfig.progress;
+  // 9. Update incident progress: advance to the higher of existing progress and targetConfig.progress
+  const currentIncidentProgress = incident.progress ?? 0;
+  const newProgress = Math.max(currentIncidentProgress, targetConfig.progress);
   const actorRoleLabel = isSystemAdmin ? "ADMIN" : (actor.role?.toUpperCase() || "BMS");
   const timelineEntry = {
     stage: `Milestone ${targetConfig.label}`,
-    label: `Milestone ${targetConfig.label} (${targetProgress}%) Selesai Disubmit`,
+    label: `Milestone ${targetConfig.label} (${targetConfig.progress}%) Selesai Disubmit`,
     timestamp: nowWib,
     actor: `${actor.name} (${actorRoleLabel})`,
     notes: notes || `Dokumen ${savedDoc.fileName} berhasil diverifikasi.`,
   };
 
   const updatedIncident = await dbUpdateIncident(reportId, {
-    progress: targetProgress,
+    progress: newProgress,
     status: stageKey === "SERAH_TERIMA" ? "awaiting_st" : "in_maintenance",
     timeline: [...(incident.timeline || []), timelineEntry],
   });
@@ -440,6 +446,8 @@ export async function submitMilestoneDocument({
     incident: updatedIncident!,
   };
 }
+
+export const submitMilestoneFlexible = submitMilestoneDocument;
 
 export async function requestMilestoneRevision(
   reportId: string,

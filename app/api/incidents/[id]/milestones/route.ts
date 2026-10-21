@@ -6,6 +6,7 @@ import {
   getMilestones,
   submitMilestoneDocument,
   checkOperationalProgressGating,
+  checkMilestoneCompleteness,
 } from "@/lib/milestone-service";
 import { MilestoneKey, MILESTONE_CONFIG } from "@/types/incident";
 
@@ -36,6 +37,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     const activeIndex = milestones.findIndex((m) => m.status !== "SUBMITTED");
     const activeMilestone = activeIndex !== -1 ? milestones[activeIndex] : null;
     const gating = await checkOperationalProgressGating(incident);
+    const completeness = await checkMilestoneCompleteness(id);
 
     return NextResponse.json({
       data: {
@@ -45,6 +47,9 @@ export async function GET(request: Request, { params }: RouteContext) {
         milestones,
         activeMilestone,
         isCompleted: milestones.every((m) => m.status === "SUBMITTED"),
+        isDocumentComplete: completeness.isDocumentComplete,
+        missingDocuments: completeness.missingDocuments,
+        completedStages: completeness.completedStages,
         isProgressGated: gating.isProgressGated,
         gatingReason: gating.gatingReason,
         nextRequiredAction: gating.nextRequiredAction,

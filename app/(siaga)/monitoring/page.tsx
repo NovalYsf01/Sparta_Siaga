@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Activity, AlertTriangle, Building2, Filter, Layers, List, Loader2, MapPin, Radio, Search, Store as StoreIcon, X } from "lucide-react";
+import { Activity, AlertTriangle, Building2, Clock, Filter, Layers, List, Loader2, MapPin, Radio, Search, Store as StoreIcon, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 type MapMode = "event" | "store" | "dc";
 import { MapControls } from "@/components/map/map-controls";
@@ -27,6 +27,24 @@ const MapView = dynamic(
   }
 );
 
+function formatIndonesianDateTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return (
+      d.toLocaleString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+      }) + " WIB"
+    );
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function MonitoringPage() {
   // Mode Kejadian is the strict default mode
   const [mapMode, setMapMode] = useState<MapMode>("event");
@@ -45,6 +63,20 @@ export default function MonitoringPage() {
   const [viewport, setViewport] = useState<{ north: number; south: number; east: number; west: number } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isMobileControlsOpen, setIsMobileControlsOpen] = useState(false);
+  const [lastStoreUpdate, setLastStoreUpdate] = useState<string | null>(null);
+  const [storeSyncSource, setStoreSyncSource] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stores/sync")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (res?.lastSync) {
+          setLastStoreUpdate(res.lastSync.completed_at || res.lastSync.started_at || null);
+          setStoreSyncSource(res.lastSync.sourceType || (res.lastSync.sync_source?.includes("GOOGLE") ? "GOOGLE_SHEETS" : "LOCAL_MASTER"));
+        }
+      })
+      .catch((e) => console.error("[MonitoringPage] Gagal memuat status sinkronisasi toko:", e));
+  }, []);
 
   const {
     computedStores,
@@ -488,6 +520,19 @@ export default function MonitoringPage() {
                   Reset
                 </button>
               )}
+
+              {/* Data toko terakhir diperbarui status pill */}
+              <div className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] shadow-sm backdrop-blur-md min-h-[34px] ${
+                isDark ? "bg-slate-800/80 border-slate-700 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-600"
+              }`}>
+                <Clock className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400 shrink-0" />
+                <span>
+                  Data toko terakhir diperbarui:{" "}
+                  <strong className={isDark ? "text-white font-semibold" : "text-slate-900 font-semibold"}>
+                    {lastStoreUpdate ? formatIndonesianDateTime(lastStoreUpdate) : "Terbaru (Sinkron)"}
+                  </strong>
+                </span>
+              </div>
             </div>
           )}
         </div>
@@ -560,6 +605,8 @@ export default function MonitoringPage() {
           {/* Map Controls (Desktop floating panel + Mobile bottom sheet) */}
           <MapControls
             locationMode={mapMode}
+            lastStoreUpdate={lastStoreUpdate}
+            storeSyncSource={storeSyncSource}
             latestEarthquake={latestEq}
             incidentOnly={incidentOnly}
             onToggleIncidentOnly={() => setIncidentOnly((prev) => !prev)}

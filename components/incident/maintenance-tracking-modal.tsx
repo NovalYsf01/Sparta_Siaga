@@ -26,6 +26,7 @@ import {
   Maximize2,
   ChevronRight,
   ClipboardList,
+  Info,
 } from "lucide-react";
 import {
   IncidentRecord,
@@ -724,6 +725,17 @@ export function MaintenanceTrackingModal({
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              <a
+                href={`/api/incidents/${incident.id}/export/pdf`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Unduh dokumen PDF laporan resmi"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D5AA6] hover:bg-[#123B6D] text-white font-semibold text-xs transition-colors shadow-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Unduh PDF Laporan</span>
+                <span className="sm:hidden">PDF</span>
+              </a>
               <button
                 type="button"
                 onClick={loadData}
@@ -1343,39 +1355,38 @@ export function MaintenanceTrackingModal({
           {/* TAB 3: ESTIMASI & APPROVAL */}
           {activeTab === "estimasi" && (
             <div className="space-y-4 animate-in fade-in">
+              <div className="bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-2xl p-4 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <h6 className="font-bold text-xs">Ketentuan Estimasi Biaya SPARTA SIAGA</h6>
+                  <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
+                    Perhitungan dan pembuatan rincian estimasi biaya dikerjakan melalui aplikasi SPARTA terkait (di luar SIAGA). Petugas mengunggah dokumen hasil estimasi secara manual melalui menu <strong>Update Progress</strong> pada tahap <strong>Milestone Estimasi (25%)</strong>.
+                  </p>
+                </div>
+              </div>
+
               {estimationRoute ? (
                 <>
                   <EstimationStatusCard route={estimationRoute} loading={loading} />
                   <WorkReadinessCard
                     incident={incident}
                     estimationRoute={estimationRoute}
-                    canUpdate={canUpdateReadiness}
-                    updateReason={updateReadinessReason}
+                    canUpdate={false}
+                    updateReason="Kesiapan kerja dikelola melalui sistem SPARTA terkait."
                     onReadinessUpdated={loadData}
                   />
                 </>
               ) : (
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-4">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-3">
                   <Calculator className="w-10 h-10 text-slate-400 mx-auto" />
                   <div>
                     <h5 className="font-bold text-sm text-slate-900 dark:text-white">
-                      Tahap Estimasi Belum Dibuat
+                      Dokumentasi Estimasi Biaya
                     </h5>
                     <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
-                      Setelah pemeriksaan disetujui BnM Manajer (Confirmed Affected), rute estimasi harus dibuat oleh petugas BMS cabang untuk menentukan nilai estimasi biaya dan kelengkapan kesiapan kerja.
+                      Data laporan dapat digunakan pada proses aplikasi SPARTA terkait. Setelah dokumen estimasi selesai, unggah dokumen PDF/berkas hasil estimasi pada menu Update Progress untuk mencatat Milestone 25%.
                     </p>
                   </div>
-
-                  {canTriggerEstimation && !isReadOnly && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEstimationModalOpen(true)}
-                      className="px-5 py-2.5 rounded-xl bg-[#1D5AA6] hover:bg-[#123B6D] text-white font-bold text-xs shadow-sm inline-flex items-center gap-2 transition-colors"
-                    >
-                      <Calculator className="w-4 h-4" />
-                      <span>Buat Estimasi Pekerjaan Sekarang</span>
-                    </button>
-                  )}
                 </div>
               )}
             </div>
@@ -1387,6 +1398,7 @@ export function MaintenanceTrackingModal({
               <MilestoneProgressionCard
                 incident={incident}
                 identity={identity}
+                readOnly={true}
                 onMilestoneUpdated={loadData}
               />
 
@@ -1429,6 +1441,28 @@ export function MaintenanceTrackingModal({
                       Unduh berkas PDF terverifikasi sistem sesuai tahapan penanganan laporan.
                     </p>
                   </div>
+                </div>
+
+                {/* Unified PDF Download Banner */}
+                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-xs text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Dokumen Laporan PDF Resmi
+                    </span>
+                    <p className="text-[11px] text-blue-700 dark:text-blue-300">
+                      Tautan resmi `/api/incidents/${incident.id}/export/pdf` untuk mencetak atau mengunduh ringkasan laporan terbaru.
+                    </p>
+                  </div>
+                  <a
+                    href={`/api/incidents/${incident.id}/export/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-2 px-4 rounded-lg text-xs font-bold bg-[#1D5AA6] hover:bg-[#123B6D] text-white flex items-center justify-center gap-2 transition-colors shadow-xs shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Unduh PDF Laporan</span>
+                  </a>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

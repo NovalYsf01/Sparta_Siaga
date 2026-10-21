@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Store } from "@/types/store";
 import fs from "fs/promises";
 import path from "path";
+import { getLastStoreSyncHistory } from "@/lib/google-sheets-sync";
 
 let cachedStores: Store[] | null = null;
 let lastCacheTime = 0;
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
         },
       },
       metadata: cachedDataQuality || undefined,
+      lastSync: await getLastStoreSyncHistory(),
     });
   }
 
@@ -241,6 +243,7 @@ export async function GET(request: Request) {
         dataQuality,
       },
       metadata: dataQuality,
+      lastSync: await getLastStoreSyncHistory(),
     });
   } catch (error: any) {
     console.error("[Stores API] Critical error loading stores:", error);

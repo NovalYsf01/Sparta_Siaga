@@ -51,6 +51,13 @@ export type CompletionApprovalAction =
   | "APPROVE_MANAGER"
   | "REJECT_MANAGER";
 
+export interface CompletionApprovalAttachment {
+  url: string;
+  originalName: string;
+  type: string;
+  size: number;
+}
+
 export interface CompletionApprovalRecord {
   id: string;
   reportId: string;
@@ -61,6 +68,7 @@ export interface CompletionApprovalRecord {
   picUserName: string | null;
   submittedAt: string | null;
   submissionNotes: string | null;
+  attachments?: CompletionApprovalAttachment[];
   coordinatorRole: string; // 'bmc' | 'bec' | 'bbc'
   coordinatorUserId: string | null;
   coordinatorUserName: string | null;
@@ -133,10 +141,13 @@ export async function ensureCompletionApprovalTables(): Promise<void> {
       rejected_by_user_id VARCHAR(64),
       rejected_by_user_name VARCHAR(255),
       rejected_at TIMESTAMPTZ,
+      attachments JSONB DEFAULT '[]'::jsonb,
       branch_code VARCHAR(64) NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE report_completion_approvals ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
 
     CREATE INDEX IF NOT EXISTS idx_comp_appr_report ON report_completion_approvals(report_id);
     CREATE INDEX IF NOT EXISTS idx_comp_appr_status ON report_completion_approvals(status);
@@ -359,6 +370,7 @@ export class CompletionApprovalService {
       branch?: string | null;
     };
     notes?: string;
+    attachments?: Array<{ url: string; originalName: string; type: string; size: number }>;
   }): Promise<CompletionApprovalRecord> {
     const { report, route } = await this.validateCompletionPrerequisites(params.reportId);
     const approval = await this.getOrCreateApproval(params.reportId);
@@ -421,26 +433,28 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 6. Update Approval State -> WAITING_MANAGER_APPROVAL (Direct to BM in new workflow)
+    // 6. Update Approval State -> WAITING_COORDINATOR_APPROVAL (Flow: PIC -> Koordinator -> BnM Manajer)
     const pool = getDbPool();
     const submissionNotes = (params.notes || "").trim() || "Pekerjaan fisik telah 100% selesai dan siap diverifikasi.";
+    const attachmentsJson = JSON.stringify(params.attachments || []);
 
     const updateRes = await pool.query(
       `UPDATE report_completion_approvals SET
-        status = 'WAITING_MANAGER_APPROVAL',
+        status = 'WAITING_COORDINATOR_APPROVAL',
         pic_user_id = $1,
         pic_user_name = $2,
         submitted_at = NOW(),
         submission_notes = $3,
+        attachments = $4,
         rejection_reason = NULL,
         rejected_by_role = NULL,
         rejected_by_user_id = NULL,
         rejected_by_user_name = NULL,
         rejected_at = NULL,
         updated_at = NOW()
-       WHERE report_id = $4
+       WHERE report_id = $5
        RETURNING *`,
-      [params.actor.id, params.actor.name, submissionNotes, params.reportId]
+      [params.actor.id, params.actor.name, submissionNotes, attachmentsJson, params.reportId]
     );
 
     // 7. Append History
@@ -817,18 +831,29 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 5. Status Check: WAITING_MANAGER_APPROVAL, legacy WAITING_COORDINATOR_APPROVAL, or WAITING_PIC_SUBMISSION when hasMilestoneSt is true
+    // 5. Status Check: WAITING_MANAGER_APPROVAL or WAITING_COORDINATOR_APPROVAL for Admin
     const isReadyForManager =
       approval.status === "WAITING_MANAGER_APPROVAL" ||
-      approval.status === "WAITING_COORDINATOR_APPROVAL" ||
-      (approval.status === "WAITING_PIC_SUBMISSION" && hasMilestoneSt);
+      (approval.status === "WAITING_COORDINATOR_APPROVAL" && isSystemAdmin);
 
     if (!isReadyForManager) {
       const err: any = new Error(
-        `Persetujuan final ditolak: Status approval saat ini adalah '${approval.status}'.`
+        `Persetujuan final ditolak: Status approval saat ini adalah '${approval.status}'. Serah Terima wajib disetujui Koordinator terlebih dahulu.`
       );
       err.status = 400;
       err.code = "INVALID_APPROVAL_STATE";
+      throw err;
+    }
+
+    // 5b. Document Completeness Check (All 5 mandatory milestone documents must be complete!)
+    const { checkMilestoneCompleteness } = await import("./milestone-service");
+    const completeness = await checkMilestoneCompleteness(params.reportId);
+    if (!completeness.isDocumentComplete) {
+      const err: any = new Error(
+        `Penutupan laporan ditolak. Seluruh 5 dokumen milestone wajib dilengkapi terlebih dahulu. Dokumen yang belum lengkap: ${completeness.missingDocuments.join(", ")}`
+      );
+      err.status = 400;
+      err.code = "MANDATORY_DOCUMENTS_INCOMPLETE";
       throw err;
     }
 
@@ -1054,6 +1079,15 @@ export class CompletionApprovalService {
   }
 
   private static mapRowToRecord(row: any): CompletionApprovalRecord {
+    let attachments: CompletionApprovalAttachment[] = [];
+    if (row.attachments) {
+      try {
+        attachments = typeof row.attachments === "string" ? JSON.parse(row.attachments) : row.attachments;
+      } catch {
+        attachments = [];
+      }
+    }
+
     return {
       id: row.id,
       reportId: row.report_id,
@@ -1064,6 +1098,7 @@ export class CompletionApprovalService {
       picUserName: row.pic_user_name || null,
       submittedAt: row.submitted_at ? (row.submitted_at.toISOString ? row.submitted_at.toISOString() : new Date(row.submitted_at).toISOString()) : null,
       submissionNotes: row.submission_notes || null,
+      attachments,
       coordinatorRole: row.coordinator_role,
       coordinatorUserId: row.coordinator_user_id || null,
       coordinatorUserName: row.coordinator_user_name || null,

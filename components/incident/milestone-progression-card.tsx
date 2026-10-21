@@ -31,12 +31,14 @@ interface MilestoneProgressionCardProps {
   incident: IncidentRecord;
   identity: UserIdentity | null;
   onMilestoneUpdated?: () => void;
+  readOnly?: boolean;
 }
 
 export function MilestoneProgressionCard({
   incident,
   identity,
   onMilestoneUpdated,
+  readOnly = false,
 }: MilestoneProgressionCardProps) {
   const [milestones, setMilestones] = useState<MilestoneRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,6 +52,9 @@ export function MilestoneProgressionCard({
   const [isGated, setIsGated] = useState(false);
   const [gatingReason, setGatingReason] = useState<string | null>(null);
   const [nextAction, setNextAction] = useState<string | null>(null);
+  const [isDocComplete, setIsDocComplete] = useState<boolean>(false);
+  const [missingDocs, setMissingDocs] = useState<string[]>([]);
+  const [selectedStageKey, setSelectedStageKey] = useState<MilestoneKey>("CEKLIS");
 
   // Expanded revisions
   const [expandedRevisions, setExpandedRevisions] = useState<Record<string, boolean>>({});
@@ -77,6 +82,17 @@ export function MilestoneProgressionCard({
           setIsGated(Boolean(json.data.isProgressGated));
           setGatingReason(json.data.gatingReason || null);
           setNextAction(json.data.nextRequiredAction || null);
+          setIsDocComplete(Boolean(json.data.isDocumentComplete));
+          setMissingDocs(json.data.missingDocuments || []);
+        }
+
+        // Default selectedStageKey to first unsubmitted if currently pointing to submitted
+        const unsubmitted = list.find((m: any) => m.status !== "SUBMITTED");
+        if (unsubmitted) {
+          setSelectedStageKey((prev) => {
+            const currentItem = list.find((m: any) => m.stageKey === prev);
+            return currentItem?.status === "SUBMITTED" ? unsubmitted.stageKey : prev;
+          });
         }
       }
     } catch (err) {
@@ -93,9 +109,9 @@ export function MilestoneProgressionCard({
   // Ensure safe array operations
   const safeMilestones = Array.isArray(milestones) ? milestones : [];
 
-  // Find active milestone
-  const activeMilestone = safeMilestones.find((m) => m.status === "NOT_STARTED" || m.status === "REVISION_REQUESTED");
-  const allCompleted = safeMilestones.length === 5 && safeMilestones.every((m) => m.status === "SUBMITTED");
+  // Active milestone based on selectedStageKey or unsubmitted
+  const targetMilestone = safeMilestones.find((m) => m.stageKey === selectedStageKey) || safeMilestones.find((m) => m.status !== "SUBMITTED");
+  const allCompleted = isDocComplete || (safeMilestones.length === 5 && safeMilestones.every((m) => m.status === "SUBMITTED"));
   const currentProgress = incident.progress ?? 0;
 
   const isBmUser = identity?.businessRole === "bm" || identity?.role === "bm";
@@ -113,7 +129,7 @@ export function MilestoneProgressionCard({
 
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeMilestone || !selectedFile) return;
+    if (!targetMilestone || !selectedFile) return;
 
     setSubmitting(true);
     setErrorMessage(null);
@@ -121,8 +137,8 @@ export function MilestoneProgressionCard({
 
     try {
       const formData = new FormData();
-      formData.append("stage_key", activeMilestone.stageKey);
-      formData.append("stageKey", activeMilestone.stageKey);
+      formData.append("stage_key", targetMilestone.stageKey);
+      formData.append("stageKey", targetMilestone.stageKey);
       formData.append("file", selectedFile);
       if (submitNotes.trim()) {
         formData.append("notes", submitNotes.trim());
@@ -135,7 +151,7 @@ export function MilestoneProgressionCard({
 
       const json = await res.json().catch(() => ({}));
       if (res.ok) {
-        setSuccessMessage(`Milestone ${activeMilestone.stageName} (${activeMilestone.targetProgress}%) berhasil disubmit.`);
+        setSuccessMessage(`Milestone ${targetMilestone.stageName} (${targetMilestone.targetProgress}%) berhasil dicatat.`);
         setSelectedFile(null);
         setSubmitNotes("");
         await loadMilestones();
@@ -241,6 +257,22 @@ export function MilestoneProgressionCard({
                 </span>
               )}
             </h3>
+            <div className="flex items-center gap-3 mt-1.5 text-xs font-semibold">
+              <span className="text-slate-600 dark:text-slate-400">
+                Progres Pekerjaan: <strong className="text-blue-600 dark:text-blue-400">{currentProgress}%</strong>
+              </span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className="text-slate-600 dark:text-slate-400">
+                Kelengkapan Dokumen:{" "}
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                  isDocComplete
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                }`}>
+                  {isDocComplete ? "Lengkap" : "Belum Lengkap"}
+                </span>
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -263,24 +295,44 @@ export function MilestoneProgressionCard({
           />
         </div>
 
+        {/* Missing Documents Alert Banner */}
+        {!isDocComplete && missingDocs.length > 0 && (
+          <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>Dokumen Wajib yang Masih Perlu Dilengkapi:</span>
+            </div>
+            <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-800 dark:text-amber-300 pl-1">
+              {missingDocs.map((doc, idx) => (
+                <li key={idx}>{doc}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Milestone Steps Stepper (Responsive) */}
         <div className="grid grid-cols-5 gap-2 pt-1 text-center">
           {MILESTONE_ORDER.map((key, idx) => {
             const cfg = MILESTONE_CONFIG[key];
             const ms = safeMilestones.find((m) => m.stageKey === key);
             const isCompleted = ms?.status === "SUBMITTED";
-            const isCurrent = activeMilestone?.stageKey === key;
+            const isSelected = selectedStageKey === key;
             const isRevision = ms?.status === "REVISION_REQUESTED";
 
             return (
-              <div key={key} className="flex flex-col items-center space-y-1">
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedStageKey(key)}
+                className="flex flex-col items-center space-y-1 group focus:outline-none"
+              >
                 <div
                   className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     isCompleted
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700"
                       : isRevision
                       ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse"
-                      : isCurrent
+                      : isSelected
                       ? "bg-blue-600 text-white shadow-sm ring-2 ring-blue-300"
                       : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 border border-slate-200 dark:border-slate-700"
                   }`}
@@ -291,13 +343,15 @@ export function MilestoneProgressionCard({
                     <span>{idx + 1}</span>
                   )}
                 </div>
-                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate w-full">
+                <span className={`text-[10px] sm:text-[11px] font-semibold truncate w-full ${
+                  isSelected ? "text-blue-600 dark:text-blue-400 font-bold" : "text-slate-700 dark:text-slate-300"
+                }`}>
                   {cfg.label}
                 </span>
                 <span className="text-[9px] font-mono text-slate-400 dark:text-slate-500">
                   {cfg.progress}%
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -338,7 +392,7 @@ export function MilestoneProgressionCard({
                 </span>
               </div>
               <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed font-medium">
-                {gatingReason || "Laporan baru memerlukan tahap verifikasi awal dan estimasi selesai sebelum progres operasional dapat di-submit."}
+                {gatingReason || "Laporan baru memerlukan tahap verifikasi awal sebelum progres operasional dapat di-submit."}
               </p>
               {nextAction && (
                 <div className="pt-2 flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 p-2.5 rounded-xl border border-amber-200 dark:border-amber-800/60">
@@ -355,26 +409,57 @@ export function MilestoneProgressionCard({
       )}
 
       {/* Upload & Submit Active Milestone (PIC only - Unlocked when prerequisites met) */}
-      {!isGated && activeMilestone && isPicUser && !isClosed && (
+      {!isGated && targetMilestone && isPicUser && !isClosed && (
         <div className="bg-white dark:bg-slate-900 border-2 border-blue-200 dark:border-blue-900/60 rounded-2xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Upload className="w-5 h-5 text-[#1D5AA6] dark:text-blue-400" />
               <div>
                 <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Unggah Bukti: {activeMilestone.stageName} ({activeMilestone.targetProgress}%)
+                  Unggah Bukti: {targetMilestone.stageName} ({targetMilestone.targetProgress}%)
                 </h4>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Dokumen bukti fisik (PDF/JPEG/PNG) wajib diunggah sebelum submit.
+                  Pilih tahap milestone yang dicapai di lapangan dan unggah berkas bukti fisik (PDF/JPEG/PNG).
                 </p>
               </div>
             </div>
-            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-              Tahap {activeMilestone.stageOrder} dari 5
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 self-start sm:self-auto">
+              Tahap {targetMilestone.stageOrder} dari 5
             </span>
           </div>
 
-          {activeMilestone.stageKey === "APPROVE_PROXY" && (
+          {/* Quick Stage Selector Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">
+              Pilih Tahap:
+            </span>
+            {MILESTONE_ORDER.map((stageKey) => {
+              const cfg = MILESTONE_CONFIG[stageKey];
+              const ms = safeMilestones.find((m) => m.stageKey === stageKey);
+              const isSelected = selectedStageKey === stageKey;
+              const isSubmitted = ms?.status === "SUBMITTED";
+
+              return (
+                <button
+                  key={stageKey}
+                  type="button"
+                  onClick={() => setSelectedStageKey(stageKey)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-[#1D5AA6] text-white shadow-xs"
+                      : isSubmitted
+                      ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                      : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200"
+                  }`}
+                >
+                  {isSubmitted && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+                  <span>{cfg.label} ({cfg.progress}%)</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {targetMilestone.stageKey === "APPROVE_PROXY" && (
             <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/40 rounded-xl text-xs text-blue-900 dark:text-blue-200 space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
                 <Info className="w-4 h-4 text-blue-600 shrink-0" />
@@ -386,64 +471,88 @@ export function MilestoneProgressionCard({
             </div>
           )}
 
-          <form onSubmit={handleFileUpload} className="space-y-4">
-            <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-slate-800/30">
-              <input
-                type="file"
-                id="milestone-file-input"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                className="hidden"
-              />
-              <label
-                htmlFor="milestone-file-input"
-                className="cursor-pointer flex flex-col items-center space-y-1.5"
-              >
-                <Upload className="w-6 h-6 text-slate-400" />
-                <span className="text-xs font-bold text-[#1D5AA6] dark:text-blue-400">
-                  {selectedFile ? selectedFile.name : "Pilih Dokumen Bukti (PDF / Foto JPEG)"}
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  Maksimal 10MB • Format PDF, JPEG, JPG, PNG
-                </span>
-              </label>
+          {targetMilestone.stageKey === "ESTIMASI" && (
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold">
+                <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Dokumentasi Milestone Estimasi (25%):</span>
+              </div>
+              <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
+                Perhitungan estimasi biaya dikerjakan pada aplikasi SPARTA terkait. Unggah dokumen hasil estimasi resmi di sini sebagai dokumentasi perkembangan pekerjaan 25%.
+              </p>
             </div>
+          )}
 
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Catatan Pekerjaan (Opsional):
-              </label>
-              <textarea
-                value={submitNotes}
-                onChange={(e) => setSubmitNotes(e.target.value)}
-                rows={2}
-                placeholder="Tambahkan keterangan teknis milestone..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
-              />
+          {readOnly ? (
+            <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-xs text-slate-600 dark:text-slate-400 flex items-start gap-3">
+              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h6 className="font-bold text-slate-800 dark:text-slate-200">Detail Laporan (Read-Only)</h6>
+                <p className="text-[11px] leading-relaxed">
+                  Pembaruan dokumen bukti milestone (10% Ceklis, 25% Estimasi, 30% Approve Proxy, 50% SPK, 100% Serah Terima) dikelola secara terpusat melalui tombol <strong>Update Progress</strong> di Pusat Laporan.
+                </p>
+              </div>
             </div>
+          ) : (
+            <form onSubmit={handleFileUpload} className="space-y-4">
+              <div className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-slate-800/30">
+                <input
+                  type="file"
+                  id="milestone-file-input"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="milestone-file-input"
+                  className="cursor-pointer flex flex-col items-center space-y-1.5"
+                >
+                  <Upload className="w-6 h-6 text-slate-400" />
+                  <span className="text-xs font-bold text-[#1D5AA6] dark:text-blue-400">
+                    {selectedFile ? selectedFile.name : "Pilih Dokumen Bukti (PDF / Foto JPEG)"}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    Maksimal 10MB • Format PDF, JPEG, JPG, PNG
+                  </span>
+                </label>
+              </div>
 
-            <div className="flex justify-end pt-1">
-              <button
-                type="submit"
-                disabled={submitting || !selectedFile}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-1.5"
-              >
-                {submitting ? (
-                  <span>Mengunggah Berkas...</span>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Submit {activeMilestone.stageName} ({activeMilestone.targetProgress}%)</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Catatan Pekerjaan (Opsional):
+                </label>
+                <textarea
+                  value={submitNotes}
+                  onChange={(e) => setSubmitNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Tambahkan keterangan teknis milestone..."
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  disabled={submitting || !selectedFile}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm flex items-center gap-1.5"
+                >
+                  {submitting ? (
+                    <span>Mengunggah Berkas...</span>
+                  ) : (
+                    <>
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Submit {targetMilestone.stageName} ({targetMilestone.targetProgress}%)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 
       {/* Ready for Final BM Submission (100% reached, pending BM submit) */}
-      {allCompleted && !isClosed && isPicUser && incident.status !== "pending_final_approval" && (
+      {!readOnly && allCompleted && !isClosed && isPicUser && incident.status !== "pending_final_approval" && (
         <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5 space-y-3">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
@@ -474,7 +583,7 @@ export function MilestoneProgressionCard({
       )}
 
       {/* Building & Maintenance Manager Final Review Card */}
-      {isAwaitingFinalBm && isBmUser && (
+      {!readOnly && isAwaitingFinalBm && isBmUser && (
         <div className="bg-white dark:bg-slate-900 border-2 border-purple-200 dark:border-purple-900/60 rounded-2xl p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

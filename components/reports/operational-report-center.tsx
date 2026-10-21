@@ -103,8 +103,8 @@ export function OperationalReportCenter({
   const isSystemAdmin = identity?.systemRole === "ADMIN";
   const isHoViewer = identity?.scope === "HO" && !isSystemAdmin;
   const canTriggerEstimation = !isSystemAdmin && Boolean(identity?.effectivePermissions?.ESTIMATION_TRIGGER);
-  const canUpdateProgress = !isSystemAdmin && Boolean(identity?.effectivePermissions?.REPORT_UPDATE_PROGRESS);
-  const canCreateReport = Boolean(identity) && !isSystemAdmin && !isHoViewer;
+  const canUpdateProgress = isSystemAdmin || Boolean(identity?.effectivePermissions?.REPORT_UPDATE_PROGRESS);
+  const canCreateReport = Boolean(identity) && !isHoViewer;
 
   // Entry Point D2 & O states
   const [selectReportPurpose, setSelectReportPurpose] = useState<"ESTIMATION" | "PROGRESS" | null>(null);
@@ -200,15 +200,6 @@ export function OperationalReportCenter({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {canTriggerEstimation && (
-            <button
-              onClick={() => setSelectReportPurpose("ESTIMATION")}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
-            >
-              <Calculator className="w-4 h-4" />
-              Buat Estimasi
-            </button>
-          )}
           {canUpdateProgress && (
             <button
               onClick={() => setSelectReportPurpose("PROGRESS")}
@@ -524,29 +515,17 @@ export function OperationalReportCenter({
       )}
 
 
-      {/* Select Report Modal (Entry Point D2 & O) */}
+      {/* Select Report Modal for Update Progress */}
       <SelectReportModal
         isOpen={selectReportPurpose !== null}
         onClose={() => setSelectReportPurpose(null)}
-        purpose={selectReportPurpose || "ESTIMATION"}
+        purpose="PROGRESS"
         incidents={incidents}
         currentUser={identity}
         onSelectReport={(rep) => {
-          if (selectReportPurpose === "ESTIMATION") {
-            setSelectedEstimationReport(rep);
-          } else if (selectReportPurpose === "PROGRESS") {
-            setSelectedProgressReport(rep);
-          }
+          setSelectedProgressReport(rep);
           setSelectReportPurpose(null);
         }}
-      />
-
-      {/* Sub-modal: Buat / Status Estimasi */}
-      <EstimationModal
-        isOpen={selectedEstimationReport !== null}
-        onClose={() => setSelectedEstimationReport(null)}
-        incident={selectedEstimationReport}
-        onRouteCreated={() => {}}
       />
 
       {/* Sub-modal: Update Progress */}

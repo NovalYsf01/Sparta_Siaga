@@ -14,6 +14,7 @@ import {
   Activity,
   Waves,
   Store,
+  Clock,
   X,
 } from "lucide-react";
 import { Earthquake } from "@/types/disaster";
@@ -44,13 +45,39 @@ interface MapControlsProps {
   selectedEarthquake?: Earthquake | null;
   onClearEventFocus?: () => void;
 
+  // Store Sync Update Info
+  lastStoreUpdate?: string | null;
+  storeSyncSource?: "GOOGLE_SHEETS" | "LOCAL_MASTER" | string | null;
+  storeSyncLabel?: string | null;
+
   // Mobile Bottom Sheet Props
   isMobileSheetOpen?: boolean;
   onCloseMobileSheet?: () => void;
 }
 
+function formatIndonesianDateTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return (
+      d.toLocaleString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+      }) + " WIB"
+    );
+  } catch {
+    return dateStr;
+  }
+}
+
 export function MapControls({
   locationMode = "event",
+  lastStoreUpdate,
+  storeSyncSource,
+  storeSyncLabel,
   incidentOnly,
   onToggleIncidentOnly,
   basemap,
@@ -135,6 +162,31 @@ export function MapControls({
         <Compass className="w-4 h-4 shrink-0 text-cyan-500" />
         <span>Reset Tampilan Peta</span>
       </button>
+
+      {/* Catatan Terakhir Pembaruan Data Toko */}
+      <div className={`pt-2 border-t text-[10px] space-y-1 ${
+        isDark ? "border-slate-800 text-slate-400" : "border-slate-200 text-slate-500"
+      }`}>
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3 h-3 text-cyan-500 shrink-0" />
+          <span className="leading-tight">
+            Data toko:{" "}
+            <strong className={isDark ? "text-slate-300 font-semibold" : "text-slate-800 font-semibold"}>
+              {lastStoreUpdate ? formatIndonesianDateTime(lastStoreUpdate) : "Terbaru"}
+            </strong>
+          </span>
+        </div>
+        <div className="flex items-center gap-1 pl-4.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
+            storeSyncSource === "GOOGLE_SHEETS" ? "bg-emerald-500" : "bg-amber-500"
+          }`} />
+          <span className="text-[9px] opacity-85 truncate">
+            {storeSyncSource === "GOOGLE_SHEETS"
+              ? "Sumber: Google Sheets (Sinkron)"
+              : "Sumber: Master Toko Lokal (21.550 Toko)"}
+          </span>
+        </div>
+      </div>
     </div>
   ) : (
 
@@ -336,6 +388,31 @@ export function MapControls({
         <Compass className="w-4 h-4 shrink-0 text-cyan-500" />
         <span>Reset Tampilan Peta</span>
       </button>
+
+      {/* Catatan Terakhir Pembaruan Data Toko */}
+      <div className={`pt-2 border-t text-[10px] space-y-1 ${
+        isDark ? "border-slate-800 text-slate-400" : "border-slate-200 text-slate-500"
+      }`}>
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3 h-3 text-cyan-500 shrink-0" />
+          <span className="leading-tight">
+            Data toko:{" "}
+            <strong className={isDark ? "text-slate-300 font-semibold" : "text-slate-800 font-semibold"}>
+              {lastStoreUpdate ? formatIndonesianDateTime(lastStoreUpdate) : "Terbaru"}
+            </strong>
+          </span>
+        </div>
+        <div className="flex items-center gap-1 pl-4.5">
+          <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
+            storeSyncSource === "GOOGLE_SHEETS" ? "bg-emerald-500" : "bg-amber-500"
+          }`} />
+          <span className="text-[9px] opacity-85 truncate">
+            {storeSyncSource === "GOOGLE_SHEETS"
+              ? "Sumber: Google Sheets (Sinkron)"
+              : "Sumber: Master Toko Lokal (21.550 Toko)"}
+          </span>
+        </div>
+      </div>
     </div>
   );
 

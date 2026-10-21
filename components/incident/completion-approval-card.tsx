@@ -297,6 +297,28 @@ export function CompletionApprovalCard({
         </div>
       )}
 
+      {/* Serah Terima Attachments List */}
+      {approval?.attachments && approval.attachments.length > 0 && (
+        <div className="p-3.5 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+            <FileCheck className="w-4 h-4 text-blue-600" />
+            <span>Dokumen & Foto Bukti Serah Terima ({approval.attachments.length} berkas):</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {approval.attachments.map((att, i) => (
+              <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200/60 dark:border-slate-700">
+                <span className="truncate font-medium text-slate-700 dark:text-slate-300" title={att.originalName}>
+                  {att.originalName}
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-2">
+                  {Math.round(att.size / 1024)} KB
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Action Area based on Role and Stage */}
       {!isResolved && (
         <div className="bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
