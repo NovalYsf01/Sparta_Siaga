@@ -1510,15 +1510,13 @@ export function MaintenanceTrackingModal({
 
         {/* LIGHTBOX PHOTO PREVIEW MODAL */}
         {previewPhoto && (
-          <div
-            id="initial-photo-preview-modal"
-            className="fixed inset-0 z-60 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
-            onClick={() => setPreviewPhoto(null)}
+          <AppDialog
+            open={!!previewPhoto}
+            onClose={() => setPreviewPhoto(null)}
+            title={previewPhoto.title || "Pratinjau Foto Bukti"}
+            className="sm:!max-w-3xl"
           >
-            <div
-              className="relative max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="relative w-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]">
               {/* Preview Header */}
               <div className="px-4 py-3 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1578,7 +1576,7 @@ export function MaintenanceTrackingModal({
                 )}
               </div>
             </div>
-          </div>
+          </AppDialog>
         )}
         {/* MINIMAL FOOTER */}
         <div className="px-5 py-3 bg-slate-50/70 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
