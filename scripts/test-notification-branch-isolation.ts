@@ -207,6 +207,19 @@ async function run() {
     );
   }
 
+  const firstPublicAlert = ownBranchBody.logs?.[0];
+  assert(
+    Boolean(firstPublicAlert) &&
+      !("recipient_contact" in firstPublicAlert!) &&
+      !("recipient_role" in firstPublicAlert!) &&
+      !("email_html_preview" in firstPublicAlert!) &&
+      !("store_verifications" in firstPublicAlert!) &&
+      !("acknowledged_at" in firstPublicAlert!) &&
+      !("status" in firstPublicAlert!),
+    "N13",
+    "Feed nasional tidak membocorkan kontak penerima, status, atau data operasional internal"
+  );
+
   const actualAdminPermission = await checkUserPermission({
     user: systemAdmin,
     permission: "NOTIFICATION_VIEW",
