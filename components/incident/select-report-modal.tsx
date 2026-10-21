@@ -26,6 +26,24 @@ interface SelectReportModalProps {
   currentUser?: UserIdentity | null;
 }
 
+function formatDisasterIndonesian(type?: string): string {
+  if (!type) return "Insiden";
+  switch (type.toLowerCase()) {
+    case "earthquake":
+      return "Gempa Bumi";
+    case "heavy_rain":
+      return "Hujan Lebat";
+    case "flood":
+      return "Banjir";
+    case "fire":
+      return "Kebakaran";
+    case "theft":
+      return "Pencurian";
+    default:
+      return type;
+  }
+}
+
 export function SelectReportModal({
   isOpen,
   onClose,
@@ -74,7 +92,7 @@ export function SelectReportModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none touch-none select-none">
+    <div className="fixed inset-0 z-[6000] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in overscroll-none select-none">
       <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
         {/* Header (Fixed) */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
@@ -139,7 +157,7 @@ export function SelectReportModal({
                         {report.id}
                       </span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        {report.disasterType}
+                        {formatDisasterIndonesian(report.disasterType)}
                       </span>
                       {isDc && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold">

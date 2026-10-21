@@ -21,6 +21,10 @@ import {
   Sliders,
   Lock,
   AlertTriangle,
+  RotateCcw,
+  ArrowUpDown,
+  Filter,
+  Users,
 } from "lucide-react";
 import { RolePermissionTab } from "@/components/admin/role-permission-tab";
 import { UserOverrideTab } from "@/components/admin/user-override-tab";
@@ -54,8 +58,10 @@ export default function UserManagementPage() {
   // Filters
   const [activeTab, setActiveTab] = useState<"users" | "roles" | "overrides">("users");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterSystemRole, setFilterSystemRole] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [filterScope, setFilterScope] = useState("");
+  const [sortBy, setSortBy] = useState<"hierarchy" | "name-asc" | "name-desc" | "nik-asc" | "status-active">("hierarchy");
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -108,24 +114,88 @@ export default function UserManagementPage() {
     fetchUsers();
   }, []);
 
+  // Role Hierarchy Weights for organizational ordering
+  const getHierarchyWeight = (u: User): number => {
+    if (u.systemRole === "ADMIN") return 10;
+    const r = (u.businessRole || "").toLowerCase();
+    switch (r) {
+      case "gm_ho": return 20;
+      case "sm_ho": return 25;
+      case "ho_admin": return 30;
+      case "bm": return 40;
+      case "bmc": return 50;
+      case "bec": return 51;
+      case "bbc": return 52;
+      case "bms": return 60;
+      case "bes": return 61;
+      case "bbs": return 62;
+      case "store_crew":
+      case "tim_toko": return 70;
+      default: return 80;
+    }
+  };
+
   useEffect(() => {
-    let result = users;
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
+    let result = [...users];
+
+    // Search filter: nama, NIK, or email
+    if (searchTerm.trim()) {
+      const lower = searchTerm.trim().toLowerCase();
       result = result.filter(u => 
-        u.name.toLowerCase().includes(lower) || 
+        (u.name && u.name.toLowerCase().includes(lower)) || 
         (u.nik && u.nik.toLowerCase().includes(lower)) ||
         (u.email && u.email.toLowerCase().includes(lower))
       );
     }
-    if (filterSystemRole) {
-      result = result.filter(u => u.systemRole === filterSystemRole);
+
+    // Role filter: specific role or system admin
+    if (filterRole) {
+      if (filterRole === "ADMIN") {
+        result = result.filter(u => u.systemRole === "ADMIN");
+      } else {
+        result = result.filter(u => u.systemRole !== "ADMIN" && u.businessRole?.toLowerCase() === filterRole.toLowerCase());
+      }
     }
+
+    // Status filter: ACTIVE or INACTIVE
+    if (filterStatus) {
+      result = result.filter(u => u.status === filterStatus);
+    }
+
+    // Scope filter: HO or BRANCH
     if (filterScope) {
       result = result.filter(u => u.scope === filterScope);
     }
+
+    // Sort order
+    result.sort((a, b) => {
+      if (sortBy === "hierarchy") {
+        const weightDiff = getHierarchyWeight(a) - getHierarchyWeight(b);
+        if (weightDiff !== 0) return weightDiff;
+        const branchDiff = (a.branch || "").localeCompare(b.branch || "");
+        if (branchDiff !== 0) return branchDiff;
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === "name-asc") {
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === "name-desc") {
+        return b.name.localeCompare(a.name);
+      }
+      if (sortBy === "nik-asc") {
+        return (a.nik || "").localeCompare(b.nik || "");
+      }
+      if (sortBy === "status-active") {
+        if (a.status !== b.status) {
+          return a.status === "ACTIVE" ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      }
+      return 0;
+    });
+
     setFilteredUsers(result);
-  }, [users, searchTerm, filterSystemRole, filterScope]);
+  }, [users, searchTerm, filterRole, filterStatus, filterScope, sortBy]);
 
   // Click outside to close branch dropdown
   useEffect(() => {
@@ -575,8 +645,34 @@ export default function UserManagementPage() {
 
       {activeTab === "users" && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          {/* Filters Bar */}
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-3 bg-slate-50/50 dark:bg-slate-950/50">
+          {/* Quick Summary Badges */}
+          <div className="px-4 py-2.5 bg-slate-50/80 dark:bg-slate-950/80 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-4 text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                Total: <span className="font-bold">{users.length}</span>
+              </span>
+              <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+              <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                Aktif: <span className="font-bold">{users.filter(u => u.status === "ACTIVE").length}</span>
+              </span>
+              <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+              <span className="text-slate-500 dark:text-slate-400">
+                Nonaktif: <span className="font-bold">{users.filter(u => u.status === "INACTIVE").length}</span>
+              </span>
+              <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+              <span className="text-purple-700 dark:text-purple-400 font-medium">
+                Admin: <span className="font-bold">{users.filter(u => u.systemRole === "ADMIN").length}</span>
+              </span>
+            </div>
+            <div className="text-slate-500 dark:text-slate-400 text-[11px]">
+              Menampilkan <span className="font-bold text-slate-800 dark:text-slate-200">{filteredUsers.length}</span> dari {users.length} akun
+            </div>
+          </div>
+
+          {/* Filters & Search Bar */}
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row gap-3 bg-white dark:bg-slate-900">
+            {/* Search Input with Clear Button */}
             <div className="relative flex-1">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <input 
@@ -584,27 +680,104 @@ export default function UserManagementPage() {
                 placeholder="Cari nama, NIK, atau email..." 
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+                className="w-full pl-9 pr-8 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
               />
+              {searchTerm && (
+                <button 
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-0.5 rounded"
+                  title="Hapus pencarian"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+
+            {/* Filter Role Dropdown */}
             <select 
-              value={filterSystemRole} 
-              onChange={e => setFilterSystemRole(e.target.value)}
-              className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filterRole} 
+              onChange={e => setFilterRole(e.target.value)}
+              className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 min-w-[150px] focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Semua System Role</option>
-              <option value="ADMIN">ADMIN</option>
-              <option value="USER">USER</option>
+              <option value="">Semua Peran / Role</option>
+              <optgroup label="System Administrator">
+                <option value="ADMIN">System Administrator (ADMIN)</option>
+              </optgroup>
+              <optgroup label="Head Office (HO)">
+                <option value="gm_ho">GM HO (General Manager)</option>
+                <option value="sm_ho">SM HO (Senior Manager)</option>
+                <option value="ho_admin">HO Admin Monitoring</option>
+              </optgroup>
+              <optgroup label="Manajemen Cabang">
+                <option value="bm">BnM Manajer (Branch)</option>
+              </optgroup>
+              <optgroup label="Koordinator Cabang">
+                <option value="bmc">BMC (Koordinator BMS)</option>
+                <option value="bec">BEC (Koordinator BES)</option>
+                <option value="bbc">BBC (Koordinator BBS)</option>
+              </optgroup>
+              <optgroup label="Petugas Lapangan">
+                <option value="bms">BMS (Maintenance Staff)</option>
+                <option value="bes">BES (Engineering Staff)</option>
+                <option value="bbs">BBS (Building Staff)</option>
+                <option value="store_crew">Store Crew / Toko</option>
+              </optgroup>
             </select>
+
+            {/* Filter Status Aktif/Nonaktif */}
+            <select 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)}
+              className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 min-w-[130px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Semua Status</option>
+              <option value="ACTIVE">Aktif (ACTIVE)</option>
+              <option value="INACTIVE">Nonaktif (INACTIVE)</option>
+            </select>
+
+            {/* Filter Scope */}
             <select 
               value={filterScope} 
               onChange={e => setFilterScope(e.target.value)}
-              className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 min-w-[140px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 min-w-[130px] focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Semua Scope</option>
-              <option value="HO">HO</option>
-              <option value="BRANCH">BRANCH</option>
+              <option value="HO">HO (Head Office)</option>
+              <option value="BRANCH">BRANCH (Cabang)</option>
             </select>
+
+            {/* Urutan Akun (Sort By) */}
+            <select 
+              value={sortBy} 
+              onChange={e => setSortBy(e.target.value as any)}
+              className="border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-200 min-w-[170px] focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+            >
+              <option value="hierarchy">Urut: Hierarki Jabatan</option>
+              <option value="name-asc">Urut: Nama (A - Z)</option>
+              <option value="name-desc">Urut: Nama (Z - A)</option>
+              <option value="nik-asc">Urut: NIK (Terkecil)</option>
+              <option value="status-active">Urut: Status (Aktif Teratas)</option>
+            </select>
+
+            {/* Reset Filter Button */}
+            {(searchTerm || filterRole || filterStatus || filterScope || sortBy !== "hierarchy") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterRole("");
+                  setFilterStatus("");
+                  setFilterScope("");
+                  setSortBy("hierarchy");
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap border border-slate-200 dark:border-slate-700"
+                title="Reset Semua Filter"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto flex-1">

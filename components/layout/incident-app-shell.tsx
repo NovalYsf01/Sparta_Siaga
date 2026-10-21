@@ -231,7 +231,6 @@ export function IncidentAppShell({
       title: "Administrasi",
       items: [
         { id: "user-management", href: "/admin/users", label: "Manajemen User & Role", icon: ShieldAlert },
-        { id: "location-management", href: "/admin/facilities", label: "Data Fasilitas", icon: Store },
       ],
     });
   }
@@ -807,16 +806,6 @@ export function IncidentAppShell({
                         <div className="flex items-center gap-2.5">
                           <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
                           <span>Manajemen User & Hak Akses</span>
-                        </div>
-                      </Link>
-                      <Link
-                        href="/admin/facilities"
-                        onClick={() => setIsMoreSheetOpen(false)}
-                        className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200/90 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-xs font-semibold min-h-[44px]"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-                          <span>Data Fasilitas (Toko & DC)</span>
                         </div>
                       </Link>
                     </div>

@@ -27,6 +27,7 @@ import {
   ChevronRight,
   ClipboardList,
   Info,
+  MapPin,
 } from "lucide-react";
 import {
   IncidentRecord,
@@ -34,10 +35,8 @@ import {
   DamageReport,
   IncidentPhotoDetail,
 } from "@/types/incident";
-import { EstimationModal } from "./estimation-modal";
 import { EstimationStatusCard } from "./estimation-status-card";
 import { EstimationRouteRecord } from "@/lib/estimation-service";
-import { ProgressUpdateModal } from "./progress-update-modal";
 import { ProgressTimeline } from "./progress-timeline";
 import { CompletionApprovalCard } from "./completion-approval-card";
 import {
@@ -49,7 +48,6 @@ import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import { WorkReadinessCard } from "./work-readiness-card";
-import { StoreVerificationModal } from "./store-verification-modal";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
 
 interface MaintenanceTrackingModalProps {
@@ -159,21 +157,18 @@ export function MaintenanceTrackingModal({
 
   // Estimation state
   const [estimationRoute, setEstimationRoute] = useState<EstimationRouteRecord | null>(null);
-  const [isEstimationModalOpen, setIsEstimationModalOpen] = useState(false);
 
   // Progress state
   const [progressHistory, setProgressHistory] = useState<ProgressUpdateRecord[]>([]);
   const [latestProgress, setLatestProgress] = useState<number>(0);
   const [workStatus, setWorkStatus] = useState<WorkStatus>("NOT_STARTED");
   const [hasFinalEvidence, setHasFinalEvidence] = useState(false);
-  const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
 
-  // Permissions state
+  // Permissions state (for informational indicators only)
   const [canConfirm, setCanConfirm] = useState(false);
   const [confirmReason, setConfirmReason] = useState("");
   const [canBmApprove, setCanBmApprove] = useState(false);
   const [bmApproveReason, setBmApproveReason] = useState("");
-  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
   const [canUpdateProgress, setCanUpdateProgress] = useState(false);
   const [updateProgressReason, setUpdateProgressReason] = useState("");
   const [canClose, setCanClose] = useState(false);
@@ -205,33 +200,6 @@ export function MaintenanceTrackingModal({
     receiptContext?: string | null;
     capturedAt?: string | null;
   } | null>(null);
-
-  // Target date management state
-  const [currentTargetDate, setCurrentTargetDate] = useState<string | null>(null);
-  const [targetDateInput, setTargetDateInput] = useState<string>("");
-  const [isEditingTarget, setIsEditingTarget] = useState(false);
-  const [isSavingTarget, setIsSavingTarget] = useState(false);
-
-  const handleSaveTarget = async () => {
-    if (!incident || !targetDateInput) return;
-    setIsSavingTarget(true);
-    try {
-      const res = await fetch(`/api/incidents/${incident.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetCompletionDate: targetDateInput }),
-      });
-      if (res.ok) {
-        setCurrentTargetDate(new Date(targetDateInput).toISOString());
-        setIsEditingTarget(false);
-        loadData();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSavingTarget(false);
-    }
-  };
 
   const [loading, setLoading] = useState(false);
 
@@ -725,6 +693,19 @@ export function MaintenanceTrackingModal({
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              {/* Navigasi Titik Lokasi di Peta */}
+              {incident.storeId && (
+                <a
+                  href={`/map?storeId=${encodeURIComponent(incident.storeId)}`}
+                  title="Lihat titik lokasi di peta"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors shadow-2xs"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-[#1D5AA6]" />
+                  <span className="hidden sm:inline">Lihat di Peta</span>
+                  <span className="sm:hidden">Peta</span>
+                </a>
+              )}
+
               <a
                 href={`/api/incidents/${incident.id}/export/pdf`}
                 target="_blank"
@@ -861,9 +842,9 @@ export function MaintenanceTrackingModal({
           {/* TAB 1: RINGKASAN */}
           {activeTab === "ringkasan" && (
             <div className="space-y-4 animate-in fade-in">
-              {/* OPERATIONAL PIC & TARGET BANNER */}
+              {/* OPERATIONAL PIC & TARGET BANNER (READ-ONLY) */}
               {(() => {
-                const targetDateVal = currentTargetDate || incident.maintenanceTicket?.completedAt;
+                const targetDateVal = incident.targetCompletionDate || incident.maintenanceTicket?.completedAt;
                 const isOverdue = Boolean(
                   targetDateVal &&
                     new Date(targetDateVal) < new Date() &&
@@ -871,12 +852,6 @@ export function MaintenanceTrackingModal({
                     incident.status !== "resolved" &&
                     incident.status !== "confirmed_safe"
                 );
-                const userRoleStr = (identity?.role || (identity as any)?.businessRole || "").toLowerCase();
-                const canEditTarget =
-                  !isReadOnly &&
-                  (identity?.systemRole === "ADMIN" ||
-                    ["bms", "bes"].includes(userRoleStr) ||
-                    incident.primaryPicUserId === identity?.id);
 
                 return (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-50/80 dark:bg-slate-950/60 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
@@ -899,47 +874,17 @@ export function MaintenanceTrackingModal({
                       </span>
                     </div>
                     <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Selesai</span>
-                        {canEditTarget && (
-                          <button
-                            type="button"
-                            onClick={() => setIsEditingTarget(!isEditingTarget)}
-                            className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            {isEditingTarget ? "Batal" : targetDateVal ? "Ubah" : "+ Atur Target"}
-                          </button>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Target Selesai</span>
+                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <span className="text-slate-800 dark:text-slate-200 font-medium">
+                          {targetDateVal ? safeFormatDate(targetDateVal) : "Belum Ditentukan"}
+                        </span>
+                        {isOverdue && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
+                            Melewati Target
+                          </span>
                         )}
                       </div>
-                      {isEditingTarget ? (
-                        <div className="mt-1 flex items-center gap-1">
-                          <input
-                            type="date"
-                            value={targetDateInput}
-                            onChange={(e) => setTargetDateInput(e.target.value)}
-                            className="text-[11px] p-1 border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none w-28"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSaveTarget}
-                            disabled={isSavingTarget || !targetDateInput}
-                            className="px-2 py-1 text-[10px] font-bold bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-                          >
-                            {isSavingTarget ? "..." : "Simpan"}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-slate-800 dark:text-slate-200 font-medium">
-                            {targetDateVal ? safeFormatDate(targetDateVal) : "Belum Ditentukan"}
-                          </span>
-                          {isOverdue && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800">
-                              Melewati Target
-                            </span>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -1177,21 +1122,9 @@ export function MaintenanceTrackingModal({
                       Hasil Pemeriksaan Fisik Cabang (BMS / BES)
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Verifikasi langsung di TKP untuk menentukan tingkat keparahan dan kondisi aman/rusak.
+                      Verifikasi langsung di TKP untuk menentukan kondisi aman atau rusak.
                     </p>
                   </div>
-
-                  {/* Contextual Action: Submit Pemeriksaan Lapangan */}
-                  {(incident.status === "pending_confirmation" || incident.status === "clarification_requested") && canConfirm && (
-                    <button
-                      type="button"
-                      onClick={() => setIsVerificationModalOpen(true)}
-                      className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
-                    >
-                      <Camera className="w-3.5 h-3.5" />
-                      <span>{incident.status === "clarification_requested" ? "Revisi Pemeriksaan" : "Input Pemeriksaan Lapangan"}</span>
-                    </button>
-                  )}
                 </div>
 
                 {incident.verification ? (
@@ -1295,18 +1228,6 @@ export function MaintenanceTrackingModal({
                       Persetujuan manajerial untuk menentukan apakah laporan masuk penanganan pekerjaan atau selesai.
                     </p>
                   </div>
-
-                  {/* Contextual Action: BM Review & Approval */}
-                  {incident.status === "pending_bm_approval" && canBmApprove && (
-                    <button
-                      type="button"
-                      onClick={() => setIsVerificationModalOpen(true)}
-                      className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors"
-                    >
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      <span>Review & Berikan Keputusan BnM Manajer</span>
-                    </button>
-                  )}
                 </div>
 
                 {incident.verification?.bmApproval ? (
@@ -1410,15 +1331,6 @@ export function MaintenanceTrackingModal({
                       <Clock className="w-4 h-4 text-blue-600" />
                       Log Pembaruan Fisik Tambahan ({progressHistory.length})
                     </h5>
-                    {isWorkReadyForProgress && canUpdateProgress && !isReadOnly && !isReportClosed && (
-                      <button
-                        type="button"
-                        onClick={() => setIsProgressModalOpen(true)}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg transition-colors"
-                      >
-                        + Tambah Update
-                      </button>
-                    )}
                   </div>
                   <ProgressTimeline history={progressHistory} loading={loading} />
                 </div>
@@ -1702,64 +1614,6 @@ export function MaintenanceTrackingModal({
           </button>
         </div>
       </div>
-
-      {/* Sub-Modal: Buat / Status Estimasi */}
-      <EstimationModal
-        isOpen={isEstimationModalOpen}
-        onClose={() => {
-          setIsEstimationModalOpen(false);
-          loadData();
-        }}
-        incident={incident}
-        onRouteCreated={() => {
-          loadData();
-        }}
-      />
-
-      {/* Sub-Modal: Update Progress */}
-      <ProgressUpdateModal
-        isOpen={isProgressModalOpen}
-        onClose={() => {
-          setIsProgressModalOpen(false);
-          loadData();
-        }}
-        incident={incident}
-        latestProgress={latestProgress}
-        onSuccess={() => {
-          loadData();
-        }}
-      />
-
-      {/* Sub-Modal: Konfirmasi Kondisi Toko */}
-      <StoreVerificationModal
-        incident={incident}
-        activeRole={activeRole}
-        isOpen={isVerificationModalOpen}
-        onClose={() => setIsVerificationModalOpen(false)}
-        onConfirmVerification={async (incidentId, isDamaged, report) => {
-          if (onConfirmVerification) {
-            onConfirmVerification(incidentId, isDamaged, report);
-          } else {
-            try {
-              await fetch(`/api/incidents/${incidentId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  verification: {
-                    ...report,
-                    isDamaged,
-                  },
-                  status: isDamaged ? "investigating" : "resolved",
-                }),
-              });
-            } catch (e) {
-              console.error("[MaintenanceTrackingModal] Verification error:", e);
-            }
-          }
-          setIsVerificationModalOpen(false);
-          loadData();
-        }}
-      />
     </div>
   );
 }

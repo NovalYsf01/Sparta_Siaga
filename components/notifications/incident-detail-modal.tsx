@@ -12,6 +12,7 @@ import {
   Layers,
 } from "lucide-react";
 import { NotificationLog } from "@/types/notification";
+import { cleanDisplayTitle, cleanDisplayText } from "@/lib/display-formatters";
 
 interface IncidentDetailModalProps {
   isOpen: boolean;
@@ -46,11 +47,8 @@ export function IncidentDetailModal({
   const stores = incident.affected_stores_sample || [];
   const totalStores = incident.affected_stores_count || stores.length;
 
-  const isSimulation = Boolean(
-    (incident as any).is_simulation ||
-      incident.title?.toUpperCase().includes("[SIMULASI]") ||
-      incident.ticket_number?.toUpperCase().startsWith("SIM")
-  );
+  const displayTitle = cleanDisplayTitle(incident.title);
+  const displayMessage = cleanDisplayText(incident.message);
 
   const formattedDateTime = incident.sent_at
     ? new Date(incident.sent_at).toLocaleDateString("id-ID", {
@@ -114,16 +112,9 @@ export function IncidentDetailModal({
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                {isSimulation ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-amber-500 text-slate-950 shadow-xs">
-                    <AlertTriangle className="w-3 h-3" />
-                    [SIMULASI] LATIHAN TANGGAP
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-red-600 text-white shadow-xs">
-                    PERINGATAN AWAS DINI
-                  </span>
-                )}
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-red-600 text-white shadow-xs">
+                  {isEarthquake ? "GEMPA BUMI • BMKG" : "PERINGATAN DINI CUACA"}
+                </span>
 
                 <span
                   className={`font-mono text-[11px] font-bold tracking-wider ${
@@ -141,7 +132,7 @@ export function IncidentDetailModal({
               </div>
 
               <h2 className={`text-base font-bold leading-snug ${isDark ? "text-white" : "text-slate-900"}`}>
-                {incident.title}
+                {displayTitle}
               </h2>
             </div>
           </div>
@@ -161,16 +152,6 @@ export function IncidentDetailModal({
 
         {/* Modal Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Simulation Notice Banner if Applicable */}
-          {isSimulation && (
-            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-              <div>
-                <strong className="block font-bold">Pemberitahuan Latihan & Simulasi Sistem</strong>
-                Notifikasi ini adalah bagian dari simulasi kesiapsiagaan internal SPARTA SIAGA. Tidak ada bencana fisik riil yang terjadi di lapangan.
-              </div>
-            </div>
-          )}
 
           {/* Awareness Info Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs">
@@ -223,7 +204,7 @@ export function IncidentDetailModal({
               </button>
             </div>
             <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-              {incident.message}
+              {displayMessage}
             </p>
           </div>
 

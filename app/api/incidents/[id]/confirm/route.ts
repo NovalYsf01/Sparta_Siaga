@@ -95,6 +95,22 @@ export async function POST(request: Request, { params }: RouteContext) {
       const notes = (bodyData.notes as string)?.trim() || "";
       const reason = (bodyData.reason as string)?.trim() || (bodyData.notes as string)?.trim() || "";
 
+      if (decision === "rejected") {
+        const isAutoEarthquake =
+          report.reportOrigin === "automatic_earthquake" ||
+          (report.disasterType === "earthquake" && report.reportOrigin !== "manual");
+        if (isAutoEarthquake) {
+          return NextResponse.json(
+            {
+              error:
+                "Laporan gempa otomatis tidak dapat ditolak sebagai laporan palsu/hoax. Jika kondisi lapangan aman dan tidak ada kerusakan, pilih 'Kondisi Aman' / 'Tidak Ada Kerusakan' untuk menutup laporan dengan aman.",
+              code: "EARTHQUAKE_REJECTION_FORBIDDEN",
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       if ((decision === "rejected" || decision === "clarification_requested") && !reason) {
         return NextResponse.json(
           {

@@ -85,8 +85,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Maintenance Coordinator",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: false,
-    description: "Koordinator pemeliharaan cabang (NONAKTIF — dinonaktifkan sesuai kebijakan restrukturisasi, data historis dipertahankan).",
+    selectable: true,
+    description: "Branch Maintenance Coordinator: Koordinator pemeliharaan gerai cabang, verifikator dan approver Serah Terima fisik pekerjaan Toko sebelum diajukan ke BnM Manajer.",
   },
   {
     key: "bes",
@@ -103,8 +103,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Engineering Coordinator",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: false,
-    description: "Koordinator Engineering cabang (NONAKTIF — dinonaktifkan sesuai kebijakan restrukturisasi, data historis dipertahankan).",
+    selectable: true,
+    description: "Branch Engineering Coordinator: Koordinator Engineering cabang, verifikator dan approver Serah Terima pekerjaan Gudang / DC sebelum diajukan ke BnM Manajer.",
   },
   {
     key: "bbs",
@@ -112,8 +112,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Building Support",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: false,
-    description: "Branch Building Support (NONAKTIF — disembunyikan dari UI operasional, struktur backend & histori dipertahankan).",
+    selectable: true,
+    description: "Branch Building Support: PIC teknis pemeliharaan gedung/fasilitas cabang, pengunggah bukti pekerjaan dan dokumen milestone.",
   },
   {
     key: "bbc",
@@ -121,8 +121,8 @@ export const CANONICAL_HUMAN_ROLES: readonly BusinessRoleDefinition[] = [
     fullLabel: "Branch Building Coordinator",
     scope: "BRANCH",
     category: "BRANCH",
-    selectable: false,
-    description: "Branch Building Coordinator (NONAKTIF — disembunyikan dari UI operasional, struktur backend & histori dipertahankan).",
+    selectable: true,
+    description: "Branch Building Coordinator: Koordinator pemeliharaan gedung cabang, verifikator dan approver Serah Terima pekerjaan Gedung sebelum diajukan ke BnM Manajer.",
   },
 ] as const;
 

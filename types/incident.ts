@@ -52,7 +52,7 @@ export type IncidentStatus =
 /**
  * Tipe lokasi TKP sesuai flowchart
  */
-export type TkpType = "toko" | "dc";
+export type TkpType = "toko" | "dc" | "building";
 
 /**
  * Role sesuai glossary yang telah dikonfirmasi
@@ -299,6 +299,7 @@ export interface IncidentRecord {
 
   // === Maintenance / Construction (diisi setelah estimasi) ===
   maintenanceTicket?: MaintenanceTicket;
+  targetCompletionDate?: string;
 
   // === Foto Lapangan ===
   // Manual: wajib (4 foto tampak). Auto-report: field ini null/empty pending konfirmasi.

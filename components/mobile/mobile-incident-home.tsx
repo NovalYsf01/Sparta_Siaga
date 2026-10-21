@@ -268,11 +268,11 @@ export function MobileIncidentHome({
         {(isAdmin || isHO) && (
           <div className="grid grid-cols-2 gap-2">
             <Link
-              href={isAdmin ? "/admin/facilities" : "/reports"}
+              href={isAdmin ? "/admin/users" : "/reports"}
               className="min-h-[48px] px-3 py-2.5 bg-slate-800 text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-1.5"
             >
               <Building2 className="w-4 h-4" />
-              <span>{isAdmin ? "Data Fasilitas" : "Monitoring Laporan"}</span>
+              <span>{isAdmin ? "Manajemen User & Role" : "Monitoring Laporan"}</span>
             </Link>
             <Link
               href="/monitoring"

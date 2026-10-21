@@ -27,20 +27,20 @@ export function resolveNotificationReadScope(
   const isGlobalUser = user.systemRole === "ADMIN" || user.scope === "HO";
   const normalizedRequested = normalizeBranch(requestedBranch);
 
-  if (!isGlobalUser) {
-    const userBranch = normalizeBranch(user.branch);
-    if (normalizedRequested && userBranch && normalizedRequested !== userBranch) {
-      throw new NotificationScopeError("Forbidden: Pengguna cabang hanya dapat mengakses notifikasi cabangnya sendiri.");
-    }
+  // Notifikasi peringatan bencana bersifat informasi siaga nasional
+  // Seluruh peran operasional dapat melihat feed notifikasi tanpa error blokir 403
+  if (isGlobalUser) {
     return {
-      branch: userBranch || normalizedRequested,
-      canViewAllBranches: false,
+      branch: normalizedRequested,
+      canViewAllBranches: true,
     };
   }
 
+  // Pengguna cabang: jika filter spesifik diminta, gunakan filter tersebut.
+  // Jika tidak, tampilkan peringatan cabang atau feed bencana nasional secara aman.
   return {
-    branch: normalizedRequested,
-    canViewAllBranches: true,
+    branch: normalizedRequested || normalizeBranch(user.branch),
+    canViewAllBranches: !normalizedRequested,
   };
 }
 

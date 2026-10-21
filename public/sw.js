@@ -103,3 +103,79 @@ self.addEventListener("fetch", (event) => {
   // Default: Normal network request
   event.respondWith(fetch(request));
 });
+
+// =========================================================================
+// PWA REAL WEB PUSH NOTIFICATION HANDLERS
+// =========================================================================
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "SPARTA SIAGA — Peringatan Bencana",
+    body: "Terdapat pembaruan siaga bencana di unit operasional Anda.",
+    icon: "/icons/icon-192x192.png",
+    badge: "/icons/icon-192x192.png",
+    data: {
+      url: "/",
+    },
+  };
+
+  if (event.data) {
+    try {
+      const json = event.data.json();
+      data = {
+        title: json.title || data.title,
+        body: json.body || json.message || data.body,
+        icon: json.icon || data.icon,
+        badge: json.badge || data.badge,
+        tag: json.tag || "sparta-disaster-alert",
+        data: {
+          url: json.url || (json.reportId ? `/?selectedReport=${json.reportId}` : "/"),
+          reportId: json.reportId,
+        },
+      };
+    } catch {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon,
+    badge: data.badge,
+    tag: data.tag || "sparta-siaga-alert",
+    renotify: true,
+    data: data.data,
+    actions: [
+      { action: "open_report", title: "Buka Laporan" },
+      { action: "dismiss", title: "Tutup" },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  if (event.action === "dismiss") {
+    return;
+  }
+
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && "focus" in client) {
+          if ("navigate" in client) {
+            client.navigate(targetUrl);
+          }
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

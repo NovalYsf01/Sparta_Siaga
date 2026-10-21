@@ -198,6 +198,9 @@ export function resolveApprovalRoute(
   if (report.tkpType === "dc") {
     return { flowType: "BES", picRole: "bes", coordinatorRole: "bec", managerRole: "bm" };
   }
+  if (report.tkpType === "building") {
+    return { flowType: "BUILDING", picRole: "bbs", coordinatorRole: "bbc", managerRole: "bm" };
+  }
 
   return { flowType: "BMS", picRole: "bms", coordinatorRole: "bmc", managerRole: "bm" };
 }

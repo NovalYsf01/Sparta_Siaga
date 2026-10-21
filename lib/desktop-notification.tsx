@@ -1,6 +1,11 @@
 import React from "react";
 import { toast } from "sonner";
 import { ShieldAlert, CloudRain, Map, AlertTriangle, X } from "lucide-react";
+import {
+  cleanDisplayTitle,
+  cleanDisplayText,
+  formatNotificationWibTimestamp,
+} from "./display-formatters";
 
 /**
  * Global audio context reference with autoplay unlock mechanism
@@ -220,72 +225,90 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
     }
   }
 
-  // 3. In-App Pop-up Toast Banner (always visible inside dashboard)
+// 3. In-App Pop-up Toast Banner (always visible inside dashboard, antislop-ui & executive layout)
   const isQuake = payload.disasterType === "earthquake" || payload.disasterType === "tsunami";
-  const isSimulation = payload.isSimulation;
+  const displayTitle = cleanDisplayTitle(payload.title);
+  const displayBody = cleanDisplayText(payload.body);
+  const displayTime = formatNotificationWibTimestamp(payload.timestamp || new Date(), true);
 
   toast.custom(
     (t) => (
-      <div className="w-[360px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col relative pointer-events-auto animate-in slide-in-from-right-full">
-        {/* Header */}
-        <div className={`px-4 py-2 flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 ${isSimulation ? 'bg-amber-50 dark:bg-amber-950/30' : (isQuake ? 'bg-red-50 dark:bg-red-950/30' : 'bg-blue-50 dark:bg-blue-950/30')}`}>
-          {isSimulation ? (
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-          ) : isQuake ? (
-            <ShieldAlert className="w-4 h-4 text-red-600" />
-          ) : (
-            <CloudRain className="w-4 h-4 text-blue-600" />
-          )}
-          <span className={`text-[11px] font-bold tracking-wider ${isSimulation ? 'text-amber-700' : (isQuake ? 'text-red-700' : 'text-blue-700')}`}>
-            {isSimulation ? "SIMULASI • " : ""}
-            {isQuake ? "GEMPA BUMI" : "HUJAN/BANJIR"}
-          </span>
-          <button 
+      <div
+        role="alert"
+        aria-live="assertive"
+        className="w-[calc(100vw-32px)] sm:w-[380px] max-w-[380px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col relative pointer-events-auto transition-all animate-in slide-in-from-right-5 duration-200"
+      >
+        {/* Header: Measured alert badge, clear category, clean X button */}
+        <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className={`p-1.5 rounded-lg shrink-0 ${
+                isQuake
+                  ? "bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400"
+                  : "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400"
+              }`}
+            >
+              {isQuake ? (
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+              ) : (
+                <CloudRain className="w-4 h-4 shrink-0" />
+              )}
+            </div>
+            <span className="text-xs font-bold tracking-wider uppercase text-slate-800 dark:text-slate-100 truncate">
+              {isQuake ? "GEMPA BUMI" : "PERINGATAN DINI"}
+            </span>
+          </div>
+
+          <button
+            type="button"
             onClick={() => toast.dismiss(t)}
-            className="ml-auto p-1 rounded hover:bg-black/5 text-slate-400 hover:text-slate-600 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Tutup notifikasi"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content */}
+        {/* Content Body: Proportional typography, no panic styling */}
         <div className="p-4 flex flex-col gap-2">
-          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug">
-            {payload.title.replace("[SIMULATION] ", "").replace("🚨 ", "").replace("🌧️ ", "")}
+          <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
+            {displayTitle}
           </h4>
-          <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-3">
-            {payload.body}
+          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+            {displayBody}
           </p>
 
-          <div className="text-[10px] text-slate-400 mt-1 font-medium">
-            {payload.timestamp || new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB"} 
-            {payload.source ? ` • ${payload.source}` : ""}
+          <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium pt-0.5">
+            {displayTime}
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="px-4 py-3 bg-slate-50 dark:bg-slate-950/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+        {/* Footer Actions: Equal height (36px), consistent typography, distinct visual hierarchy */}
+        <div className="px-4 py-3 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
           {payload.onClickMap && (
-            <button 
+            <button
+              type="button"
               onClick={() => {
                 toast.dismiss(t);
                 payload.onClickMap!();
               }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+              className="h-9 min-h-[36px] px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-blue-600"
             >
-              <Map className="w-3.5 h-3.5" />
-              Lihat di Peta
+              <Map className="w-3.5 h-3.5 shrink-0" />
+              <span>Lihat di Peta</span>
             </button>
           )}
+
           {payload.onClickDetail && (
-            <button 
+            <button
+              type="button"
               onClick={() => {
                 toast.dismiss(t);
                 payload.onClickDetail!();
               }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+              className="h-9 min-h-[36px] px-4 rounded-xl bg-[#1D5AA6] hover:bg-[#164785] text-white text-xs font-semibold transition-colors shadow-xs flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600"
             >
-              Lihat Detail
+              <span>Lihat Detail</span>
             </button>
           )}
         </div>
