@@ -135,6 +135,7 @@ export function StoreVerificationModal({
   const isAutoEarthquake =
     incident.reportOrigin === "automatic_earthquake" ||
     (incident.disasterType === "earthquake" && incident.reportOrigin !== "manual");
+  const isAutomaticReport = incident.reportOrigin !== "manual";
 
   const clientCheck = checkClientPermission({
     identity,
@@ -257,9 +258,9 @@ export function StoreVerificationModal({
     e.preventDefault();
     if (!canBmApprove || isSubmitting) return;
 
-    if (bmDecision === "rejected" && isAutoEarthquake) {
+    if (bmDecision === "rejected" && isAutomaticReport) {
       setSubmitError(
-        "Laporan gempa otomatis BMKG tidak dapat ditolak sebagai hoax. Pilih 'Nyatakan Aman' jika toko tidak mengalami kerusakan."
+        "Laporan otomatis tidak dapat ditolak sebagai laporan tidak valid. Pilih Kondisi Aman jika tidak ditemukan kerusakan."
       );
       return;
     }
@@ -563,8 +564,8 @@ export function StoreVerificationModal({
                   </div>
                 </button>
 
-                {/* Tolak Laporan: Restricted for Automatic Earthquake */}
-                {!isAutoEarthquake ? (
+                {/* Tolak Laporan hanya tersedia untuk laporan manual. */}
+                {!isAutomaticReport ? (
                   <button
                     type="button"
                     onClick={() => setBmDecision("rejected")}
@@ -591,7 +592,7 @@ export function StoreVerificationModal({
                       <span>Tolak Laporan (Nonaktif)</span>
                     </div>
                     <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 leading-tight">
-                      Laporan gempa otomatis terverifikasi sensor BMKG. Pilih &quot;Kondisi Aman&quot; jika toko tidak mengalami kerusakan.
+                      Laporan otomatis tidak dapat ditolak. Pilih &quot;Kondisi Aman&quot; jika hasil pemeriksaan tidak menemukan kerusakan.
                     </div>
                   </div>
                 )}
