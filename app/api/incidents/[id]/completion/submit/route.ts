@@ -11,7 +11,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
+    if (sessionUser.scope === "HO") {
       return NextResponse.json(
         { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
         { status: 403 }

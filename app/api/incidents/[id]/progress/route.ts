@@ -104,6 +104,34 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
     }
 
+    if (incident.status === "closed" || incident.status === "resolved" || incident.status === "archived") {
+      return NextResponse.json(
+        { error: "Laporan sudah ditutup/selesai. Tidak dapat memperbarui progress pekerjaan.", code: "REPORT_CLOSED" },
+        { status: 422 }
+      );
+    }
+
+    const preApprovalStatuses = [
+      "pending_confirmation",
+      "verifying",
+      "investigating",
+      "pending_bm_approval",
+      "clarification_requested",
+    ];
+    if (preApprovalStatuses.includes(incident.status)) {
+      return NextResponse.json(
+        { error: "Tindakan progres fisik belum dapat dilakukan karena laporan belum disetujui BnM Manajer.", code: "REPORT_NOT_APPROVED" },
+        { status: 422 }
+      );
+    }
+
+    if (incident.status === "confirmed_safe" || incident.status === "rejected_invalid") {
+      return NextResponse.json(
+        { error: "Laporan berstatus aman atau ditolak tidak memerlukan penanganan progress fisik.", code: "REPORT_TERMINAL" },
+        { status: 422 }
+      );
+    }
+
     // 4. Permission check REPORT_UPDATE_PROGRESS
     const permCheck = await checkUserPermission({
       user: sessionUser,

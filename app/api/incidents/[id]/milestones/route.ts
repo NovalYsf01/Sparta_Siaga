@@ -73,10 +73,36 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // HO users are strictly read-only
+    if (sessionUser.scope === "HO") {
+      return NextResponse.json(
+        { error: "Forbidden: Akun Head Office hanya memiliki hak akses baca (read-only) dan dilarang mengunggah berkas milestone." },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const incident = await dbGetIncidentById(id);
     if (!incident) {
       return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
+    }
+
+    if (incident.status === "closed" || incident.status === "resolved" || incident.status === "archived") {
+      return NextResponse.json(
+        { error: "Laporan sudah ditutup/selesai. Tidak dapat mengunggah dokumen milestone lagi." },
+        { status: 422 }
+      );
+    }
+
+    // Branch isolation for non-admin
+    if (sessionUser.systemRole !== "ADMIN") {
+      const clean = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
+      if (!sessionUser.branch || clean(sessionUser.branch) !== clean(incident.branch)) {
+        return NextResponse.json(
+          { error: `Aksi hanya berlaku untuk cabang sendiri (${sessionUser.branch || "N/A"}), bukan ${incident.branch}.` },
+          { status: 403 }
+        );
+      }
     }
 
     // Operational Progress Gating Guard

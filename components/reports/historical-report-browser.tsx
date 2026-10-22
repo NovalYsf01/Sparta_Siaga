@@ -14,6 +14,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
+import { getReportSourceInfo } from "@/lib/display-formatters";
 
 interface HistoricalReportBrowserProps {
   activeRole: string;
@@ -226,13 +227,14 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
                         {inc.disasterType}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide border ${
-                          inc.reportOrigin === "manual" 
-                            ? "bg-slate-100 border-slate-200 text-slate-600 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
-                            : "bg-purple-100 border-purple-200 text-purple-700 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-400"
-                        }`}>
-                          {inc.reportOrigin === "manual" ? "Manual" : "Auto"}
-                        </span>
+                        {(() => {
+                          const src = getReportSourceInfo(inc.reportOrigin);
+                          return (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-medium tracking-wide ${src.badgeCls}`}>
+                              {src.label}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] ${stat.color}`}>

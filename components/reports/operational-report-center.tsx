@@ -23,6 +23,7 @@ import { EstimationModal } from "../incident/estimation-modal";
 import { ProgressUpdateModal } from "../incident/progress-update-modal";
 import { HoReportMonitoring } from "./ho-report-monitoring";
 import { getStandardizedOperationalStatus } from "@/lib/operational-status";
+import { getReportSourceInfo } from "@/lib/display-formatters";
 
 const DISASTER_ID_MAP: Record<string, string> = {
   earthquake: "Gempa Bumi",
@@ -56,21 +57,10 @@ export function getOperationalHandlingStatus(inc: IncidentRecord) {
 }
 
 export function getOriginBadge(inc: IncidentRecord) {
-  const isAuto =
-    inc.reportOrigin === "automatic_earthquake" ||
-    inc.reportOrigin === "automatic_weather" ||
-    (inc.id && inc.id.startsWith("LAP-EQ-"));
-
-  if (isAuto) {
-    return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 whitespace-nowrap">
-        Laporan Otomatis
-      </span>
-    );
-  }
+  const source = getReportSourceInfo(inc.reportOrigin);
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 whitespace-nowrap">
-      Laporan Manual
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap ${source.badgeCls}`}>
+      {source.longLabel}
     </span>
   );
 }
@@ -455,10 +445,8 @@ export function OperationalReportCenter({
                           <div className="font-medium text-slate-800 dark:text-slate-200 text-xs">
                             {disasterLabel}
                           </div>
-                          <div className="text-[10px] text-slate-400 dark:text-slate-500">
-                            {inc.reportOrigin === "automatic_earthquake" || inc.reportOrigin === "automatic_weather" || (inc.id && inc.id.startsWith("LAP-EQ-"))
-                              ? "Otomatis"
-                              : "Manual"}
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {getReportSourceInfo(inc.reportOrigin).label}
                           </div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
@@ -575,10 +563,7 @@ export function OperationalReportCenter({
                 inc.status !== "closed" &&
                 new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
 
-              const isAuto =
-                inc.reportOrigin === "automatic_earthquake" ||
-                inc.reportOrigin === "automatic_weather" ||
-                (inc.id && inc.id.startsWith("LAP-EQ-"));
+              const sourceInfo = getReportSourceInfo(inc.reportOrigin);
 
               return (
                 <div
@@ -592,7 +577,7 @@ export function OperationalReportCenter({
                         {inc.maintenanceTicket?.ticketId || inc.id}
                       </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
-                        {formattedDate} • {isAuto ? "Laporan Otomatis" : "Laporan Manual"}
+                        {formattedDate}
                       </div>
                     </div>
                     <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] shrink-0 ${handlingStatus.cls}`}>
@@ -614,8 +599,13 @@ export function OperationalReportCenter({
                       ) : null}
                       <span>{inc.storeName}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      {inc.branch} • {displayCity} — <span className="font-medium text-slate-700 dark:text-slate-300">{disasterLabel}</span>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span>{inc.branch} • {displayCity}</span>
+                      <span>—</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{disasterLabel}</span>
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
+                        {sourceInfo.label}
+                      </span>
                     </div>
                   </div>
 

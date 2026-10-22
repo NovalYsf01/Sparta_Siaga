@@ -11,9 +11,16 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (sessionUser.scope === "HO" || sessionUser.systemRole === "ADMIN") {
+    if (sessionUser.scope === "HO") {
       return NextResponse.json(
-        { error: "Forbidden: Pengguna HO hanya memiliki hak akses baca (read-only)." },
+        { error: "Forbidden: Pengguna Head Office (HO) hanya memiliki hak akses monitoring (read-only)." },
+        { status: 403 }
+      );
+    }
+
+    if (sessionUser.systemRole === "ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden: Administrator sistem tidak berwenang memberikan keputusan revisi operasional atas nama BnM Manajer atau Koordinator." },
         { status: 403 }
       );
     }

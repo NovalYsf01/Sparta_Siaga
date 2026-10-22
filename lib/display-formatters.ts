@@ -122,3 +122,60 @@ export function humanizeDocumentStatus(docKey: string, isAvailable: boolean): st
   const name = docLabels[docKey] || docKey;
   return isAvailable ? `Dokumen ${name} tersedia` : `Dokumen ${name} belum diunggah`;
 }
+
+/**
+ * SPARTA SIAGA — Report Source Origin Display Helper (TASK T05E)
+ *
+ * Source of truth: reportOrigin metadata recorded during report creation.
+ * Principles:
+ * - Distinguish strictly between Disaster Type (e.g. Gempa, Banjir) and Report Source (Manual vs Otomatis).
+ * - Never infer source from disaster type, store location, or ID patterns.
+ * - If source metadata is missing, empty, or unverified, display "Belum diketahui", never guess.
+ */
+export interface ReportSourceInfo {
+  type: "manual" | "automatic" | "unknown";
+  label: "Manual" | "Otomatis" | "Belum diketahui";
+  longLabel: "Laporan Manual" | "Laporan Otomatis" | "Sumber Belum Diketahui";
+  badgeCls: string;
+}
+
+export function getReportSourceInfo(origin?: string | null): ReportSourceInfo {
+  if (!origin || typeof origin !== "string") {
+    return {
+      type: "unknown",
+      label: "Belum diketahui",
+      longLabel: "Sumber Belum Diketahui",
+      badgeCls: "bg-slate-100 text-slate-500 dark:bg-slate-800/80 dark:text-slate-400 border border-slate-200 dark:border-slate-700",
+    };
+  }
+
+  const normalized = origin.trim().toLowerCase();
+  if (
+    normalized === "automatic_earthquake" ||
+    normalized === "automatic_weather" ||
+    normalized === "automatic"
+  ) {
+    return {
+      type: "automatic",
+      label: "Otomatis",
+      longLabel: "Laporan Otomatis",
+      badgeCls: "bg-blue-50 text-[#1D5AA6] dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200/80 dark:border-blue-800",
+    };
+  }
+
+  if (normalized === "manual") {
+    return {
+      type: "manual",
+      label: "Manual",
+      longLabel: "Laporan Manual",
+      badgeCls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700",
+    };
+  }
+
+  return {
+    type: "unknown",
+    label: "Belum diketahui",
+    longLabel: "Sumber Belum Diketahui",
+    badgeCls: "bg-slate-100 text-slate-500 dark:bg-slate-800/80 dark:text-slate-400 border border-slate-200 dark:border-slate-700",
+  };
+}

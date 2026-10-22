@@ -154,6 +154,10 @@ export async function POST(request: Request) {
       body.date = body.createdAt || new Date().toISOString();
     }
 
+    // TASK T05E: Enforce manual origin for reports submitted through user endpoint.
+    // Untrusted user input must never be allowed to claim "automatic" origin.
+    body.reportOrigin = "manual";
+
     const created = await dbCreateIncident(body);
     
     // Trigger distribution (Email/WA)

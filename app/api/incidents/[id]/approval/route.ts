@@ -24,6 +24,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Unauthorized: Sesi login diperlukan." }, { status: 401 });
     }
 
+    if (sessionUser.scope === "HO") {
+      return NextResponse.json(
+        { error: "Forbidden: Akun Head Office hanya memiliki hak akses baca (read-only) dan dilarang memberikan approval BnM Manajer." },
+        { status: 403 }
+      );
+    }
+
+    if (report.status === "closed" || report.status === "resolved" || report.status === "archived") {
+      return NextResponse.json(
+        { error: "Laporan sudah ditutup/selesai. Tidak dapat memberikan approval pemeriksaan awal." },
+        { status: 422 }
+      );
+    }
+
     const bmAuth = await canApproveAsBmAsync(sessionUser, report);
     if (!bmAuth.authorized) {
       return NextResponse.json(

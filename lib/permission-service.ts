@@ -447,14 +447,38 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
   const contextBranch = cleanBranch(targetBranch || report?.branch);
   const userBranch = cleanBranch(user.branch);
 
+  // 0. HEAD OFFICE SCOPE ENFORCEMENT
+  // HO users (HO Admin, GM HO, SM HO) have strictly read-only monitoring access across all branches.
+  // They must not perform operational mutations or operational approvals (Section 4.F).
+  if (user.scope === "HO" && isOperationalPermission(permission)) {
+    if (permission === "MANAGEMENT_INSTRUCTION_CREATE" && (user.role === "gm_ho" || user.role === "sm_ho")) {
+      // Allowed for GM/SM HO only
+    } else {
+      return {
+        authorized: false,
+        source: "ROLE_PERMISSION",
+        reason: "Scope Head Office (HO) hanya memiliki hak akses monitoring (read-only) dan dilarang melakukan aksi operasional cabang.",
+      };
+    }
+  }
+
   // 1. SYSTEM ADMIN CLASSIFICATION
-  // Admin SPARTA SIAGA is the super administrator with full application access across all branches.
+  // Admin SPARTA SIAGA is the super administrator for application administration.
+  // Section 4.G: System Admin tidak otomatis boleh menggantikan pihak operasional dalam melakukan approval (REPORT_BM_APPROVAL, COMPLETION_APPROVE_COORDINATOR, REPORT_CLOSE).
   if (user.systemRole === "ADMIN") {
-    return {
-      authorized: true,
-      source: "SYSTEM_ADMIN",
-      reason: "Admin SPARTA SIAGA memiliki akses penuh aplikasi.",
-    };
+    if (
+      permission === "REPORT_BM_APPROVAL" ||
+      permission === "COMPLETION_APPROVE_COORDINATOR" ||
+      permission === "REPORT_CLOSE"
+    ) {
+      // Fall through to strict role & branch operational evaluation
+    } else {
+      return {
+        authorized: true,
+        source: "SYSTEM_ADMIN",
+        reason: "Admin SPARTA SIAGA memiliki akses administratif aplikasi.",
+      };
+    }
   }
 
   // 2. FETCH ACTIVE USER OVERRIDES (Evaluated for business users)
@@ -634,16 +658,53 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
       };
     }
 
-    // Lifecycle guard: Technical processing requires store confirmation to be completed
+    // Lifecycle guard: Technical processing requires BnM initial approval to be completed first
+    const preBnMApprovalStatuses: readonly string[] = [
+      "pending_confirmation",
+      "verifying",
+      "investigating",
+      "pending_bm_approval",
+      "clarification_requested",
+    ];
+    const terminalStatuses: readonly string[] = [
+      "confirmed_safe",
+      "rejected_invalid",
+      "closed",
+      "resolved",
+      "archived",
+    ];
+
     if (
-      (permission === "ESTIMATION_TRIGGER" || permission === "REPORT_UPDATE_PROGRESS" || permission === "WORK_READINESS_UPDATE") &&
-      report?.status === "pending_confirmation"
+      (permission === "ESTIMATION_TRIGGER" ||
+        permission === "REPORT_UPDATE_PROGRESS" ||
+        permission === "WORK_READINESS_UPDATE" ||
+        permission === "COMPLETION_SUBMIT") &&
+      report?.status
     ) {
-      return {
-        authorized: false,
-        source: "ROLE_PERMISSION",
-        reason: "Tindakan teknis belum dapat dilakukan karena laporan masih menunggu konfirmasi kondisi toko.",
-      };
+      if (preBnMApprovalStatuses.includes(report.status)) {
+        return {
+          authorized: false,
+          source: "ROLE_PERMISSION",
+          reason: "Tindakan teknis belum dapat dilakukan karena laporan belum disetujui oleh BnM Manajer pada pemeriksaan awal.",
+        };
+      }
+      if (terminalStatuses.includes(report.status)) {
+        return {
+          authorized: false,
+          source: "ROLE_PERMISSION",
+          reason: "Laporan sudah ditutup atau tidak memerlukan tindakan perbaikan teknis lebih lanjut.",
+        };
+      }
+    }
+
+    if (permission === "REPORT_CLOSE" && report?.status) {
+      if (["closed", "resolved", "archived"].includes(report.status)) {
+        return {
+          authorized: false,
+          source: "ROLE_PERMISSION",
+          reason: "Laporan sudah ditutup/selesai sebelumnya.",
+        };
+      }
     }
 
     return { authorized: true, source: "ROLE_PERMISSION" };
@@ -734,6 +795,27 @@ export async function canSubmitInspectionAsync(
     };
   }
 
+  const closedStatuses = ["closed", "resolved", "archived"];
+  if (closedStatuses.includes(report.status)) {
+    return {
+      authorized: false,
+      reason: "Laporan sudah ditutup/selesai. Tidak dapat melakukan pemeriksaan lapangan lagi.",
+    };
+  }
+
+  const allowedInspectionStatuses = [
+    "pending_confirmation",
+    "verifying",
+    "investigating",
+    "clarification_requested",
+  ];
+  if (!allowedInspectionStatuses.includes(report.status)) {
+    return {
+      authorized: false,
+      reason: `Pemeriksaan lapangan tidak dapat dilakukan pada status '${report.status}'.`,
+    };
+  }
+
   // Admin SPARTA SIAGA has full access to inspect Toko and DC across branches
   if (user.systemRole === "ADMIN") {
     return { authorized: true };
@@ -776,11 +858,38 @@ export async function canApproveAsBmAsync(
     };
   }
 
-  // Admin SPARTA SIAGA has full access to approve across branches
-  if (user.systemRole === "ADMIN") {
-    return { authorized: true };
+  const closedStatuses = ["closed", "resolved", "archived"];
+  if (closedStatuses.includes(report.status)) {
+    return {
+      authorized: false,
+      reason: "Laporan sudah ditutup/selesai. Tidak dapat memberikan persetujuan BnM Manajer.",
+    };
   }
 
+  // Approval Pemeriksaan Awal hanya dapat diberikan sebelum alur pekerjaan teknis berjalan
+  const validApprovalStatuses = [
+    "pending_bm_approval",
+    "clarification_requested",
+    "pending_confirmation",
+    "verifying",
+    "investigating",
+  ];
+  if (!validApprovalStatuses.includes(report.status)) {
+    return {
+      authorized: false,
+      reason: `Approval pemeriksaan awal tidak dapat dilakukan pada status '${report.status}'.`,
+    };
+  }
+
+  // Syarat bukti pemeriksaan harus terpenuhi sebelum persetujuan BnM Manajer
+  if (!report.verification?.confirmedBy && report.status !== "pending_bm_approval") {
+    return {
+      authorized: false,
+      reason: "Hasil pemeriksaan lapangan wajib disubmit oleh petugas cabang sebelum BnM Manajer memberikan keputusan persetujuan.",
+    };
+  }
+
+  // Section 4.G: System Admin tidak otomatis boleh menggantikan BnM Manajer dalam melakukan approval
   if (user.role !== "bm") {
     return {
       authorized: false,

@@ -96,6 +96,13 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
+    if (incident.status === "closed" || incident.status === "resolved" || incident.status === "archived") {
+      return NextResponse.json(
+        { error: "Laporan sudah ditutup/selesai. Persyaratan kesiapan kerja tidak dapat diubah.", code: "REPORT_CLOSED" },
+        { status: 422 }
+      );
+    }
+
     const route = await EstimationIntegrationService.getRouteByReportId(id);
     if (!route) {
       return NextResponse.json(

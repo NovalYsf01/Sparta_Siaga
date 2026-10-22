@@ -5,6 +5,7 @@ import { AppDialog } from "@/components/shared/app-dialog";
 import { AlertTriangle, ArrowLeft, CalendarDays, ClipboardList, Download, Eye, FileText, Search, ShieldCheck, X } from "lucide-react";
 import type { DisasterType, IncidentRecord, IncidentStatus } from "@/types/incident";
 import { formatReportDate, getHoAttentionReasons, getReportTarget, isFinalPdfAvailable, isReportFinalized, reportStatusLabel } from "@/lib/ho-report-monitoring";
+import { getReportSourceInfo } from "@/lib/display-formatters";
 
 type ReportTab = "all" | "attention";
 
@@ -81,9 +82,10 @@ function ReportDetail({ incident, onClose }: { incident: IncidentRecord; onClose
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/70 p-4 pb-12 dark:bg-slate-950/40 sm:p-6">
-          <section className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4">
+          <section className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-5">
             {[
               ["Kejadian", incidentEventName(incident.disasterType)],
+              ["Sumber Laporan", getReportSourceInfo(incident.reportOrigin).label],
               ["Tanggal", formatReportDate(incident.createdAt)],
               ["PIC", incident.primaryPicName || "Belum ditugaskan"],
               ["Target Selesai", target ? formatReportDate(target) : "Belum ditentukan"],
@@ -288,7 +290,11 @@ export function HoReportMonitoring({ incidents }: { incidents: IncidentRecord[] 
               const target = getReportTarget(inc);
               return <tr key={inc.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/35">
                 <td className="p-3"><p className="max-w-[240px] truncate font-semibold">{inc.storeName}</p><p className="max-w-[250px] truncate text-[10px] text-slate-500">{inc.id} · {formatReportDate(inc.createdAt)}</p>{reasons.length > 0 && <p className="mt-1 max-w-[260px] text-[10px] text-amber-700 dark:text-amber-300">{reasons[0]}</p>}</td>
-                <td className="p-3">{inc.branch}</td><td className="p-3">{incidentEventName(inc.disasterType)}</td>
+                <td className="p-3">{inc.branch}</td>
+                <td className="p-3">
+                  <div>{incidentEventName(inc.disasterType)}</div>
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{getReportSourceInfo(inc.reportOrigin).label}</div>
+                </td>
                 <td className="p-3"><span className={`inline-block rounded-md px-2 py-1 text-[11px] font-medium ${statusStyle(inc.status)}`}>{reportStatusLabel(inc.status)}</span></td>
                 <td className="p-3">{inc.primaryPicName || "—"}</td>
                 <td className="p-3">{target ? formatReportDate(target) : "—"}</td>
@@ -300,7 +306,7 @@ export function HoReportMonitoring({ incidents }: { incidents: IncidentRecord[] 
         <div className="space-y-2 p-3 md:hidden">{filtered.map(inc => {
           const reasons = getHoAttentionReasons(inc), target = getReportTarget(inc);
           return <article key={inc.id} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-semibold">{inc.storeName}</p><p className="text-[11px] text-slate-500">{inc.branch} · {incidentEventName(inc.disasterType)}</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium ${statusStyle(inc.status)}`}>{reportStatusLabel(inc.status)}</span></div>
+            <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-sm font-semibold">{inc.storeName}</p><p className="text-[11px] text-slate-500">{inc.branch} · {incidentEventName(inc.disasterType)} ({getReportSourceInfo(inc.reportOrigin).label})</p></div><span className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-medium ${statusStyle(inc.status)}`}>{reportStatusLabel(inc.status)}</span></div>
             {reasons.length > 0 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{reasons[0]}</p>}
             <p className="mt-2 text-xs text-slate-500">PIC: {inc.primaryPicName || "Belum ditugaskan"}</p>
             <p className="text-xs text-slate-500">Target: {target ? formatReportDate(target) : "Belum ditentukan"}</p>

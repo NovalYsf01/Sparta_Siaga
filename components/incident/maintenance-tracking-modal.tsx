@@ -46,6 +46,7 @@ import { ProgressUpdateRecord, WorkStatus } from "@/lib/progress-service";
 import { UserIdentity } from "@/lib/identity";
 import { AppDialog } from "@/components/shared/app-dialog";
 import { MilestoneProgressionCard } from "./milestone-progression-card";
+import { getReportSourceInfo } from "@/lib/display-formatters";
 
 interface MaintenanceTrackingModalProps {
   incident: IncidentRecord | null;
@@ -251,9 +252,8 @@ export function MaintenanceTrackingModal({
 
   if (!isOpen || !incident) return null;
 
-  const isAutoReport =
-    incident.reportOrigin === "automatic_earthquake" ||
-    Boolean(incident.earthquakeEventId);
+  const reportSource = getReportSourceInfo(incident.reportOrigin);
+  const isAutoReport = reportSource.type === "automatic";
 
   const isTkpToko = (incident.tkpType || "toko").toLowerCase() === "toko";
   const isReportClosed = incident.status === "resolved" || completionApproval?.status === "CLOSED";
@@ -397,6 +397,10 @@ export function MaintenanceTrackingModal({
                 <span className="text-slate-300 dark:text-slate-600">•</span>
                 <span className="text-blue-700 dark:text-blue-400 font-medium">
                   {getDisasterLabel(incident.disasterType)}
+                </span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="text-slate-600 dark:text-slate-300 font-medium">
+                  Sumber: {reportSource.label}
                 </span>
                 <span className="text-slate-300 dark:text-slate-600">•</span>
                 <span className="text-slate-500 dark:text-slate-400">
@@ -616,7 +620,7 @@ export function MaintenanceTrackingModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs pt-1">
                   <div>
                     <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Tipe Lokasi TKP</span>
                     <span className="font-bold text-slate-900 dark:text-white block mt-0.5">
@@ -630,22 +634,30 @@ export function MaintenanceTrackingModal({
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
-                      {isAutoReport ? "Sumber Laporan" : "Pelapor Lapangan"}
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Sumber Laporan</span>
+                    <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 mt-0.5">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${reportSource.badgeCls}`}>
+                        {reportSource.label}
+                      </span>
                     </span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
+                      {isAutoReport ? "Pembuat Sistem" : "Pelapor Lapangan"}
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5 truncate">
                       {isAutoReport ? (
                         <>
                           <Bot className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span>Sistem Otomasi SPARTA (InaTEWS / BMKG)</span>
+                          <span className="truncate">Sistem Otomasi SPARTA</span>
                         </>
                       ) : (
                         <>
                           <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{incident.reporter?.name || incident.timeline?.[0]?.actor || "Pelapor Lapangan"}</span>
+                          <span className="truncate">{incident.reporter?.name || incident.timeline?.[0]?.actor || "Pelapor Lapangan"}</span>
                           {incident.reporter?.nik && (
-                            <span className="font-mono text-slate-400 text-[10px]">
-                              • NIK: {incident.reporter.nik}
+                            <span className="font-mono text-slate-400 text-[10px] shrink-0">
+                              ({incident.reporter.nik})
                             </span>
                           )}
                         </>

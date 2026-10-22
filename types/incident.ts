@@ -22,7 +22,8 @@ export type ReportOrigin =
   | "manual"
   | "automatic_earthquake"
   | "automatic_weather"
-  | "automatic";
+  | "automatic"
+  | "unknown";
 
 /**
  * Status laporan dalam lifecycle
@@ -252,7 +253,7 @@ export interface IncidentRecord {
   disasterType: DisasterType;
 
   // === Asal Laporan ===
-  reportOrigin: ReportOrigin;
+  reportOrigin?: ReportOrigin | null;
   reporter?: IncidentReporter;   // Source of truth original pelapor
   earthquakeEventId?: string;    // Linked ke earthquake event ID jika auto
   earthquakeSource?: string;     // "BMKG" | "USGS"

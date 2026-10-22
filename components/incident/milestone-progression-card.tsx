@@ -108,15 +108,25 @@ export function MilestoneProgressionCard({
   const allCompleted = isDocComplete || (safeMilestones.length === 5 && safeMilestones.every((m) => m.status === "SUBMITTED"));
   const currentProgress = incident.progress ?? 0;
 
-  const isPicUser =
-    identity?.businessRole === "bms" ||
-    identity?.role === "bms" ||
-    identity?.businessRole === "bes" ||
-    identity?.role === "bes" ||
-    identity?.businessRole === "bbs" ||
-    identity?.role === "bbs";
+  const isBranchMatch = Boolean(
+    identity?.branch &&
+    incident.branch &&
+    identity.branch.trim().toLowerCase() === incident.branch.trim().toLowerCase()
+  );
 
-  const isClosed = incident.status === "closed" || incident.status === "resolved";
+  const isPicUser =
+    identity?.scope !== "HO" &&
+    (identity?.systemRole === "ADMIN" || isBranchMatch) &&
+    (
+      identity?.businessRole === "bms" ||
+      identity?.role === "bms" ||
+      identity?.businessRole === "bes" ||
+      identity?.role === "bes" ||
+      identity?.businessRole === "bbs" ||
+      identity?.role === "bbs"
+    );
+
+  const isClosed = incident.status === "closed" || incident.status === "resolved" || incident.status === "archived";
   const handleFileUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!targetMilestone || !selectedFile) return;

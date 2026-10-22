@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
 import { getStandardizedOperationalStatus } from "@/lib/operational-status";
+import { getReportSourceInfo } from "@/lib/display-formatters";
 
 interface ActiveIncidentsTableProps {
   incidents: IncidentRecord[];
@@ -160,14 +161,10 @@ export function ActiveIncidentsTable({
   };
 
   const getOriginBadge = (inc: IncidentRecord) => {
-    const isManual = (inc.reportOrigin as string) === "manual";
-    return isManual ? (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
-        Laporan Manual
-      </span>
-    ) : (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800">
-        Laporan Otomatis
+    const source = getReportSourceInfo(inc.reportOrigin);
+    return (
+      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium tracking-tight ${source.badgeCls}`}>
+        {source.longLabel}
       </span>
     );
   };

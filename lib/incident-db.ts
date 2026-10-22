@@ -6,7 +6,7 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
     id: row.id as string,
     date: row.date as string,
     disasterType: row.disaster_type as IncidentRecord["disasterType"],
-    reportOrigin: (row.report_origin as IncidentRecord["reportOrigin"]) ?? "manual",
+    reportOrigin: (row.report_origin as IncidentRecord["reportOrigin"]) || undefined,
     reporter: (row.reporter as IncidentRecord["reporter"]) ?? undefined,
     earthquakeEventId: (row.earthquake_event_id as string) ?? undefined,
     earthquakeSource: (row.earthquake_source as string) ?? undefined,

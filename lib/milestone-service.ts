@@ -59,7 +59,7 @@ export async function checkOperationalProgressGating(
     };
   }
 
-  if (incident.status === "closed") {
+  if (incident.status === "closed" || incident.status === "resolved" || incident.status === "archived") {
     return {
       isProgressGated: true,
       gatingReason: "Laporan telah resmi disetujui final BnM Manajer dan berstatus CLOSED.",
@@ -289,15 +289,19 @@ export async function submitMilestoneDocument(params: SubmitMilestoneParams): Pr
     throw new Error(`Laporan kejadian dengan ID ${reportId} tidak ditemukan.`);
   }
 
-  if (incident.status === "closed") {
-    throw new Error("Laporan sudah ditutup (closed). Tidak dapat mengunggah dokumen milestone lagi.");
+  if (actor.scope === "HO") {
+    throw new Error("Scope Head Office tidak memiliki izin mengunggah dokumen milestone operasional.");
+  }
+
+  if (incident.status === "closed" || incident.status === "resolved" || incident.status === "archived") {
+    throw new Error("Laporan sudah ditutup/selesai. Tidak dapat mengunggah dokumen milestone lagi.");
   }
 
   const isSystemAdmin = actor.systemRole === "ADMIN";
 
-  // 3. Operational Gating Check
+  // 3. Operational Gating Check (Must apply to all, including System Admin)
   const gating = await checkOperationalProgressGating(incident);
-  if (gating.isProgressGated && !isSystemAdmin) {
+  if (gating.isProgressGated) {
     throw new Error(
       `Progres operasional terkunci. ${gating.gatingReason} ${gating.nextRequiredAction ? `Tindakan berikutnya: ${gating.nextRequiredAction}` : ""}`.trim()
     );

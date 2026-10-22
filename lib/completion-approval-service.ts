@@ -302,9 +302,9 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    if (report.status === "resolved") {
-      const err: any = new Error("Laporan sudah ditutup (resolved). Tindakan approval tidak dapat diulangi.");
-      err.status = 400;
+    if (report.status === "closed" || report.status === "resolved" || report.status === "archived") {
+      const err: any = new Error("Laporan sudah ditutup/selesai. Tindakan approval tidak dapat diulangi.");
+      err.status = 422;
       err.code = "ALREADY_CLOSED";
       throw err;
     }
@@ -444,8 +444,8 @@ export class CompletionApprovalService {
     const updateRes = await pool.query(
       `UPDATE report_completion_approvals SET
         status = 'WAITING_COORDINATOR_APPROVAL',
-        pic_user_id = $1,
-        pic_user_name = $2,
+        pic_user_id = COALESCE(pic_user_id, $1),
+        pic_user_name = COALESCE(pic_user_name, $2),
         submitted_at = NOW(),
         submission_notes = $3,
         attachments = $4,

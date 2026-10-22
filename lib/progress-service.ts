@@ -224,11 +224,39 @@ export class ProgressService {
     await ensureProgressTables();
     const pool = getDbPool();
 
-    // 1. Cek Laporan
+    // 1. Cek Laporan & Status Tertutup/Terminal
     const report = await dbGetIncidentById(params.reportId);
     if (!report) {
       const err: any = new Error("Laporan tidak ditemukan.");
       err.status = 404;
+      throw err;
+    }
+
+    if (report.status === "closed" || report.status === "resolved" || report.status === "archived") {
+      const err: any = new Error("Laporan sudah ditutup/selesai. Tidak dapat memperbarui progress pekerjaan.");
+      err.status = 422;
+      err.code = "REPORT_CLOSED";
+      throw err;
+    }
+
+    const preApprovalStatuses = [
+      "pending_confirmation",
+      "verifying",
+      "investigating",
+      "pending_bm_approval",
+      "clarification_requested",
+    ];
+    if (preApprovalStatuses.includes(report.status)) {
+      const err: any = new Error("Tindakan progres fisik belum dapat dilakukan karena laporan belum disetujui BnM Manajer.");
+      err.status = 422;
+      err.code = "REPORT_NOT_APPROVED";
+      throw err;
+    }
+
+    if (report.status === "confirmed_safe" || report.status === "rejected_invalid") {
+      const err: any = new Error("Laporan berstatus aman atau ditolak tidak memerlukan penanganan progress fisik.");
+      err.status = 422;
+      err.code = "REPORT_TERMINAL";
       throw err;
     }
 
@@ -380,9 +408,12 @@ export class ProgressService {
     // Section Y/AE: incident.status tetap 'in_maintenance', TIDAK PERNAH auto-resolve.
     // COMPLETED hanya mengubah work_status, bukan incident.status.
     // incident.status = 'resolved' hanya terjadi melalui approval chain Task 5.
+    const nextStatus = ["awaiting_st", "pending_final_approval", "revision_requested"].includes(report.status)
+      ? report.status
+      : "in_maintenance";
     await dbUpdateIncident(params.reportId, {
       progress: percentage,
-      status: "in_maintenance", // NEVER auto-resolve — Task 5 handles Case Close
+      status: nextStatus, // NEVER auto-resolve — Task 5 handles Case Close
       timeline: [...(report.timeline || []), timelineEntry],
     });
 
