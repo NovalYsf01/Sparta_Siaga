@@ -1,8 +1,18 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { AppDialog } from "@/components/shared/app-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   ShieldAlert,
   UserCog,
@@ -97,17 +107,6 @@ export default function UserManagementPage() {
   const [selectedLocationObj, setSelectedLocationObj] = useState<any>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (isModalOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isModalOpen]);
 
   useEffect(() => {
     setMounted(true);
@@ -897,33 +896,40 @@ export default function UserManagementPage() {
       )}
 
       {/* Modal Create / Edit User */}
-      {isModalOpen && mounted && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
-                  {formMode === "CREATE" ? <Plus className="w-5 h-5" /> : <Edit className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h2 className="font-bold text-lg text-slate-900 dark:text-white">
-                    {formMode === "CREATE" ? "Tambah User Baru" : "Edit Data User"}
-                  </h2>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 font-medium">
-                    <span className={currentStep === 1 ? "text-blue-600 dark:text-blue-400" : ""}>1. Identitas & Penempatan</span>
-                    <span className="text-slate-300 dark:text-slate-600">→</span>
-                    <span className={currentStep === 2 ? "text-blue-600 dark:text-blue-400" : ""}>2. Keamanan & Konfirmasi</span>
-                  </div>
+      <AppDialog
+        open={isModalOpen}
+        onClose={handleCloseModal}
+        title={formMode === "CREATE" ? "Tambah User Baru" : "Edit Data User"}
+        description="Form manajemen akun dan penempatan operasional SPARTA SIAGA"
+        className="sm:!max-w-2xl"
+      >
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90dvh] sm:max-h-[85dvh] overscroll-contain touch-auto select-text">
+          {/* Modal Header */}
+          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl">
+                {formMode === "CREATE" ? <Plus className="w-5 h-5" /> : <Edit className="w-5 h-5" />}
+              </div>
+              <div>
+                <h2 className="font-bold text-lg text-slate-900 dark:text-white">
+                  {formMode === "CREATE" ? "Tambah User Baru" : "Edit Data User"}
+                </h2>
+                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 font-medium">
+                  <span className={currentStep === 1 ? "text-blue-600 dark:text-blue-400" : ""}>1. Identitas & Penempatan</span>
+                  <span className="text-slate-300 dark:text-slate-600">→</span>
+                  <span className={currentStep === 2 ? "text-blue-600 dark:text-blue-400" : ""}>2. Keamanan & Konfirmasi</span>
                 </div>
               </div>
-              <button 
-                onClick={handleCloseModal}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
+            <button 
+              type="button"
+              onClick={handleCloseModal}
+              aria-label="Tutup modal"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto overscroll-contain flex-1 space-y-6">
@@ -1274,43 +1280,40 @@ export default function UserManagementPage() {
               )}
             </div>
           </div>
-        </div>
-      , document.body)}
+        </AppDialog>
 
       {/* Confirmation Dialog Unsaved Changes */}
-      {showConfirmClose && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4 overscroll-contain">
+      <AlertDialog open={showConfirmClose} onOpenChange={(open) => { if (!open) setShowConfirmClose(false); }}>
+        <AlertDialogContent className="max-w-sm rounded-2xl p-6">
+          <AlertDialogHeader>
             <div className="flex items-center gap-3 text-amber-600 dark:text-amber-400">
               <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-white">
                 Perubahan Belum Disimpan
-              </h3>
+              </AlertDialogTitle>
             </div>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            <AlertDialogDescription className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed text-left pt-2">
               Ada perubahan yang belum disimpan. Apakah Anda yakin ingin menutup tanpa menyimpan?
-            </p>
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirmClose(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={confirmCloseModal}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
-              >
-                Ya, Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex items-center justify-end gap-3 pt-2">
+            <AlertDialogCancel
+              onClick={() => setShowConfirmClose(false)}
+              className="rounded-xl text-xs font-bold"
+            >
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCloseModal}
+              className="rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Ya, Tutup
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

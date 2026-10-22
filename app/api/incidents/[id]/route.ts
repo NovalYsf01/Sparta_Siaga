@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     // Role-based visibility
     const canView = await canViewReportAsync(sessionUser, incident);
     if (!canView) {
-      return NextResponse.json({ error: "Unauthorized: Cabang tidak berhak mengakses laporan ini" }, { status: 403 });
+      return NextResponse.json({ error: "Unauthorized: Akses laporan ditolak." }, { status: 403 });
     }
 
     return NextResponse.json({ data: incident });

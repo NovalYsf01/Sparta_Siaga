@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { AppDialog } from "@/components/shared/app-dialog";
 import { AlertTriangle, ArrowLeft, CalendarDays, ClipboardList, Download, Eye, FileText, Search, ShieldCheck, X } from "lucide-react";
 import type { DisasterType, IncidentRecord, IncidentStatus } from "@/types/incident";
 import { formatReportDate, getHoAttentionReasons, getReportTarget, isFinalPdfAvailable, isReportFinalized, reportStatusLabel } from "@/lib/ho-report-monitoring";
@@ -45,12 +45,23 @@ function ReportDetail({ incident, onClose }: { incident: IncidentRecord; onClose
     ...(incident.verification?.evidenceDetails?.map(p => p.photoUrl) || []),
   ])).filter((url): url is string => typeof url === "string" && url.startsWith(photoPrefix));
 
-  const dialogContent = (
-    <div className="fixed inset-0 z-[2700] flex flex-col bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white md:items-center md:justify-center md:bg-slate-950/65 md:p-5" role="dialog" aria-modal="true" aria-label={`Detail laporan ${incident.id}`}>
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900 md:max-h-[92dvh] md:max-w-5xl md:flex-none md:rounded-xl md:shadow-xl">
+  return (
+    <AppDialog
+      open={Boolean(incident)}
+      onClose={onClose}
+      title={`Detail Laporan ${incident.id}`}
+      description={`${incident.storeName} - ${incident.branch}`}
+      className="sm:!max-w-5xl"
+    >
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-white dark:bg-slate-900 max-h-[92dvh] rounded-2xl shadow-xl overscroll-contain touch-auto select-text border border-slate-200 dark:border-slate-800">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-start gap-2.5">
-            <button type="button" onClick={onClose} aria-label="Kembali ke daftar laporan" className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Kembali ke daftar laporan"
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors dark:border-slate-700 dark:hover:bg-slate-800"
+            >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="min-w-0">
@@ -59,10 +70,17 @@ function ReportDetail({ incident, onClose }: { incident: IncidentRecord; onClose
               <span className={`mt-2 inline-flex rounded-md px-2 py-1 text-[11px] font-semibold ${statusStyle(incident.status)}`}>{reportStatusLabel(incident.status)}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Tutup detail" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Tutup detail"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/70 p-4 pb-24 dark:bg-slate-950/40 sm:p-6">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain bg-slate-50/70 p-4 pb-12 dark:bg-slate-950/40 sm:p-6">
           <section className="grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4">
             {[
               ["Kejadian", incidentEventName(incident.disasterType)],
@@ -143,13 +161,8 @@ function ReportDetail({ incident, onClose }: { incident: IncidentRecord; onClose
           </section>
         </div>
       </div>
-    </div>
+    </AppDialog>
   );
-
-  if (typeof document === "undefined") {
-    return dialogContent;
-  }
-  return createPortal(dialogContent, document.body);
 }
 
 /** Read-only command view. No operational approve / edit / dispatch controls. */
@@ -215,24 +228,54 @@ export function HoReportMonitoring({ incidents }: { incidents: IncidentRecord[] 
           </div>
           <span className="text-xs text-slate-500">{filtered.length} laporan ditampilkan</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 border-b border-slate-100 p-3 dark:border-slate-800 sm:grid-cols-4 sm:p-4 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 border-b border-slate-100 p-3 dark:border-slate-800 sm:grid-cols-4 sm:p-4 lg:grid-cols-5">
           <div className="relative col-span-2 sm:col-span-4 lg:col-span-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/>
-            <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari laporan, toko, DC..." aria-label="Cari laporan"
-              className="min-h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-xs dark:border-slate-700 dark:bg-slate-800" />
+            <input
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Cari laporan, toko, DC..."
+              aria-label="Cari laporan"
+              className="h-9 w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-800 py-1.5 pl-9 pr-3 text-xs outline-none transition-colors focus:border-[#1D5AA6] focus:ring-1 focus:ring-[#1D5AA6]/30 dark:border-slate-700 text-slate-900 dark:text-white"
+            />
           </div>
-          <select value={branch} onChange={e => setBranch(e.target.value)} aria-label="Cabang" className="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-800"><option value="all">Semua Cabang</option>{branches.map(v => <option key={v} value={v}>{v}</option>)}</select>
-          <select value={kind} onChange={e => setKind(e.target.value as DisasterType | "all")} aria-label="Jenis kejadian" className="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-800">
+          <select
+            value={branch}
+            onChange={e => setBranch(e.target.value)}
+            aria-label="Cabang"
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-800 px-2.5 text-xs outline-none transition-colors focus:border-[#1D5AA6] focus:ring-1 focus:ring-[#1D5AA6]/30 dark:border-slate-700 text-slate-900 dark:text-white"
+          >
+            <option value="all">Semua Cabang</option>
+            {branches.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <select
+            value={kind}
+            onChange={e => setKind(e.target.value as DisasterType | "all")}
+            aria-label="Jenis kejadian"
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-800 px-2.5 text-xs outline-none transition-colors focus:border-[#1D5AA6] focus:ring-1 focus:ring-[#1D5AA6]/30 dark:border-slate-700 text-slate-900 dark:text-white"
+          >
             <option value="all">Semua Kejadian</option>
             {(["earthquake", "flood", "fire", "theft", "heavy_rain", "other"] as DisasterType[]).map(v => <option value={v} key={v}>{incidentEventName(v)}</option>)}
           </select>
-          <select value={status} onChange={e => setStatus(e.target.value as IncidentStatus | "all")} aria-label="Status laporan" className="min-h-10 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs dark:border-slate-700 dark:bg-slate-800">
+          <select
+            value={status}
+            onChange={e => setStatus(e.target.value as IncidentStatus | "all")}
+            aria-label="Status laporan"
+            className="h-9 w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-800 px-2.5 text-xs outline-none transition-colors focus:border-[#1D5AA6] focus:ring-1 focus:ring-[#1D5AA6]/30 dark:border-slate-700 text-slate-900 dark:text-white"
+          >
             <option value="all">Semua Status</option>
             {Array.from(new Set(incidents.map(i => i.status))).map(v => <option key={v} value={v}>{reportStatusLabel(v)}</option>)}
           </select>
-          <label className="relative flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 px-2 dark:border-slate-700">
+          <label className="relative flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white dark:bg-slate-800 px-2.5 dark:border-slate-700 focus-within:border-[#1D5AA6] focus-within:ring-1 focus-within:ring-[#1D5AA6]/30">
             <CalendarDays className="h-4 w-4 shrink-0 text-slate-400"/>
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} aria-label="Tanggal laporan mulai" className="w-full bg-transparent text-xs text-slate-700 dark:text-slate-200"/>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              aria-label="Tanggal laporan mulai"
+              className="w-full bg-transparent text-xs text-slate-700 dark:text-slate-200 outline-none"
+            />
           </label>
         </div>
         <div className="hidden overflow-x-auto md:block">

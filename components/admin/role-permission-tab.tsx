@@ -3,6 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Shield,
   Users,
   AlertTriangle,
@@ -306,42 +316,38 @@ export function RolePermissionTab() {
       </div>
 
       {/* Confirmation Dialog (Section E) */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <AlertDialog open={showConfirmModal} onOpenChange={(open) => { if (!open) setShowConfirmModal(false); }}>
+        <AlertDialogContent className="max-w-md rounded-2xl p-6">
+          <AlertDialogHeader>
             <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400">
               <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/50">
                 <Shield className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-white">
                 Konfirmasi Hak Akses Role
-              </h3>
+              </AlertDialogTitle>
             </div>
-
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            <AlertDialogDescription className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed text-left pt-2">
               Perubahan hak akses ini akan berlaku untuk <strong>{selectedRole?.userCount || 0} user</strong> dengan role{" "}
               <strong>{selectedRole?.label}</strong>. Lanjutkan?
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmSave}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-              >
-                Ya, Simpan Perubahan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex items-center justify-end gap-3 pt-2">
+            <AlertDialogCancel
+              onClick={() => setShowConfirmModal(false)}
+              className="rounded-xl text-xs font-bold"
+            >
+              Batal
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSave}
+              className="rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Ya, Simpan Perubahan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

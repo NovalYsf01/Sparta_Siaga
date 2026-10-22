@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { AppDialog } from "@/components/shared/app-dialog";
 
 interface QueueItem {
   id: string;
@@ -387,18 +388,20 @@ export default function SharedQueuePage() {
         {/* Filter & Search Bar */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Cari kode/nama lokasi, nomor laporan, atau PIC..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs md:text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1D5AA6]"
+              className="w-full h-10 pl-10 pr-10 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs md:text-sm font-medium text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:border-[#1D5AA6] focus:ring-1 focus:ring-[#1D5AA6]/30 transition-colors"
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+                aria-label="Hapus pencarian"
+                className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -409,7 +412,7 @@ export default function SharedQueuePage() {
             <select
               value={locationTypeFilter}
               onChange={(e) => setLocationTypeFilter(e.target.value as any)}
-              className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs md:text-sm font-semibold text-slate-700 focus:outline-none focus:border-[#1D5AA6]"
+              className="h-10 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs md:text-sm font-semibold text-slate-700 dark:text-slate-200 focus:outline-none focus:border-[#1D5AA6] focus:ring-1 focus:ring-[#1D5AA6]/30 transition-colors"
             >
               <option value="all">Semua Tipe Lokasi</option>
               <option value="store">Gerai / Toko (BMS)</option>
@@ -688,30 +691,30 @@ export default function SharedQueuePage() {
         )}
 
         {/* Modal: Kelola & Histori PIC */}
-        {selected && (
-          <div
-            className="fixed inset-0 z-[6000] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pic-modal-title"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setSelected(null);
-            }}
-          >
-            <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-6 sm:zoom-in-95">
+        <AppDialog
+          open={Boolean(selected)}
+          onClose={() => setSelected(null)}
+          title="Kelola PIC Laporan"
+          description={selected ? `${selected.location_name} • ${selected.id}` : "Kelola penugasan dan riwayat PIC"}
+          className="sm:!max-w-lg"
+        >
+          {selected && (
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl max-h-[90dvh] sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 overscroll-contain touch-auto select-text">
               {/* Modal Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50 shrink-0">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 shrink-0">
                 <div>
-                  <h3 id="pic-modal-title" className="font-bold text-sm md:text-base text-slate-900">
+                  <h3 id="pic-modal-title" className="font-bold text-sm md:text-base text-slate-900 dark:text-white">
                     Kelola PIC Laporan
                   </h3>
-                  <p className="text-xs text-slate-500 truncate max-w-xs md:max-w-sm">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs md:max-w-sm">
                     {selected.location_name} • {selected.id}
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelected(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                  aria-label="Tutup modal"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -898,17 +901,18 @@ export default function SharedQueuePage() {
               </div>
 
               {/* Modal Footer */}
-              <div className="p-4 border-t border-slate-200 bg-slate-50 shrink-0 flex items-center justify-end">
+              <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 shrink-0 flex items-center justify-end">
                 <button
+                  type="button"
                   onClick={() => setSelected(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors touch-target-min"
                 >
                   Tutup
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </AppDialog>
       </div>
     </div>
   );

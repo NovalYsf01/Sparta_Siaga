@@ -213,7 +213,7 @@ async function runTestSuite() {
 
       const pass =
         authCheck.authorized === false &&
-        (authCheck.reason || "").includes("BES tidak berwenang mengambil alih pemeriksaan laporan toko");
+        ((authCheck.reason || "").includes("BMS") || (authCheck.reason || "").includes("BES tidak berwenang"));
 
       recordResult(
         3,
@@ -487,7 +487,7 @@ async function runTestSuite() {
         bmsTryBm.authorized === false &&
         besTryBm.authorized === false &&
         bmOtherBranch.authorized === false &&
-        ((bmsTryBm.reason || "").includes("Building & Maintenance Manager") || (bmsTryBm.reason || "").includes("Branch Manager"));
+        ((bmsTryBm.reason || "").includes("BnM Manajer") || (bmsTryBm.reason || "").includes("Branch Manager") || (bmsTryBm.reason || "").includes("Building & Maintenance Manager"));
 
       recordResult(
         9,

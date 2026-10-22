@@ -20,7 +20,7 @@ import {
   PERMISSION_DEFINITIONS,
   getPermissionScopeRule,
 } from "@/types/permission";
-import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
+import { AppDialog } from "@/components/shared/app-dialog";
 
 interface AddOverrideModalProps {
   isOpen: boolean;
@@ -43,8 +43,6 @@ export function AddOverrideModal({
   userBranch,
   onSuccess,
 }: AddOverrideModalProps) {
-  // Lock background scroll when modal is open
-  useBodyScrollLock(isOpen);
 
   const [permissionKey, setPermissionKey] = useState<PermissionKey>("REPORT_FOLLOW_UP");
   const [effect, setEffect] = useState<PermissionEffect>("ALLOW");
@@ -268,8 +266,14 @@ export function AddOverrideModal({
   const categories = ["LAPORAN", "NOTIFIKASI", "MANAGEMENT", "ESTIMASI"] as const;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in overscroll-none touch-none select-none">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[88vh] overflow-hidden touch-auto select-text">
+    <AppDialog
+      open={isOpen}
+      onClose={onClose}
+      title="Tambah Akses Khusus User"
+      description={`User: ${userName} • ${userRole || "Tanpa Role"}`}
+      className="sm:!max-w-lg"
+    >
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[85dvh] overflow-hidden overscroll-contain touch-auto select-text">
         {/* Header (Stable) */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 p-5 pb-3.5 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -286,8 +290,10 @@ export function AddOverrideModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+            aria-label="Tutup modal"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -598,6 +604,6 @@ export function AddOverrideModal({
           </div>
         </form>
       </div>
-    </div>
+    </AppDialog>
   );
 }

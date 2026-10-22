@@ -3,7 +3,7 @@ import { dbGetAllIncidents, dbCreateIncident } from "@/lib/incident-db";
 import { IncidentRecord } from "@/types/incident";
 import { getSessionUser } from "@/lib/auth";
 import { ReportDistributionService } from "@/lib/distribution-service";
-import { canViewReport } from "@/lib/report-permissions";
+import { canViewReport, isReportVisibleToHo } from "@/lib/report-permissions";
 import { checkUserPermission } from "@/lib/permission-service";
 
 export async function GET(request?: Request) {
@@ -15,14 +15,14 @@ export async function GET(request?: Request) {
 
     const incidents = await dbGetAllIncidents();
 
-    // Check if user has global read permission (HO, Admin, or active user override REPORT_VIEW_ALL)
-    let hasGlobalView = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
-    if (!hasGlobalView && sessionUser.id) {
+    // Check if user has global read override REPORT_VIEW_ALL
+    let hasGlobalViewOverride = false;
+    if (sessionUser.systemRole !== "ADMIN" && sessionUser.scope !== "HO" && sessionUser.id) {
       const permCheck = await checkUserPermission({
         user: sessionUser,
         permission: "REPORT_VIEW_ALL",
       });
-      hasGlobalView = permCheck.authorized;
+      hasGlobalViewOverride = permCheck.authorized;
     }
 
     let url: URL | null = null;
@@ -33,9 +33,14 @@ export async function GET(request?: Request) {
     }
     const statusParam = url?.searchParams.get("status");
 
-    let filteredIncidents = incidents.filter(
-      (inc) => !inc.id.startsWith("INC-TEST-") && (hasGlobalView || canViewReport(sessionUser, inc))
-    );
+    let filteredIncidents = incidents.filter((inc) => {
+      if (inc.id.startsWith("INC-TEST-")) return false;
+      if (sessionUser.systemRole === "ADMIN") return true;
+      if (hasGlobalViewOverride) {
+        return canViewReport(sessionUser, inc) || isReportVisibleToHo(inc);
+      }
+      return canViewReport(sessionUser, inc);
+    });
 
     if (statusParam === "active") {
       filteredIncidents = filteredIncidents.filter(

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { Earthquake } from "@/types/disaster";
+import { AppDialog } from "@/components/shared/app-dialog";
 import {
   X,
   Activity,
@@ -53,18 +53,19 @@ export function EarthquakeListModal({
 
   const isDark = theme === "dark";
 
-  const modalContent = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Daftar Gempa Bumi Terkini"
-      className={`fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 ${isDark ? "bg-black/80" : "bg-slate-900/40"} backdrop-blur-sm`}
+  return (
+    <AppDialog
+      open={isOpen}
+      onClose={onClose}
+      title="Daftar Gempa Bumi Terkini"
+      description="Data real-time BMKG & USGS dengan kalkulasi dampak Zona Pantau SPARTA"
+      className="sm:!max-w-2xl"
     >
-      <div className={`rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transition-colors border ${
+      <div className={`rounded-2xl w-full max-w-2xl max-h-[90dvh] sm:max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden transition-colors border overscroll-contain touch-auto select-text ${
         isDark ? "bg-slate-900 border-slate-700/80 text-slate-100" : "bg-white border-slate-200 text-slate-900"
       }`}>
         {/* Header */}
-        <div className={`p-4 sm:p-5 border-b flex items-center justify-between ${
+        <div className={`p-4 sm:p-5 border-b flex items-center justify-between shrink-0 ${
           isDark ? "border-slate-800 bg-slate-950/50" : "border-slate-100 bg-slate-50"
         }`}>
           <div className="flex items-center gap-3">
@@ -100,25 +101,26 @@ export function EarthquakeListModal({
           isDark ? "border-slate-800 bg-slate-900/50" : "border-slate-100 bg-white"
         }`}>
           <div className="relative w-full sm:flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Cari wilayah gempa (misal: Jawa Barat)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-9 pr-3 py-1.5 rounded-xl border text-xs focus:outline-none focus:border-cyan-500 transition-colors ${
+              className={`w-full h-9 pl-9 pr-3 rounded-lg border text-xs outline-none transition-colors ${
                 isDark 
-                  ? "bg-slate-950 border-slate-800 text-white placeholder-slate-500" 
-                  : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
+                  ? "bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30" 
+                  : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400 focus:border-cyan-600 focus:ring-1 focus:ring-cyan-600/30"
               }`}
             />
           </div>
 
           <div className="flex items-center gap-1.5 w-full sm:w-auto">
-            <Filter className={`w-3.5 h-3.5 ${isDark ? "text-slate-400" : "text-slate-500"}`} />
+            <Filter className={`w-3.5 h-3.5 shrink-0 ${isDark ? "text-slate-400" : "text-slate-500"}`} />
             <button
+              type="button"
               onClick={() => setMinMagnitude("all")}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-target-min ${
                 minMagnitude === "all"
                   ? isDark ? "bg-slate-800 text-white font-bold border border-slate-700" : "bg-slate-200 text-slate-900 font-bold border border-slate-300"
                   : isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
@@ -127,8 +129,9 @@ export function EarthquakeListModal({
               Semua
             </button>
             <button
+              type="button"
               onClick={() => setMinMagnitude(5.0)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-target-min ${
                 minMagnitude === 5.0
                   ? "bg-red-500/10 text-red-600 dark:text-red-400 font-bold border border-red-500/30"
                   : isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
@@ -137,8 +140,9 @@ export function EarthquakeListModal({
               M ≥ 5.0
             </button>
             <button
+              type="button"
               onClick={() => setMinMagnitude(6.0)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all touch-target-min ${
                 minMagnitude === 6.0
                   ? "bg-red-600 text-white font-bold shadow-sm"
                   : isDark ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
@@ -262,13 +266,14 @@ export function EarthquakeListModal({
         </div>
 
         {/* Footer */}
-        <div className={`p-3 sm:p-4 border-t flex items-center justify-between text-[11px] font-medium ${
+        <div className={`p-3 sm:p-4 border-t flex items-center justify-between text-[11px] font-medium shrink-0 ${
           isDark ? "border-slate-800 bg-slate-950/50 text-slate-400" : "border-slate-100 bg-slate-50 text-slate-500"
         }`}>
           <span>Menampilkan {filteredEarthquakes.length} dari {earthquakes.length} gempa bumi</span>
           <button
+            type="button"
             onClick={onClose}
-            className={`px-4 py-1.5 rounded-lg border font-semibold transition-colors ${
+            className={`px-4 py-1.5 rounded-lg border font-semibold transition-colors touch-target-min ${
               isDark ? "border-slate-700 hover:bg-slate-800 text-slate-200" : "border-slate-300 hover:bg-slate-200 text-slate-700"
             }`}
           >
@@ -276,8 +281,6 @@ export function EarthquakeListModal({
           </button>
         </div>
       </div>
-    </div>
+    </AppDialog>
   );
-
-  return createPortal(modalContent, document.body);
 }

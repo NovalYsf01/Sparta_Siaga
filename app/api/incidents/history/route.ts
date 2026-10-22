@@ -60,6 +60,15 @@ export async function GET(request: Request) {
     // Exclude test fixture namespace from normal runtime history
     conditions.push("id NOT LIKE 'INC-TEST-%'");
 
+    // HO Visibility Rule enforcement (TASK T05B)
+    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
+      conditions.push(`(
+        report_origin = 'automatic_earthquake' OR 
+        status IN ('closed', 'resolved', 'archived', 'confirmed_affected', 'confirmed_safe') OR
+        (verification->'bmApproval'->>'decision') IN ('approved', 'safe')
+      )`);
+    }
+
     // ENFORCE HISTORY STATUSES (closed, resolved, archived)
     if (status && status !== "all") {
       // If user passes a specific status, ensure it's a history status

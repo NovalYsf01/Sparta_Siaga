@@ -1,5 +1,5 @@
 import { getDbPool } from "./db";
-import { UserContext } from "./report-permissions";
+import { UserContext, isReportVisibleToHo } from "./report-permissions";
 import { IncidentRecord } from "@/types/incident";
 
 export * from "@/types/permission";
@@ -522,6 +522,13 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
   // CHECK EXPLICIT ACTIVE USER ALLOW
   const userAllow = matchingOverrides.find((ov) => ov.effect === "ALLOW" && doesOverrideScopeMatch(ov));
   if (userAllow) {
+    if (permission === "REPORT_VIEW_ALL" && report && !isReportVisibleToHo(report)) {
+      return {
+        authorized: false,
+        source: "USER_OVERRIDE_ALLOW",
+        reason: "Laporan manual belum disetujui oleh BnM Manajer pada pemeriksaan awal.",
+      };
+    }
     return {
       authorized: true,
       source: "USER_OVERRIDE_ALLOW",
@@ -566,6 +573,13 @@ export async function checkUserPermission(params: CheckPermissionParams): Promis
   if (permission === "REPORT_VIEW_ALL") {
     // Only HO roles have view all
     if (user.scope === "HO") {
+      if (report && !isReportVisibleToHo(report)) {
+        return {
+          authorized: false,
+          source: "ROLE_PERMISSION",
+          reason: "Laporan manual belum disetujui oleh BnM Manajer pada pemeriksaan awal.",
+        };
+      }
       return { authorized: true, source: "ROLE_PERMISSION" };
     }
     return {
@@ -668,13 +682,27 @@ export async function canViewReportAsync(
   user: UserContext,
   report: IncidentRecord
 ): Promise<boolean> {
+  // 1. System Admin
+  if (user.systemRole === "ADMIN") {
+    return true;
+  }
+
+  // 2. Scope Head Office (HO): harus mematuhi aturan visibilitas laporan HO
+  if (user.scope === "HO") {
+    return isReportVisibleToHo(report);
+  }
+
+  // 3. User dengan override REPORT_VIEW_ALL
   const result = await checkUserPermission({
     user,
     permission: "REPORT_VIEW_ALL",
     report,
   });
-  if (result.authorized) return true;
+  if (result.authorized) {
+    return isReportVisibleToHo(report);
+  }
 
+  // 4. Pengguna cabang memeriksa laporan cabang sendiri
   const ownResult = await checkUserPermission({
     user,
     permission: "REPORT_VIEW_OWN",
