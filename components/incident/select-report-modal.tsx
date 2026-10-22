@@ -88,7 +88,7 @@ export function SelectReportModal({
 
   return (
     <AppDialog open={isOpen} onClose={onClose} title={isEstimation ? "Pilih Laporan untuk Buat Estimasi" : "Pilih Laporan untuk Update Progress"} className="sm:!max-w-2xl">
-      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] touch-auto select-text">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90dvh] sm:max-h-[85dvh] overscroll-contain touch-auto select-text">
         {/* Header (Fixed) */}
         <div className="flex items-center justify-between px-6 py-4 bg-[#123B6D] text-white shrink-0">
           <div className="flex items-center gap-3">
@@ -105,8 +105,10 @@ export function SelectReportModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 hover:bg-white/20 rounded-lg transition-colors text-white"
+            aria-label="Tutup modal"
+            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-xl hover:bg-white/20 active:bg-white/30 transition-colors text-white"
           >
             <X className="w-5 h-5" />
           </button>
@@ -176,7 +178,7 @@ export function SelectReportModal({
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       type="button"
-                      className="px-3 py-1.5 bg-[#1D5AA6] group-hover:bg-[#123B6D] text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1 shadow-xs"
+                      className="px-3.5 py-2 min-h-[38px] bg-[#1D5AA6] group-hover:bg-[#123B6D] text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1 shadow-xs"
                     >
                       <span>Pilih</span>
                       <ArrowRight className="w-3.5 h-3.5" />
@@ -193,7 +195,7 @@ export function SelectReportModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl"
+            className="min-h-[44px] px-5 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-colors"
           >
             Tutup
           </button>

@@ -44,6 +44,23 @@ interface CompletionApprovalCardProps {
   readOnly?: boolean;
 }
 
+function safeFormatDate(raw?: string | null): string {
+  if (!raw) return "-";
+  try {
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return raw;
+  }
+}
+
 export function CompletionApprovalCard({
   incident,
   approval,
@@ -124,8 +141,510 @@ export function CompletionApprovalCard({
     }
   };
 
-  // Determine current step index for stepped visual
-  // 0: Physical Work, 1: PIC Submission, 2: Coordinator Approval, 3: BM Approval & Close
+  // Determine role labels based on category / route
+  const tkpType = (incident.tkpType || "toko").toLowerCase();
+  const defaultPicRole = tkpType === "dc" ? "BES" : tkpType === "building" ? "BBS" : "BMS";
+  const defaultCoordRole = tkpType === "dc" ? "BEC" : tkpType === "building" ? "BBC" : "BMC";
+
+  const picLabel = route ? route.picRole.toUpperCase() : defaultPicRole;
+  const coordLabel = route ? route.coordinatorRole.toUpperCase() : defaultCoordRole;
+
+  // READ-ONLY SIMPLIFIED APPROVAL TAB (Task T04)
+  if (readOnly) {
+    const verification = incident.verification;
+    const bmApproval = verification?.bmApproval;
+    const hasInspectionStarted = Boolean(verification?.confirmedBy || verification?.confirmedAt);
+
+    // Initial inspection decision label & style
+    const getBmDecisionInfo = () => {
+      if (!bmApproval) {
+        if (incident.status === "pending_bm_approval") {
+          return {
+            label: "Menunggu Keputusan BnM Manajer",
+            badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800",
+            decidedBy: `Menunggu BnM Manajer (${incident.branch})`,
+            date: "-",
+            notes: "Hasil pemeriksaan diajukan oleh petugas cabang dan sedang menunggu persetujuan awal BnM Manajer.",
+          };
+        }
+        if (hasInspectionStarted) {
+          return {
+            label: "Pemeriksaan Dikonfirmasi",
+            badgeClass: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+            decidedBy: `BnM Manajer (${incident.branch})`,
+            date: safeFormatDate(verification?.confirmedAt),
+            notes: verification?.notes || "Dikonfirmasi operasional.",
+          };
+        }
+        return {
+          label: "Persetujuan Belum Dimulai",
+          badgeClass: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+          decidedBy: `BnM Manajer (${incident.branch})`,
+          date: "-",
+          notes: "Persetujuan awal BnM Manajer akan aktif setelah pemeriksaan fisik lapangan diinput oleh petugas cabang.",
+        };
+      }
+
+      switch (bmApproval.decision) {
+        case "approved":
+          return {
+            label: "Disetujui Penanganan Lanjutan",
+            badgeClass: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
+            decidedBy: bmApproval.decidedBy || `BnM Manajer (${incident.branch})`,
+            date: safeFormatDate(bmApproval.decidedAt),
+            notes: bmApproval.decisionNotes || "Disetujui untuk masuk ke alur penanganan teknis.",
+          };
+        case "safe":
+          return {
+            label: "Dinyatakan Aman (Selesai)",
+            badgeClass: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200 dark:border-teal-800",
+            decidedBy: bmApproval.decidedBy || `BnM Manajer (${incident.branch})`,
+            date: safeFormatDate(bmApproval.decidedAt),
+            notes: bmApproval.decisionNotes || "Kondisi fisik aman dan operasional berjalan normal.",
+          };
+        case "rejected":
+          return {
+            label: "Ditolak (Data Tidak Valid)",
+            badgeClass: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800",
+            decidedBy: bmApproval.decidedBy || `BnM Manajer (${incident.branch})`,
+            date: safeFormatDate(bmApproval.decidedAt),
+            notes: bmApproval.rejectionReason || "Laporan tidak valid atau salah lokasi.",
+          };
+        case "clarification_requested":
+          return {
+            label: "Permintaan Klarifikasi",
+            badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+            decidedBy: bmApproval.decidedBy || `BnM Manajer (${incident.branch})`,
+            date: safeFormatDate(bmApproval.decidedAt),
+            notes: bmApproval.clarificationReason || "Diperlukan informasi atau bukti tambahan.",
+          };
+        default:
+          return {
+            label: String(bmApproval.decision).toUpperCase(),
+            badgeClass: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700",
+            decidedBy: bmApproval.decidedBy || `BnM Manajer (${incident.branch})`,
+            date: safeFormatDate(bmApproval.decidedAt),
+            notes: bmApproval.decisionNotes || "-",
+          };
+      }
+    };
+
+    const bmDecisionInfo = getBmDecisionInfo();
+
+    // Handover flow resolution
+    const isHandoverStarted = Boolean(approval?.submittedAt || approval?.status || latestProgress === 100);
+    const flowTitle = tkpType === "dc"
+      ? `Jalur DC: ${picLabel} → ${coordLabel} → BnM Manajer`
+      : tkpType === "building"
+      ? `Jalur Gedung: ${picLabel} → ${coordLabel} → BnM Manajer`
+      : `Jalur Toko: ${picLabel} → ${coordLabel} → BnM Manajer`;
+
+    // Revision check in Serah Terima
+    const isRevision = status === "REVISION_REQUIRED";
+    const isRevisionByCoord = isRevision && (approval?.rejectedByRole?.toLowerCase().includes("c") || approval?.rejectedByRole?.toLowerCase().includes("coord"));
+    const isRevisionByManager = isRevision && (approval?.rejectedByRole?.toLowerCase() === "bm" || approval?.rejectedByRole?.toLowerCase().includes("manager"));
+
+    return (
+      <div className="space-y-6 animate-in fade-in select-text">
+        {/* BAGIAN 1: APPROVAL PEMERIKSAAN AWAL */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[#1D5AA6] dark:text-blue-400" />
+                1. Approval Pemeriksaan Awal
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Alur: PIC {picLabel} ({incident.branch}) → BnM Manajer ({incident.branch})
+              </p>
+            </div>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border self-start sm:self-auto ${bmDecisionInfo.badgeClass}`}>
+              {bmDecisionInfo.label}
+            </span>
+          </div>
+
+          {!hasInspectionStarted ? (
+            <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
+              Persetujuan belum dimulai. Pemeriksaan fisik lapangan belum dilakukan oleh tim cabang.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              {/* Hasil Pemeriksaan Lapangan */}
+              <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    Pemeriksaan Fisik Lapangan
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      verification?.isDamaged
+                        ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                        : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                    }`}
+                  >
+                    {verification?.isDamaged ? "RUSAK / TERDAMPAK" : "AMAN / TIDAK RUSAK"}
+                  </span>
+                </div>
+                <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
+                  <p>
+                    <span className="text-slate-400">Pemeriksa:</span>{" "}
+                    <strong className="text-slate-800 dark:text-slate-200">{verification?.confirmedBy || "-"}</strong>
+                  </p>
+                  <p>
+                    <span className="text-slate-400">Waktu Pemeriksaan:</span>{" "}
+                    <span className="text-slate-700 dark:text-slate-300 font-medium">
+                      {safeFormatDate(verification?.confirmedAt)}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-slate-400">Metode:</span>{" "}
+                    <span className="text-slate-700 dark:text-slate-300">
+                      {verification?.inspectionMethod === "kunjungan_langsung" ? "Kunjungan Langsung" : "Informasi Petugas"}
+                    </span>
+                  </p>
+                  {verification?.notes && (
+                    <p className="pt-1 text-slate-700 dark:text-slate-300 italic border-t border-slate-200/50 dark:border-slate-800/50">
+                      &ldquo;{verification.notes}&rdquo;
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Keputusan BnM Manajer */}
+              <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    Keputusan BnM Manajer
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {bmDecisionInfo.date !== "-" ? bmDecisionInfo.date : "Menunggu"}
+                  </span>
+                </div>
+                <div className="space-y-1 text-[11px] text-slate-600 dark:text-slate-400">
+                  <p>
+                    <span className="text-slate-400">Pengambil Keputusan:</span>{" "}
+                    <strong className="text-slate-800 dark:text-slate-200">{bmDecisionInfo.decidedBy}</strong>
+                  </p>
+                  <p>
+                    <span className="text-slate-400">Status:</span>{" "}
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{bmDecisionInfo.label}</span>
+                  </p>
+                  <div className="pt-1 border-t border-slate-200/50 dark:border-slate-800/50">
+                    <span className="text-[10px] text-slate-400 block mb-0.5">Catatan BnM Manajer:</span>
+                    <p className="text-slate-700 dark:text-slate-300 italic">
+                      &ldquo;{bmDecisionInfo.notes}&rdquo;
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* BAGIAN 2: APPROVAL SERAH TERIMA & STATUS CASE CLOSE */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-2xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                2. Approval Serah Terima
+              </h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {flowTitle}
+              </p>
+            </div>
+            <div>
+              {isResolved ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Selesai & Ditutup
+                </span>
+              ) : isRevision ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                  Revisi Diminta
+                </span>
+              ) : status === "WAITING_COORDINATOR_APPROVAL" ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-700">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  Menunggu {coordLabel}
+                </span>
+              ) : status === "WAITING_MANAGER_APPROVAL" ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
+                  <Clock className="w-3.5 h-3.5 text-purple-600" />
+                  Menunggu BnM Manajer
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  {latestProgress === 100 ? `Menunggu Pengajuan ${picLabel}` : "Pekerjaan Fisik Berjalan"}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Empty state if Serah Terima hasn't started */}
+          {!isHandoverStarted ? (
+            <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30 space-y-1">
+              <p className="font-semibold text-slate-700 dark:text-slate-300">Persetujuan belum dimulai.</p>
+              <p className="text-[11px] text-slate-400">
+                Pekerjaan fisik saat ini berada pada tahap {latestProgress}%. Serah terima dapat diajukan setelah pekerjaan fisik mencapai 100% dan bukti fisik lengkap.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Alert jika ada revisi */}
+              {isRevision && (
+                <div className="p-3.5 bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl text-xs space-y-1 text-rose-900 dark:text-rose-200">
+                  <div className="font-bold flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>
+                      Catatan Permintaan Revisi ({approval?.rejectedByRole?.toUpperCase() || "Approver"} - {approval?.rejectedByUserName || "Approver"}):
+                    </span>
+                  </div>
+                  <p className="text-[11px] pl-5.5 italic bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-rose-200/50 dark:border-rose-800/50">
+                    &ldquo;{approval?.rejectionReason || "Harap lengkapi berkas dan verifikasi kembali."}&rdquo;
+                  </p>
+                  <p className="text-[10px] text-rose-600 dark:text-rose-400 pl-5.5">
+                    Perbaikan bukti pekerjaan diajukan kembali melalui Update Progress oleh PIC lapangan ({picLabel}).
+                  </p>
+                </div>
+              )}
+
+              {/* 3-Step Sequential Handover Table / Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* 1. Pengajuan PIC */}
+                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-1.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        1. Pengajuan PIC
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          approval?.submittedAt
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : latestProgress === 100 && hasFinalEvidence
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                            : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                        }`}
+                      >
+                        {approval?.submittedAt
+                          ? "Diajukan"
+                          : latestProgress === 100 && hasFinalEvidence
+                          ? "Siap Diajukan"
+                          : "Belum Diajukan"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      PIC: <strong className="text-slate-800 dark:text-slate-200">{approval?.picUserName || (latestProgress === 100 ? `PIC ${picLabel}` : "-")}</strong>
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Waktu: {safeFormatDate(approval?.submittedAt)}
+                    </p>
+                  </div>
+                  {approval?.submissionNotes && (
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 italic pt-1 border-t border-slate-200/50 dark:border-slate-800/50 line-clamp-2">
+                      &ldquo;{approval.submissionNotes}&rdquo;
+                    </p>
+                  )}
+                </div>
+
+                {/* 2. Persetujuan Koordinator */}
+                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-1.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        2. Koordinator ({coordLabel})
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          approval?.coordinatorApprovedAt
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : isRevisionByCoord
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                            : status === "WAITING_COORDINATOR_APPROVAL"
+                            ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                            : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                        }`}
+                      >
+                        {approval?.coordinatorApprovedAt
+                          ? "Disetujui"
+                          : isRevisionByCoord
+                          ? "Revisi"
+                          : status === "WAITING_COORDINATOR_APPROVAL"
+                          ? "Menunggu"
+                          : "Belum Dimulai"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Koordinator:{" "}
+                      <strong className="text-slate-800 dark:text-slate-200">
+                        {approval?.coordinatorUserName || (status === "WAITING_COORDINATOR_APPROVAL" ? `Menunggu ${coordLabel}` : "-")}
+                      </strong>
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Waktu: {safeFormatDate(approval?.coordinatorApprovedAt)}
+                    </p>
+                  </div>
+                  {approval?.coordinatorNotes && (
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 italic pt-1 border-t border-slate-200/50 dark:border-slate-800/50 line-clamp-2">
+                      &ldquo;{approval.coordinatorNotes}&rdquo;
+                    </p>
+                  )}
+                </div>
+
+                {/* 3. Final Approval BnM Manajer */}
+                <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40 space-y-1.5 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        3. Final BnM Manajer
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          approval?.managerApprovedAt
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : isRevisionByManager
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                            : status === "WAITING_MANAGER_APPROVAL"
+                            ? "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300"
+                            : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                        }`}
+                      >
+                        {approval?.managerApprovedAt
+                          ? "Disetujui Final"
+                          : isRevisionByManager
+                          ? "Revisi"
+                          : status === "WAITING_MANAGER_APPROVAL"
+                          ? "Menunggu"
+                          : "Belum Dimulai"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                      Manajer:{" "}
+                      <strong className="text-slate-800 dark:text-slate-200">
+                        {approval?.managerUserName || (status === "WAITING_MANAGER_APPROVAL" ? `Menunggu BnM Manajer` : "-")}
+                      </strong>
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Waktu: {safeFormatDate(approval?.managerApprovedAt)}
+                    </p>
+                  </div>
+                  {approval?.managerNotes && (
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 italic pt-1 border-t border-slate-200/50 dark:border-slate-800/50 line-clamp-2">
+                      &ldquo;{approval.managerNotes}&rdquo;
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Penutupan Kasus (Case Close) - Informasi Terpisah */}
+              <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      Status Penutupan Kasus (Case Close)
+                    </span>
+                    <span
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
+                        isResolved
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
+                      }`}
+                    >
+                      {isResolved ? "CLOSED" : "Belum Ditutup"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {isResolved
+                      ? `Laporan resmi ditutup oleh ${approval?.managerUserName || `BnM Manajer (${incident.branch})`} pada ${safeFormatDate(incident.closedAt || approval?.managerApprovedAt)}.`
+                      : "Penutupan kasus dilakukan setelah persetujuan akhir BnM Manajer dinyatakan lengkap."}
+                  </p>
+                </div>
+
+                <div className="text-[11px] font-mono text-slate-400 shrink-0">
+                  {isResolved ? `Waktu Close: ${safeFormatDate(incident.closedAt || approval?.managerApprovedAt)}` : "Status: Menunggu Selesai"}
+                </div>
+              </div>
+
+              {/* Berkas Bukti Lampiran Serah Terima */}
+              {approval?.attachments && approval.attachments.length > 0 && (
+                <div className="p-3.5 bg-slate-50/60 dark:bg-slate-950/30 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2 text-xs">
+                  <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <FileCheck className="w-4 h-4 text-blue-600" />
+                    Dokumen & Lampiran Bukti Serah Terima ({approval.attachments.length} berkas):
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {approval.attachments.map((att, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <span className="truncate font-medium text-slate-700 dark:text-slate-300" title={att.originalName}>
+                          {att.originalName}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-2">
+                          {Math.round(att.size / 1024)} KB
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Riwayat Keputusan & Audit Collapsible */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1.5"
+            >
+              {showHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              <span>Riwayat Keputusan & Audit Serah Terima ({history.length} catatan)</span>
+            </button>
+
+            {showHistory && (
+              <div className="mt-2.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+                {history.length === 0 ? (
+                  <p className="text-slate-400 text-[11px] italic">Belum ada riwayat keputusan tercatat untuk serah terima laporan ini.</p>
+                ) : (
+                  <div className="space-y-2 divide-y divide-slate-100 dark:divide-slate-800">
+                    {history.map((h) => (
+                      <div key={h.id} className="pt-2 first:pt-0 flex items-start justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-800 dark:text-slate-200">
+                              {h.action}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-mono uppercase">
+                              {h.actorRole}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                            Aktor: <strong className="text-slate-800 dark:text-slate-200">{h.actorName}</strong> • Cabang: {h.branch || "-"}
+                          </p>
+                          {h.notes && (
+                            <p className="text-[11px] text-slate-700 dark:text-slate-300 italic bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200/50 dark:border-slate-800/50 mt-1">
+                              &ldquo;{h.notes}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-400 shrink-0 font-mono">
+                          {safeFormatDate(h.createdAt)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Determine current step index for stepped visual in Update Progress mode
   let currentStep = 0;
   if (isCompleted) {
     if (status === "WAITING_PIC_SUBMISSION") currentStep = 1;
@@ -135,16 +654,13 @@ export function CompletionApprovalCard({
     else if (status === "CLOSED" || isResolved) currentStep = 4;
   }
 
-  const picLabel = route ? route.picRole.toUpperCase() : "PIC LAPANGAN";
-  const coordLabel = route ? route.coordinatorRole.toUpperCase() : "KOORDINATOR";
-
   return (
     <div className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800">
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            8. Alur Persetujuan Penyelesaian & Case Close
+            Alur Persetujuan Serah Terima & Case Close
           </h4>
           <p className="text-[11px] text-slate-400 mt-0.5">
             Jalur: {route?.flowType || "BMS"} • {picLabel} → {coordLabel} → BnM Manajer ({incident.branch})

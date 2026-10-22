@@ -11,7 +11,10 @@ import {
   Wrench,
   AlertTriangle,
   Plus,
-  Calculator,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  RotateCcw,
 } from "lucide-react";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
 import { UserIdentity } from "@/lib/identity";
@@ -155,6 +158,20 @@ export function OperationalReportCenter({
     });
   }, [incidents, searchQuery, filterStatus, filterType, isHoViewer]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterStatus, filterType]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredIncidents.length / pageSize));
+
+  const paginatedIncidents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredIncidents.slice(start, start + pageSize);
+  }, [filteredIncidents, currentPage, pageSize]);
+
   const activeCount = incidents.filter(i => i.status !== "closed" && i.status !== "resolved" && i.status !== "archived").length;
   const pendingCount = incidents.filter(i => i.status === "pending_confirmation").length;
   const maintenanceCount = incidents.filter(i => i.status === "in_maintenance").length;
@@ -193,7 +210,23 @@ export function OperationalReportCenter({
     }
   };
 
-  if (identityLoading) return <div role="status" className="p-6 text-sm text-slate-500">Menyiapkan laporan...</div>;
+  if (identityLoading) {
+    return (
+      <div role="status" aria-label="Menyiapkan data laporan" className="space-y-4 max-w-7xl mx-auto pb-20 animate-pulse">
+        <div className="flex flex-col gap-1">
+          <div className="h-6 w-52 bg-slate-200 dark:bg-slate-800 rounded-md" />
+          <div className="h-4 w-72 bg-slate-100 dark:bg-slate-800/60 rounded-md" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-800" />
+          ))}
+        </div>
+        <div className="h-10 bg-slate-100 dark:bg-slate-800/50 rounded-lg border border-slate-200/60 dark:border-slate-800" />
+        <div className="h-72 bg-slate-100 dark:bg-slate-800/50 rounded-xl border border-slate-200/60 dark:border-slate-800" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
@@ -203,31 +236,33 @@ export function OperationalReportCenter({
         <HoReportMonitoring incidents={incidents} />
       ) : (
         <>
-      {/* ── Header & KPI ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* ── Header & Action Bar ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-            <ClipboardList className="w-5 h-5 text-blue-600" />
-            Pusat Laporan Kejadian
+          <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+            <ClipboardList className="w-5 h-5 text-[#1D5AA6]" />
+            Daftar Laporan Kejadian
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Kelola dan pantau seluruh laporan insiden operasional.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Monitoring dan tindak lanjut laporan insiden operasional unit kerja.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pt-1 sm:pt-0">
           {canUpdateProgress && (
             <button
               onClick={() => setSelectReportPurpose("PROGRESS")}
-              className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors"
+              type="button"
+              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
-              <Wrench className="w-4 h-4" />
+              <Wrench className="w-4 h-4 text-slate-500 dark:text-slate-400" />
               Update Progress
             </button>
           )}
           {canCreateReport && (
             <button
               onClick={onOpenReportModal}
-              className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-[#1D5AA6] hover:bg-[#123B6D] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+              type="button"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-[#1D5AA6] hover:bg-[#154684] text-white shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
             >
               <Plus className="w-4 h-4" />
               Buat Laporan
@@ -236,45 +271,61 @@ export function OperationalReportCenter({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* ── KPI Summary Cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
         {[
-          { label: "Aktif / Berjalan", value: activeCount, icon: Clock, color: "text-blue-500" },
-          { label: "Perlu Konfirmasi", value: pendingCount, icon: AlertTriangle, color: "text-red-500" },
-          { label: "Dalam Penanganan", value: maintenanceCount, icon: Wrench, color: "text-amber-500" },
-          { label: "Selesai (Arsip)", value: resolvedCount, icon: CheckCircle2, color: "text-emerald-500" },
+          { label: "Aktif / Berjalan", value: activeCount, icon: Clock, color: "text-blue-600 dark:text-blue-400" },
+          { label: "Perlu Konfirmasi", value: pendingCount, icon: AlertTriangle, color: "text-rose-600 dark:text-rose-400" },
+          { label: "Dalam Penanganan", value: maintenanceCount, icon: Wrench, color: "text-amber-600 dark:text-amber-400" },
+          { label: "Selesai (Arsip)", value: resolvedCount, icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400" },
         ].map((kpi, i) => (
-          <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div
+            key={i}
+            className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-2xs flex flex-col gap-1"
+          >
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
               <kpi.icon className={`w-3.5 h-3.5 ${kpi.color}`} />
-              {kpi.label}
+              <span className="truncate">{kpi.label}</span>
             </div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">
+            <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
               {kpi.value}
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── Filters ── */}
-      <div className="flex flex-col sm:flex-row items-center gap-3">
+      {/* ── Filters & Search ── */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
         <div className="relative flex-1 w-full">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="Cari No. Laporan, Toko, Cabang..."
+            placeholder="Cari No. Laporan, Toko, Cabang, Kota..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800 dark:text-slate-200 min-h-[44px]"
+            aria-label="Cari No. Laporan, Toko, Cabang, atau Kota"
+            className="w-full pl-9 pr-9 py-2 text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-h-[40px] transition-colors"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              aria-label="Hapus pencarian"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-md"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto shrink-0 pb-1 sm:pb-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
-            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none min-h-[44px]"
+            aria-label="Filter status laporan"
+            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[40px] cursor-pointer"
           >
-            <option value="all">Semua Aktif</option>
+            <option value="all">Semua Status Aktif</option>
             <option value="pending_confirmation">Perlu Konfirmasi</option>
             <option value="pending_bm_approval">Menunggu Persetujuan BnM</option>
             <option value="clarification_requested">Perlu Klarifikasi</option>
@@ -286,11 +337,17 @@ export function OperationalReportCenter({
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value as any)}
-            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none min-h-[44px]"
+            aria-label="Filter jenis kejadian"
+            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[40px] cursor-pointer"
           >
             <option value="all">Semua Kejadian</option>
             <option value="earthquake">Gempa Bumi</option>
             <option value="flood">Banjir</option>
+            <option value="fire">Kebakaran</option>
+            <option value="heavy_rain">Hujan/Badai</option>
+            <option value="strong_wind">Angin Kencang</option>
+            <option value="theft">Kemalingan</option>
+            <option value="severe_building_damage">Kerusakan Bangunan</option>
             <option value="other">Lainnya</option>
           </select>
         </div>
@@ -298,43 +355,68 @@ export function OperationalReportCenter({
 
       {/* ── Content ── */}
       {filteredIncidents.length === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-          <ClipboardList className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">Tidak ada laporan yang sesuai.</p>
+        <div className="text-center py-14 px-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <ClipboardList className="w-9 h-9 mx-auto text-slate-300 dark:text-slate-600 mb-2.5" />
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            {searchQuery || filterStatus !== "all" || filterType !== "all"
+              ? "Tidak ada laporan yang sesuai kriteria pencarian"
+              : "Belum ada laporan insiden operasional aktif"}
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            {searchQuery || filterStatus !== "all" || filterType !== "all"
+              ? "Coba gunakan kata kunci lain atau setel ulang filter untuk melihat seluruh laporan."
+              : "Laporan baru akan muncul di sini setelah dibuat atau terdeteksi oleh sistem."}
+          </p>
+          {(searchQuery || filterStatus !== "all" || filterType !== "all") && (
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setFilterStatus("all");
+                setFilterType("all");
+              }}
+              type="button"
+              className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#1D5AA6] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset Filter
+            </button>
+          )}
         </div>
       ) : (
         <>
-          {/* DESKTOP VIEW */}
-          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          {/* DESKTOP TABLE VIEW */}
+          <div className="hidden md:block bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-700">
+                <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-700">
                   <tr>
-                    <th className="px-4 py-3">No. Laporan</th>
-                    <th className="px-4 py-3">Tanggal</th>
-                    <th className="px-4 py-3">Toko / Cabang</th>
-                    <th className="px-4 py-3">Kejadian</th>
-                    <th className="px-4 py-3">Status Penanganan</th>
-                    <th className="px-4 py-3">PIC Penanggung Jawab</th>
-                    <th className="px-4 py-3">Progres Fisik</th>
-                    <th className="px-4 py-3">Target Selesai</th>
-                    <th className="px-4 py-3">Aksi</th>
+                    <th className="px-4 py-3 whitespace-nowrap">No. Laporan</th>
+                    <th className="px-3 py-3 whitespace-nowrap">Tanggal</th>
+                    <th className="px-4 py-3">Toko / Lokasi</th>
+                    <th className="px-3 py-3">Kejadian</th>
+                    <th className="px-3 py-3">Status Penanganan</th>
+                    <th className="px-3 py-3">PIC</th>
+                    <th className="px-3 py-3">Progres</th>
+                    <th className="px-3 py-3">Target</th>
+                    <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {filteredIncidents.map((inc) => {
+                  {paginatedIncidents.map((inc) => {
                     const handlingStatus = getOperationalHandlingStatus(inc);
                     const formattedDate = formatIndonesianDate(inc.date || inc.createdAt);
                     const disasterLabel = DISASTER_ID_MAP[inc.disasterType?.toLowerCase()] || inc.disasterType;
-                    const originBadge = getOriginBadge(inc);
                     const displayCity =
                       inc.locationCity && inc.locationCity !== "Unknown"
                         ? inc.locationCity
                         : inc.branch || "Area Toko";
 
+                    const isDc = inc.locationKind === "FACILITY" || inc.tkpType === "dc";
+                    const isBuilding = inc.tkpType === "building";
+
                     const targetDateStr = inc.maintenanceTicket?.completedAt
                       ? formatIndonesianDate(inc.maintenanceTicket.completedAt)
-                      : "Belum Ditentukan";
+                      : "—";
 
                     const isOverdue =
                       Boolean(inc.maintenanceTicket?.completedAt) &&
@@ -343,77 +425,85 @@ export function OperationalReportCenter({
                       new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
 
                     return (
-                      <tr key={inc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap font-mono font-bold text-blue-600 dark:text-blue-400">
+                      <tr key={inc.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-[#1D5AA6] dark:text-blue-400">
                           {inc.maintenanceTicket?.ticketId || inc.id}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                        <td className="px-3 py-3 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
                           {formattedDate}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            {inc.locationKind === "FACILITY" && (
-                              <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded">
-                                DC
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 max-w-[220px]">
+                            {isDc ? (
+                              <span className="text-[9px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80 dark:border-amber-800 shrink-0">
+                                DC BES
                               </span>
-                            )}
-                            <span className="text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-                              {inc.locationKind === "FACILITY" || inc.tkpType === "dc" ? "Tim BES" : "Tim BMS"}
+                            ) : isBuilding ? (
+                              <span className="text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 shrink-0">
+                                Gedung
+                              </span>
+                            ) : null}
+                            <span className="truncate" title={inc.storeName}>
+                              {inc.storeName}
                             </span>
-                            <span>{inc.storeName}</span>
                           </div>
-                          <div className="text-[10px] text-slate-500">{inc.branch} • {displayCity}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
+                            {inc.branch} • {displayCity}
+                          </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="font-medium text-slate-800 dark:text-slate-200 text-xs">
                             {disasterLabel}
                           </div>
-                          <div className="mt-1">
-                            {originBadge}
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                            {inc.reportOrigin === "automatic_earthquake" || inc.reportOrigin === "automatic_weather" || (inc.id && inc.id.startsWith("LAP-EQ-"))
+                              ? "Otomatis"
+                              : "Manual"}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[10px] ${handlingStatus.cls}`}>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-medium text-[10px] ${handlingStatus.cls}`}>
                             {handlingStatus.label}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span className={`text-[11px] font-semibold ${inc.primaryPicName ? "text-slate-900 dark:text-white" : "text-slate-400 italic"}`}>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className={`text-[11px] ${inc.primaryPicName ? "font-medium text-slate-800 dark:text-slate-200" : "text-slate-400 italic"}`}>
                             {inc.primaryPicName || "Belum Ditugaskan"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap min-w-[120px]">
+                        <td className="px-3 py-3 whitespace-nowrap min-w-[100px]">
                           <div className="flex items-center gap-2">
-                            <div className="w-16 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                            <div className="w-14 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                               <div
                                 className="bg-[#1D5AA6] h-full rounded-full transition-all duration-300"
-                                style={{ width: `${inc.progress ?? 0}%` }}
+                                style={{ width: `${Math.min(100, Math.max(0, inc.progress ?? 0))}%` }}
                               />
                             </div>
-                            <span className="font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                              {(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "—"}
+                            <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                              {(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "0%"}
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-[11px] font-medium ${isOverdue ? "text-rose-600 font-bold" : "text-slate-600 dark:text-slate-400"}`}>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className={`text-[11px] ${isOverdue ? "text-rose-600 font-semibold" : "text-slate-600 dark:text-slate-400"}`}>
                               {targetDateStr}
                             </span>
                             {isOverdue && (
-                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
+                              <span className="text-[9px] font-medium text-rose-600 dark:text-rose-400">
                                 Melewati Target
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
                           <button
                             onClick={() => onSelectIncident(inc)}
                             type="button"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-colors bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300"
+                            aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
                             Detail
                           </button>
                         </td>
@@ -423,19 +513,57 @@ export function OperationalReportCenter({
                 </tbody>
               </table>
             </div>
+
+            {/* Desktop Pagination */}
+            {totalPages > 1 && (
+              <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  Menampilkan <span className="font-semibold text-slate-800 dark:text-slate-200">{(currentPage - 1) * pageSize + 1}</span>–
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{Math.min(currentPage * pageSize, filteredIncidents.length)}</span> dari{" "}
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{filteredIncidents.length}</span> laporan
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    aria-label="Halaman sebelumnya"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    Sebelumnya
+                  </button>
+                  <span className="text-xs text-slate-500 px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    aria-label="Halaman berikutnya"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700"
+                  >
+                    Berikutnya
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* MOBILE VIEW */}
+          {/* MOBILE CARD VIEW */}
           <div className="md:hidden space-y-3">
-            {filteredIncidents.map((inc) => {
+            {paginatedIncidents.map((inc) => {
               const handlingStatus = getOperationalHandlingStatus(inc);
               const formattedDate = formatIndonesianDate(inc.date || inc.createdAt);
               const disasterLabel = DISASTER_ID_MAP[inc.disasterType?.toLowerCase()] || inc.disasterType;
-              const originBadge = getOriginBadge(inc);
               const displayCity =
                 inc.locationCity && inc.locationCity !== "Unknown"
                   ? inc.locationCity
                   : inc.branch || "Area Toko";
+
+              const isDc = inc.locationKind === "FACILITY" || inc.tkpType === "dc";
+              const isBuilding = inc.tkpType === "building";
 
               const targetDateStr = inc.maintenanceTicket?.completedAt
                 ? formatIndonesianDate(inc.maintenanceTicket.completedAt)
@@ -447,75 +575,126 @@ export function OperationalReportCenter({
                 inc.status !== "closed" &&
                 new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
 
+              const isAuto =
+                inc.reportOrigin === "automatic_earthquake" ||
+                inc.reportOrigin === "automatic_weather" ||
+                (inc.id && inc.id.startsWith("LAP-EQ-"));
+
               return (
-                <div key={inc.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
+                <div
+                  key={inc.id}
+                  className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-800 shadow-2xs flex flex-col gap-2.5"
+                >
+                  {/* Top Bar: Ticket ID, Date & Status */}
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 mb-0.5">
+                      <div className="font-mono text-[11px] font-bold text-[#1D5AA6] dark:text-blue-400">
                         {inc.maintenanceTicket?.ticketId || inc.id}
                       </div>
-                      <div className="font-bold text-sm text-slate-900 dark:text-white capitalize flex items-center gap-2">
-                        {disasterLabel}
-                        {originBadge}
+                      <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {formattedDate} • {isAuto ? "Laporan Otomatis" : "Laporan Manual"}
                       </div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${handlingStatus.cls}`}>
+                    <span className={`px-2 py-0.5 rounded-full font-medium text-[10px] shrink-0 ${handlingStatus.cls}`}>
                       {handlingStatus.label}
                     </span>
                   </div>
-                  
-                  <div>
-                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      {inc.locationKind === "FACILITY" && (
-                        <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-1 py-0.5 rounded">
-                          DC
+
+                  {/* Incident & Unit Information */}
+                  <div className="pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                    <div className="text-xs font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                      {isDc ? (
+                        <span className="text-[9px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80 dark:border-amber-800">
+                          DC BES
                         </span>
-                      )}
-                      <span className="text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
-                        {inc.locationKind === "FACILITY" || inc.tkpType === "dc" ? "Tim BES" : "Tim BMS"}
-                      </span>
+                      ) : isBuilding ? (
+                        <span className="text-[9px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+                          Gedung
+                        </span>
+                      ) : null}
                       <span>{inc.storeName}</span>
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      {inc.branch} • {displayCity}
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {inc.branch} • {displayCity} — <span className="font-medium text-slate-700 dark:text-slate-300">{disasterLabel}</span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                  {/* Summary Grid: PIC & Target */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50/80 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
                     <div>
-                      <span className="text-slate-400 text-[10px] block">PIC Penanggung Jawab:</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      <span className="text-slate-400 dark:text-slate-500 text-[10px] block">PIC Penanganan:</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
                         {inc.primaryPicName || "Belum Ditugaskan"}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] block">Target Selesai:</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Target Selesai:</span>
+                      <span className={`font-medium block ${isOverdue ? "text-rose-600 dark:text-rose-400" : "text-slate-800 dark:text-slate-200"}`}>
                         {targetDateStr}
-                        {isOverdue && (
-                          <span className="text-[9px] font-bold text-rose-600 block">Melewati Target</span>
-                        )}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
-                    <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {formattedDate}{(inc.progress ?? 0) > 0 ? ` • Progres: ${inc.progress}%` : ""}
+                  {/* Progress bar if ongoing */}
+                  {(inc.progress ?? 0) > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10px] text-slate-500">
+                        <span>Progres Penanganan</span>
+                        <span className="font-mono font-medium">{inc.progress}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className="bg-[#1D5AA6] h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.max(0, inc.progress ?? 0))}%` }}
+                        />
+                      </div>
                     </div>
+                  )}
+
+                  {/* Action Button: Consistent Detail Button */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex justify-end">
                     <button
                       onClick={() => onSelectIncident(inc)}
                       type="button"
-                      className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 min-h-[44px] rounded-lg font-semibold text-xs transition-colors bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/40 text-blue-600 dark:text-blue-400"
+                      aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5 text-slate-500" />
                       Lihat Detail
                     </button>
                   </div>
                 </div>
               );
             })}
+
+            {/* Mobile Pagination */}
+            {totalPages > 1 && (
+              <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 flex items-center justify-between shadow-2xs">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Hal. {currentPage} dari {totalPages} ({filteredIncidents.length} total)
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    aria-label="Halaman sebelumnya"
+                    className="p-1.5 text-xs font-medium rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    aria-label="Halaman berikutnya"
+                    className="p-1.5 text-xs font-medium rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 min-h-[36px] min-w-[36px] flex items-center justify-center"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

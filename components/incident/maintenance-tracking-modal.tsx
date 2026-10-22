@@ -66,30 +66,6 @@ interface MaintenanceTrackingModalProps {
   isReadOnly?: boolean;
 }
 
-type LifecycleStepKey =
-  | "LAPORAN_MASUK"
-  | "KONFIRMASI_TOKO"
-  | "VERIFIKASI"
-  | "ESTIMASI"
-  | "PROGRESS"
-  | "SERAH_TERIMA"
-  | "SELESAI";
-
-type StepState = "completed" | "current" | "future";
-
-interface LifecycleStepView {
-  key: LifecycleStepKey;
-  number: number;
-  title: string;
-  state: StepState;
-  stateLabel: string;
-  primaryDetail: string;
-  secondaryDetail?: string | null;
-  actorDetail?: string | null;
-  timestampDetail?: string | null;
-  isActionable?: boolean;
-}
-
 function safeFormatDate(raw?: string | null): string {
   if (!raw) return "-";
   try {
@@ -141,13 +117,14 @@ function getDisasterLabel(type?: string): string {
 
 export function MaintenanceTrackingModal({
   incident,
-  activeRole,
+  activeRole: _activeRole,
   isOpen,
   onClose,
-  onConfirmVerification,
-  isReadOnly = false,
+  onConfirmVerification: _onConfirmVerification,
+  isReadOnly: _isReadOnly = true,
 }: MaintenanceTrackingModalProps) {
-  // Lock background scroll when modal is open
+  // Detail Laporan is strictly read-only for all roles across the entire application
+  const isReadOnly = true;
 
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
 
@@ -390,315 +367,54 @@ export function MaintenanceTrackingModal({
 
   const currentStatusInfo = getDisplayStatus();
 
-  // Compute 7 Lifecycle Steps
-  const computeSteps = (): LifecycleStepView[] => {
-    // 1. Laporan Masuk
-    const step1: LifecycleStepView = {
-      key: "LAPORAN_MASUK",
-      number: 1,
-      title: "Laporan Masuk",
-      state: "completed",
-      stateLabel: "Selesai",
-      primaryDetail: isAutoReport
-        ? "Dibuat Otomatis oleh Sistem (InaTEWS / BMKG)"
-        : `Laporan dibuat oleh ${incident.reporter?.name || incident.timeline?.[0]?.actor || "Pelapor Lapangan"}${
-            incident.reporter?.nik ? ` (NIK: ${incident.reporter.nik})` : ""
-          }`,
-      timestampDetail: safeFormatDate(incident.createdAt || incident.date),
-      actorDetail: isAutoReport ? "Sistem Otomasi SPARTA" : (incident.reporter?.name || "Pelapor"),
-    };
-
-    // 2. Pemeriksaan BMS/BES & Persetujuan BM
-    const isStep2PendingInspection =
-      incident.status === "pending_confirmation" ||
-      incident.status === "clarification_requested";
-    const isStep2PendingBm = incident.status === "pending_bm_approval";
-    const isStep2Completed =
-      incident.status !== "pending_confirmation" &&
-      incident.status !== "clarification_requested" &&
-      incident.status !== "pending_bm_approval";
-
-    let step2PrimaryDetail = "Menunggu pemeriksaan kondisi fisik oleh tim BMS/BES cabang";
-    let step2StateLabel = "Sedang Berlangsung";
-
-    if (isStep2PendingBm) {
-      step2PrimaryDetail =
-        "Hasil pemeriksaan diajukan oleh BMS/BES. Menunggu peninjauan & keputusan BnM Manajer.";
-      step2StateLabel = "Menunggu Approval BnM Manajer";
-    } else if (incident.status === "clarification_requested") {
-      step2PrimaryDetail =
-        `BnM Manajer meminta klarifikasi/revisi: "${incident.verification?.bmApproval?.clarificationReason || "Mohon lengkapi data"}"`;
-      step2StateLabel = "Klarifikasi Diminta";
-    } else if (incident.status === "confirmed_safe") {
-      step2PrimaryDetail = "Kondisi dinyatakan AMAN oleh BnM Manajer. Operasional normal.";
-      step2StateLabel = "Selesai (Aman)";
-    } else if (incident.status === "rejected_invalid") {
-      step2PrimaryDetail = "Laporan DITOLAK oleh BnM Manajer (Data Tidak Valid).";
-      step2StateLabel = "Ditolak BnM Manajer";
-    } else if (isStep2Completed) {
-      step2PrimaryDetail =
-        incident.verification?.isDamaged
-          ? "Pemeriksaan kerusakan disetujui BnM Manajer. Lanjut penanganan teknis."
-          : "Pemeriksaan selesai dan disetujui BnM Manajer.";
-      step2StateLabel = "Disetujui BnM Manajer";
-    }
-
-    const step2: LifecycleStepView = {
-      key: "KONFIRMASI_TOKO",
-      number: 2,
-      title: "Pemeriksaan & Persetujuan BnM Manajer",
-      state: isStep2Completed ? "completed" : "current",
-      stateLabel: step2StateLabel,
-      primaryDetail: step2PrimaryDetail,
-      actorDetail:
-        incident.verification?.bmApproval?.decidedBy ||
-        incident.verification?.confirmedBy ||
-        (isStep2Completed ? "Tim Cabang" : null),
-      timestampDetail: incident.verification?.confirmedAt ? safeFormatDate(incident.verification.confirmedAt) : null,
-    };
-
-    // 3. Verifikasi
-    const isStep3Current = isStep2Completed && incident.status === "verifying";
-    const isStep3Completed =
-      isStep2Completed &&
-      incident.status !== "pending_confirmation" &&
-      incident.status !== "verifying";
-
-    const step3: LifecycleStepView = {
-      key: "VERIFIKASI",
-      number: 3,
-      title: "Verifikasi Lapangan",
-      state: isStep3Completed ? "completed" : isStep3Current ? "current" : "future",
-      stateLabel: isStep3Completed ? "Selesai" : isStep3Current ? "Sedang Berlangsung" : "Belum dilakukan",
-      primaryDetail: isStep3Completed
-        ? "Kondisi fisik dan tingkat kerusakan telah diverifikasi teknis"
-        : isStep3Current
-        ? "Menunggu penyelesaian verifikasi teknis kerusakan di lapangan"
-        : "Belum dilakukan",
-      actorDetail: incident.verification?.confirmedBy || null,
-      timestampDetail: incident.verification?.confirmedAt ? safeFormatDate(incident.verification.confirmedAt) : null,
-    };
-
-    // 4. Penanganan / Estimasi
-    const isEstimationCreated = Boolean(estimationRoute);
-    const isEstimationDone = estimationRoute?.status === "ESTIMATION_COMPLETED";
-    const isReadinessReady = estimationRoute?.workStatus === "READY_FOR_WORK";
-    const isBeyondEstimation =
-      isReportClosed ||
-      latestProgress > 0 ||
-      isReadinessReady ||
-      estimationRoute?.workStatus === "IN_PROGRESS" ||
-      estimationRoute?.workStatus === "COMPLETED";
-
-    const isStep4Completed = isStep3Completed && (isBeyondEstimation || isReadinessReady);
-    const isStep4Current = isStep3Completed && !isStep4Completed;
-    const isStep4Future = !isStep3Completed;
-
-    let step4Primary = "Belum dilakukan";
-    let step4Secondary: string | null = null;
-    if (isEstimationCreated && estimationRoute) {
-      const handlerText =
-        estimationRoute.handlerType === "BMS"
-          ? "SPARTA Maintenance (Internal BMS)"
-          : estimationRoute.handlerType === "BES"
-          ? "Branch Engineering Support (BES)"
-          : estimationRoute.handlerType === "BUILDING"
-          ? "Branch Building Support (BBS)"
-          : "Rekanan BnM (Vendor)";
-      step4Primary = `Handler: ${handlerText} • ${
-        isEstimationDone ? "Estimasi Disetujui" : estimationRoute.status || "Diproses"
-      }`;
-      const noEst = estimationRoute.estimationNumber || "Menunggu Penerbitan";
-      const valEst = formatCurrency(estimationRoute.estimatedValue);
-      step4Secondary = `No. Estimasi: ${noEst} | Nilai: ${valEst}`;
-    } else if (isStep4Current) {
-      step4Primary = isTkpToko ? "Estimasi belum dibuat" : "Alur estimasi untuk lokasi DC belum tersedia";
-    }
-
-    const step4: LifecycleStepView = {
-      key: "ESTIMASI",
-      number: 4,
-      title: "Penanganan / Estimasi",
-      state: isStep4Completed ? "completed" : isStep4Current ? "current" : "future",
-      stateLabel: isStep4Completed ? "Selesai" : isStep4Current ? "Sedang Berlangsung" : "Belum dilakukan",
-      primaryDetail: isStep4Future ? "Belum dilakukan" : step4Primary,
-      secondaryDetail: isStep4Future ? null : step4Secondary,
-      actorDetail: estimationRoute?.createdByName || null,
-      timestampDetail: estimationRoute?.createdAt ? safeFormatDate(estimationRoute.createdAt) : null,
-      isActionable: isStep4Current && isTkpToko && !isEstimationCreated && canTriggerEstimation,
-    };
-
-    // 5. Update Progress
-    const isStep5Completed = isStep4Completed && (latestProgress === 100 || isReportClosed);
-    const isStep5Current = isStep4Completed && !isStep5Completed;
-    const isStep5Future = !isStep4Completed;
-
-    const lastProgressUpdate = progressHistory.length > 0 ? progressHistory[progressHistory.length - 1] : null;
-
-    const step5: LifecycleStepView = {
-      key: "PROGRESS",
-      number: 5,
-      title: "Update Progress",
-      state: isStep5Completed ? "completed" : isStep5Current ? "current" : "future",
-      stateLabel: isStep5Completed ? "Selesai" : isStep5Current ? "Sedang Berlangsung" : "Belum dilakukan",
-      primaryDetail: isStep5Future
-        ? "Belum dilakukan"
-        : isStep5Completed
-        ? "Pekerjaan fisik telah mencapai 100%"
-        : `Pekerjaan fisik berjalan (${latestProgress}%) • Status: ${workStatus}`,
-      secondaryDetail: isStep5Future
-        ? null
-        : lastProgressUpdate
-        ? `Catatan terakhir: "${lastProgressUpdate.description}"`
-        : isStep5Current && !isWorkReadyForProgress
-        ? "Pekerjaan belum siap di-update (menunggu status READY_FOR_WORK / SPK)"
-        : null,
-      actorDetail: lastProgressUpdate?.createdByName || null,
-      timestampDetail: lastProgressUpdate?.createdAt ? safeFormatDate(lastProgressUpdate.createdAt) : null,
-      isActionable: isStep5Current && isWorkReadyForProgress && canUpdateProgress && !isReadOnly && !isReportClosed,
-    };
-
-    // 6. Serah Terima
-    const isStep6Completed =
-      isStep5Completed &&
-      (isReportClosed ||
-        completionApproval?.status === "WAITING_MANAGER_APPROVAL" ||
-        completionApproval?.status === "CLOSED");
-    const isStep6Current = isStep5Completed && !isStep6Completed;
-
-    let step6Detail = "Belum dilakukan";
-    let step6Sec: string | null = null;
-    if (isStep6Completed) {
-      step6Detail = "Serah terima telah disetujui koordinator & dokumen lengkap";
-      step6Sec = hasFinalEvidence ? "Bukti foto serah terima (FINAL/HANDOVER) terverifikasi" : null;
-    } else if (isStep6Current) {
-      if (!hasFinalEvidence) {
-        step6Detail = "Menunggu upload bukti foto akhir (FINAL/HANDOVER)";
-      } else if (!completionApproval || completionApproval.status === "WAITING_PIC_SUBMISSION") {
-        step6Detail = "Foto bukti lengkap. Menunggu pengajuan serah terima oleh PIC";
-      } else if (completionApproval.status === "WAITING_COORDINATOR_APPROVAL") {
-        step6Detail = "Serah terima telah diajukan. Menunggu review & persetujuan Koordinator";
-      } else {
-        step6Detail = `Status serah terima: ${completionApproval.status}`;
-      }
-    }
-
-    const step6: LifecycleStepView = {
-      key: "SERAH_TERIMA",
-      number: 6,
-      title: "Serah Terima",
-      state: isStep6Completed ? "completed" : isStep6Current ? "current" : "future",
-      stateLabel: isStep6Completed ? "Selesai" : isStep6Current ? "Sedang Berlangsung" : "Belum dilakukan",
-      primaryDetail: step6Detail,
-      secondaryDetail: step6Sec,
-      actorDetail: completionApproval?.picUserName || (completionApproval ? "PIC Pekerjaan" : null),
-      timestampDetail: completionApproval?.submittedAt ? safeFormatDate(completionApproval.submittedAt) : null,
-      isActionable:
-        isStep6Current &&
-        !isReadOnly &&
-        !isReportClosed &&
-        ((!hasFinalEvidence && canUpdateProgress) ||
-          (hasFinalEvidence && canSubmitCompletion && (!completionApproval || completionApproval.status === "WAITING_PIC_SUBMISSION"))),
-    };
-
-    // 7. Selesai
-    const isStep7Completed = isReportClosed;
-    const isStep7Current = isStep6Completed && !isStep7Completed;
-
-    let step7Detail = "Belum dilakukan";
-    if (isStep7Completed) {
-      step7Detail = "Laporan resmi disetujui BnM Manajer & ditutup";
-    } else if (isStep7Current) {
-      if (completionApproval?.status === "WAITING_MANAGER_APPROVAL") {
-        step7Detail = "Menunggu persetujuan akhir & penutupan laporan oleh BnM Manajer";
-      } else if (completionApproval?.status === "WAITING_COORDINATOR_APPROVAL") {
-        step7Detail = `Menunggu persetujuan Koordinator (${completionRoute?.coordinatorRole?.toUpperCase() || "Cabang"})`;
-      } else {
-        step7Detail = "Menunggu kelengkapan alur persetujuan";
-      }
-    }
-
-    const step7: LifecycleStepView = {
-      key: "SELESAI",
-      number: 7,
-      title: "Selesai & Penutupan",
-      state: isStep7Completed ? "completed" : isStep7Current ? "current" : "future",
-      stateLabel: isStep7Completed ? "Selesai" : isStep7Current ? "Sedang Berlangsung" : "Belum dilakukan",
-      primaryDetail: step7Detail,
-      secondaryDetail: isStep7Completed && completionApproval?.managerApprovedAt
-        ? `Disetujui BnM Manajer (${completionApproval.managerUserName || "BnM Manajer"}) pada ${safeFormatDate(completionApproval.managerApprovedAt)}`
-        : null,
-      actorDetail: completionApproval?.managerUserName || null,
-      timestampDetail: completionApproval?.managerApprovedAt
-        ? safeFormatDate(completionApproval.managerApprovedAt)
-        : incident.closedAt
-        ? safeFormatDate(incident.closedAt)
-        : null,
-      isActionable:
-        isStep7Current &&
-        !isReadOnly &&
-        !isReportClosed &&
-        ((completionApproval?.status === "WAITING_COORDINATOR_APPROVAL" && canApproveCoordinator) ||
-          (completionApproval?.status === "WAITING_MANAGER_APPROVAL" && canClose)),
-    };
-
-    return [step1, step2, step3, step4, step5, step6, step7];
-  };
-
-  const steps = computeSteps();
-
   return (
     <AppDialog open={isOpen} onClose={onClose} title={"Detail Laporan"} className="sm:!max-w-4xl">
       <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] sm:max-h-[88dvh] min-h-0 overflow-hidden touch-auto select-text">
-        {/* COMPACT SUMMARY HEADER */}
-        <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 shrink-0">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-[#1D5AA6] dark:text-blue-400 shrink-0">
-                <Wrench className="w-4 h-4 sm:w-5 sm:h-5" />
+        {/* COMPACT & FOCUSED DETAIL HEADER */}
+        <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 shrink-0">
+          <div className="flex items-start sm:items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-extrabold text-slate-900 dark:text-white text-base sm:text-lg tracking-tight">
+                  Detail Laporan
+                </h3>
+                <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200">
+                  {incident.id}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border shadow-2xs ${currentStatusInfo.badgeClass}`}
+                >
+                  {isReportClosed && <CheckCircle2 className="w-3 h-3" />}
+                  {currentStatusInfo.label}
+                </span>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-extrabold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
-                    Detail Laporan
-                  </h3>
-                  <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    {incident.id}
-                  </span>
-                  <span
-                    className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${currentStatusInfo.badgeClass}`}
-                  >
-                    {isReportClosed && <CheckCircle2 className="w-3 h-3" />}
-                    {currentStatusInfo.label}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 truncate flex items-center gap-2">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {incident.storeName} ({incident.storeId || "-"})
-                  </span>
-                  <span className="text-slate-300 dark:text-slate-700">•</span>
-                  <span>{incident.branch}</span>
-                  <span className="text-slate-300 dark:text-slate-700">•</span>
-                  <span className="font-medium text-blue-600 dark:text-blue-400">
-                    {getDisasterLabel(incident.disasterType)}
-                  </span>
-                  <span className="text-slate-300 dark:text-slate-700">•</span>
-                  <span className="text-slate-500">{safeFormatDate(incident.createdAt || incident.date)}</span>
-                </p>
-              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 truncate flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                  {incident.storeName} ({incident.storeId || "-"})
+                </span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="font-medium text-slate-700 dark:text-slate-300">{incident.branch}</span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="text-blue-700 dark:text-blue-400 font-medium">
+                  {getDisasterLabel(incident.disasterType)}
+                </span>
+                <span className="text-slate-300 dark:text-slate-600">•</span>
+                <span className="text-slate-500 dark:text-slate-400">
+                  {safeFormatDate(incident.createdAt || incident.date)}
+                </span>
+              </p>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0 pt-0.5 sm:pt-0">
               {/* Navigasi Titik Lokasi di Peta */}
               {incident.storeId && (
                 <a
                   href={`/map?storeId=${encodeURIComponent(incident.storeId)}`}
                   title="Lihat titik lokasi di peta"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors shadow-2xs"
                 >
-                  <MapPin className="w-3.5 h-3.5 text-[#1D5AA6]" />
-                  <span className="hidden sm:inline">Lihat di Peta</span>
-                  <span className="sm:hidden">Peta</span>
+                  <MapPin className="w-3.5 h-3.5 text-[#1D5AA6] dark:text-blue-400" />
+                  <span className="hidden sm:inline">Peta</span>
                 </a>
               )}
 
@@ -710,22 +426,27 @@ export function MaintenanceTrackingModal({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D5AA6] hover:bg-[#123B6D] text-white font-semibold text-xs transition-colors shadow-xs"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Unduh PDF Laporan</span>
+                <span className="hidden sm:inline">Unduh PDF</span>
                 <span className="sm:hidden">PDF</span>
               </a>
+
               <button
                 type="button"
                 onClick={loadData}
                 disabled={loading}
                 title="Segarkan data"
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                aria-label="Segarkan data"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
               </button>
+
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                title="Tutup (Esc)"
+                aria-label="Tutup detail laporan"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -735,7 +456,7 @@ export function MaintenanceTrackingModal({
 
         {/* 5 LOGICAL SECTIONS NAVIGATION BAR */}
         <div className="px-5 pt-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
-          <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-none overscroll-x-contain">
             <button
               type="button"
               onClick={() => setActiveTab("ringkasan")}
@@ -881,64 +602,47 @@ export function MaintenanceTrackingModal({
                 );
               })()}
 
-              {/* RINCIAN IDENTITAS LOKASI & BENCANA */}
+              {/* INFORMASI OPERASIONAL & STATUS PENANGANAN */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Store className="w-4 h-4 text-blue-600" />
-                  Identitas Laporan & Lokasi TKP
-                </h4>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-semibold block">Nomor Laporan</span>
-                    <span className="font-mono font-bold text-slate-900 dark:text-white">{incident.id}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-semibold block">Jenis Bencana</span>
-                    <span className="font-bold text-slate-900 dark:text-white capitalize">
-                      {getDisasterLabel(incident.disasterType)}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 font-semibold block">Tipe TKP</span>
+                <div className="flex items-start gap-3 p-3.5 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40 text-xs">
+                  <Info className="w-4 h-4 text-[#1D5AA6] dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
                     <span className="font-bold text-slate-900 dark:text-white">
+                      Status Penanganan: {currentStatusInfo.label}
+                    </span>
+                    <p className="text-slate-600 dark:text-slate-400 leading-relaxed text-[11px]">
+                      {currentStatusInfo.desc}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs pt-1">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Tipe Lokasi TKP</span>
+                    <span className="font-bold text-slate-900 dark:text-white block mt-0.5">
                       {isTkpToko ? "Gerai Toko" : "Distribution Center (DC)"}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 font-semibold block">Tanggal Laporan</span>
-                    <span className="font-medium text-slate-800 dark:text-slate-200">
-                      {safeFormatDate(incident.createdAt || incident.date)}
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-[10px] text-slate-400 font-semibold block">Nama & Kode Unit</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                      {incident.storeName} ({incident.storeId || "-"})
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-[10px] text-slate-400 font-semibold block">Wilayah Cabang & Kota</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">Wilayah & Kota</span>
+                    <span className="font-semibold text-slate-900 dark:text-white block mt-0.5">
                       {incident.branch} {incident.locationCity ? `• ${incident.locationCity}` : ""}
                     </span>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-[10px] text-slate-400 font-semibold block">
+                  <div>
+                    <span className="text-[10px] text-slate-400 font-semibold block uppercase tracking-wider">
                       {isAutoReport ? "Sumber Laporan" : "Pelapor Lapangan"}
                     </span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mt-0.5">
                       {isAutoReport ? (
                         <>
                           <Bot className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                          <span>Dibuat Otomatis oleh Sistem (InaTEWS / BMKG)</span>
+                          <span>Sistem Otomasi SPARTA (InaTEWS / BMKG)</span>
                         </>
                       ) : (
                         <>
                           <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>
-                            {incident.reporter?.name || incident.timeline?.[0]?.actor || "Pelapor Lapangan"}
-                          </span>
+                          <span>{incident.reporter?.name || incident.timeline?.[0]?.actor || "Pelapor Lapangan"}</span>
                           {incident.reporter?.nik && (
                             <span className="font-mono text-slate-400 text-[10px]">
                               • NIK: {incident.reporter.nik}
@@ -946,12 +650,6 @@ export function MaintenanceTrackingModal({
                           )}
                         </>
                       )}
-                    </span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-[10px] text-slate-400 font-semibold block">Status Penanganan</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400">
-                      {currentStatusInfo.label}
                     </span>
                   </div>
                 </div>
@@ -1305,7 +1003,7 @@ export function MaintenanceTrackingModal({
               />
 
               {/* Progress History Timeline */}
-              {progressHistory.length > 0 && (
+              {progressHistory.length > 0 ? (
                 <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                     <h5 className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2">
@@ -1314,6 +1012,10 @@ export function MaintenanceTrackingModal({
                     </h5>
                   </div>
                   <ProgressTimeline history={progressHistory} loading={loading} />
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
+                  Belum ada catatan pembaruan fisik tambahan di luar dokumen milestone penanganan.
                 </div>
               )}
             </div>

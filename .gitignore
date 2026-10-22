@@ -46,3 +46,7 @@ next-env.d.ts
 *.png
 *.jpeg
 *.jpg
+
+# graphify
+graphify-out/
+.graphify*

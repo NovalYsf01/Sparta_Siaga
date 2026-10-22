@@ -267,3 +267,14 @@
     @apply font-sans;
   }
 }
+
+/* Modal Lock: Prevent background page and container scrolling when any dialog is open */
+body:has([data-slot="dialog-content"]) {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+body:has([data-slot="dialog-content"]) main {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
