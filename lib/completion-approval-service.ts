@@ -22,7 +22,7 @@
 
 import { getDbPool } from "./db";
 import { IncidentRecord } from "@/types/incident";
-import { dbGetIncidentById, dbUpdateIncident } from "./incident-db";
+import { dbGetIncidentById, dbUpdateIncident, rowToIncident } from "./incident-db";
 import { EstimationIntegrationService } from "./estimation-service";
 import { ProgressService } from "./progress-service";
 import { checkUserPermission } from "./permission-service";
@@ -870,64 +870,114 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 6. Update Approval State -> APPROVED_PENDING_CLOSE (TIDAK menjadi CLOSED)
+    // 6. Execute atomic, concurrency-safe Final Approval in a single transaction
     const pool = getDbPool();
+    const client = await pool.connect();
     const managerNotes = (params.notes || "").trim() || "Pekerjaan dan dokumen serah terima disetujui final oleh BnM Manajer.";
     const actorDisplayName = params.actor.name;
 
-    await pool.query(
-      `UPDATE report_completion_approvals SET
-        status = 'APPROVED_PENDING_CLOSE',
-        manager_role = 'bm',
-        manager_user_id = $1,
-        manager_user_name = $2,
-        manager_approved_at = NOW(),
-        manager_notes = $3,
-        updated_at = NOW()
-       WHERE report_id = $4`,
-      [params.actor.id, actorDisplayName, managerNotes, params.reportId]
-    );
-
-    // 7. Append History
-    const historyId = `hist_${params.reportId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    await pool.query(
-      `INSERT INTO report_completion_approval_history (
-        id, report_id, stage, action, actor_user_id, actor_name, actor_role, branch, notes, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-      [
-        historyId,
-        params.reportId,
-        "MANAGER_APPROVAL",
-        "APPROVE_MANAGER",
-        params.actor.id,
-        actorDisplayName,
-        actorRole.toUpperCase(),
-        report.branch || "",
-        managerNotes,
-      ]
-    );
-
-    // 8. Update Incident: status = approved_pending_close, progress = 100 (TIDAK CLOSED & closedAt NULL)
-    const nowWib = formatServerTimestampWib();
-    const actorLabel = `${params.actor.name} (BnM Manajer ${report.branch || ""})`;
-    const finalApprovalTimelineEntry = {
-      stage: "Persetujuan Final",
-      label: "Pekerjaan Disetujui Final oleh BnM Manajer (Menunggu Case Close)",
-      timestamp: nowWib,
-      actor: actorLabel,
-      notes: managerNotes,
-    };
-
-    const updatedIncident = await dbUpdateIncident(params.reportId, {
-      status: "approved_pending_close",
-      progress: 100,
-      timeline: [...(report.timeline || []), finalApprovalTimelineEntry],
-    });
-
-    // 9. Audit Log untuk Final Approval (bukan REPORT_CLOSED!)
     try {
+      await client.query("BEGIN");
+
+      // Row-level lock on approval record
+      const apprRes = await client.query(
+        `SELECT * FROM report_completion_approvals WHERE report_id = $1 FOR UPDATE`,
+        [params.reportId]
+      );
+      if (apprRes.rows.length === 0) {
+        const err: any = new Error("Data persetujuan tidak ditemukan.");
+        err.status = 404;
+        throw err;
+      }
+      const lockedApproval = this.mapRowToRecord(apprRes.rows[0]);
+
+      if (lockedApproval.status !== "WAITING_MANAGER_APPROVAL") {
+        const err: any = new Error(
+          `Persetujuan final ditolak: Status approval saat ini adalah '${lockedApproval.status}'. Serah Terima wajib disetujui Koordinator terlebih dahulu.`
+        );
+        err.status = 400;
+        err.code = "INVALID_APPROVAL_STATE";
+        throw err;
+      }
+
+      // Row-level lock on incident record
+      const incRes = await client.query(
+        `SELECT * FROM incidents WHERE id = $1 FOR UPDATE`,
+        [params.reportId]
+      );
+      if (incRes.rows.length === 0) {
+        const err: any = new Error("Laporan tidak ditemukan.");
+        err.status = 404;
+        throw err;
+      }
+      const lockedIncident = rowToIncident(incRes.rows[0]);
+
+      // Compare-and-set update on approval record
+      const updateApprRes = await client.query(
+        `UPDATE report_completion_approvals SET
+          status = 'APPROVED_PENDING_CLOSE',
+          manager_role = 'bm',
+          manager_user_id = $1,
+          manager_user_name = $2,
+          manager_approved_at = NOW(),
+          manager_notes = $3,
+          updated_at = NOW()
+         WHERE report_id = $4 AND status = 'WAITING_MANAGER_APPROVAL'
+         RETURNING *`,
+        [params.actor.id, actorDisplayName, managerNotes, params.reportId]
+      );
+      if (updateApprRes.rowCount === 0) {
+        const err: any = new Error("Persetujuan final ditolak karena status persetujuan telah berubah.");
+        err.status = 409;
+        err.code = "CONCURRENCY_CONFLICT";
+        throw err;
+      }
+
+      // Append History
+      const historyId = `hist_${params.reportId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await client.query(
+        `INSERT INTO report_completion_approval_history (
+          id, report_id, stage, action, actor_user_id, actor_name, actor_role, branch, notes, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+        [
+          historyId,
+          params.reportId,
+          "MANAGER_APPROVAL",
+          "APPROVE_MANAGER",
+          params.actor.id,
+          actorDisplayName,
+          actorRole.toUpperCase(),
+          lockedIncident.branch || "",
+          managerNotes,
+        ]
+      );
+
+      // Update Incident: status = approved_pending_close, progress = 100 (TIDAK CLOSED & closedAt NULL)
+      const nowWib = formatServerTimestampWib();
+      const actorLabel = `${params.actor.name} (BnM Manajer ${lockedIncident.branch || ""})`;
+      const finalApprovalTimelineEntry = {
+        stage: "Persetujuan Final",
+        label: "Pekerjaan Disetujui Final oleh BnM Manajer (Menunggu Case Close)",
+        timestamp: nowWib,
+        actor: actorLabel,
+        notes: managerNotes,
+      };
+
+      const updatedTimeline = [...(lockedIncident.timeline || []), finalApprovalTimelineEntry];
+      const updateIncRes = await client.query(
+        `UPDATE incidents SET
+          status = 'approved_pending_close',
+          progress = 100,
+          timeline = $1,
+          updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [JSON.stringify(updatedTimeline), params.reportId]
+      );
+
+      // Non-silent Audit Log inside the transaction
       const auditId = `audit_fa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      await pool.query(
+      await client.query(
         `INSERT INTO permission_audit_logs (
           id, actor_user_id, actor_name, action, target_user_id,
           permission_key, effect, scope_type, branch_code, reason, created_at
@@ -941,15 +991,19 @@ export class CompletionApprovalService {
           "REPORT_CLOSE",
           "ALLOW",
           "BRANCH",
-          report.branch || null,
+          lockedIncident.branch || null,
           `Final Approval disetujui oleh ${actorLabel}. Menunggu Case Close. Catatan: ${managerNotes}`,
         ]
       );
-    } catch (auditErr) {
-      console.warn("[CompletionApprovalService] Gagal mencatat audit log final approval:", auditErr);
-    }
 
-    return updatedIncident!;
+      await client.query("COMMIT");
+      return rowToIncident(updateIncRes.rows[0]);
+    } catch (txErr) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      client.release();
+    }
   }
 
   /**
@@ -1043,64 +1097,125 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 6. Update Approval State -> CLOSED
+    // 6. Execute atomic, concurrency-safe Case Close in a single transaction
     const pool = getDbPool();
+    const client = await pool.connect();
     const closingNotes = (params.notes || "").trim() || "Pekerjaan dan serah terima telah diverifikasi lengkap. Laporan resmi ditutup.";
     const actorDisplayName = params.actor.name;
 
-    await pool.query(
-      `UPDATE report_completion_approvals SET
-        status = 'CLOSED',
-        closed_at = NOW(),
-        closed_by_user_id = $1,
-        closed_by_user_name = $2,
-        closing_notes = $3,
-        updated_at = NOW()
-       WHERE report_id = $4`,
-      [params.actor.id, actorDisplayName, closingNotes, params.reportId]
-    );
-
-    // 7. Append History
-    const historyId = `hist_${params.reportId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    await pool.query(
-      `INSERT INTO report_completion_approval_history (
-        id, report_id, stage, action, actor_user_id, actor_name, actor_role, branch, notes, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-      [
-        historyId,
-        params.reportId,
-        "CASE_CLOSE",
-        "CLOSE_CASE",
-        params.actor.id,
-        actorDisplayName,
-        actorRole.toUpperCase(),
-        report.branch || "",
-        closingNotes,
-      ]
-    );
-
-    // 8. Update Incident: status = closed, progress = 100, closedAt
-    const nowWib = formatServerTimestampWib();
-    const actorLabel = `${params.actor.name} (BnM Manajer ${report.branch || ""})`;
-    const closeTimelineEntry = {
-      stage: "Laporan Ditutup",
-      label: "Laporan Resmi Ditutup (Case Close) oleh BnM Manajer",
-      timestamp: nowWib,
-      actor: actorLabel,
-      notes: closingNotes,
-    };
-
-    const updatedIncident = await dbUpdateIncident(params.reportId, {
-      status: "closed",
-      progress: 100,
-      closedAt: new Date().toISOString(),
-      timeline: [...(report.timeline || []), closeTimelineEntry],
-    });
-
-    // 9. Audit Log
     try {
+      await client.query("BEGIN");
+
+      // Row-level lock on incident record
+      const incRes = await client.query(
+        `SELECT * FROM incidents WHERE id = $1 FOR UPDATE`,
+        [params.reportId]
+      );
+      if (incRes.rows.length === 0) {
+        const err: any = new Error("Laporan tidak ditemukan.");
+        err.status = 404;
+        throw err;
+      }
+      const lockedIncident = rowToIncident(incRes.rows[0]);
+
+      // Idempotency under row lock
+      if (lockedIncident.status === "closed" || lockedIncident.status === "resolved") {
+        await client.query("COMMIT");
+        return lockedIncident;
+      }
+
+      // Row-level lock on approval record
+      const apprRes = await client.query(
+        `SELECT * FROM report_completion_approvals WHERE report_id = $1 FOR UPDATE`,
+        [params.reportId]
+      );
+      if (apprRes.rows.length === 0) {
+        const err: any = new Error("Data persetujuan tidak ditemukan.");
+        err.status = 404;
+        throw err;
+      }
+      const lockedApproval = this.mapRowToRecord(apprRes.rows[0]);
+
+      if (lockedApproval.status === "CLOSED") {
+        await client.query("COMMIT");
+        return lockedIncident;
+      }
+
+      if (lockedApproval.status !== "APPROVED_PENDING_CLOSE" && lockedIncident.status !== "approved_pending_close") {
+        const err: any = new Error(
+          `Case Close ditolak: Laporan belum mendapatkan persetujuan final (Final Approval) dari BnM Manajer. Status saat ini adalah '${lockedApproval.status}'.`
+        );
+        err.status = 400;
+        err.code = "INVALID_APPROVAL_STATE";
+        throw err;
+      }
+
+      // Compare-and-set update on approval record
+      const updateApprRes = await client.query(
+        `UPDATE report_completion_approvals SET
+          status = 'CLOSED',
+          closed_at = NOW(),
+          closed_by_user_id = $1,
+          closed_by_user_name = $2,
+          closing_notes = $3,
+          updated_at = NOW()
+         WHERE report_id = $4 AND status = 'APPROVED_PENDING_CLOSE'
+         RETURNING *`,
+        [params.actor.id, actorDisplayName, closingNotes, params.reportId]
+      );
+      if (updateApprRes.rowCount === 0) {
+        const err: any = new Error("Case Close ditolak karena status persetujuan telah berubah.");
+        err.status = 409;
+        err.code = "CONCURRENCY_CONFLICT";
+        throw err;
+      }
+
+      // Append History
+      const historyId = `hist_${params.reportId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await client.query(
+        `INSERT INTO report_completion_approval_history (
+          id, report_id, stage, action, actor_user_id, actor_name, actor_role, branch, notes, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+        [
+          historyId,
+          params.reportId,
+          "CASE_CLOSE",
+          "CLOSE_CASE",
+          params.actor.id,
+          actorDisplayName,
+          actorRole.toUpperCase(),
+          lockedIncident.branch || "",
+          closingNotes,
+        ]
+      );
+
+      // Update Incident: status = closed, progress = 100, closedAt
+      const nowWib = formatServerTimestampWib();
+      const actorLabel = `${params.actor.name} (BnM Manajer ${lockedIncident.branch || ""})`;
+      const closeTimelineEntry = {
+        stage: "Laporan Ditutup",
+        label: "Laporan Resmi Ditutup (Case Close) oleh BnM Manajer",
+        timestamp: nowWib,
+        actor: actorLabel,
+        notes: closingNotes,
+      };
+
+      const updatedTimeline = [...(lockedIncident.timeline || []), closeTimelineEntry];
+      const updateIncRes = await client.query(
+        `UPDATE incidents SET
+          status = 'closed',
+          progress = 100,
+          closed_at = NOW(),
+          timeline = $1,
+          updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [JSON.stringify(updatedTimeline), params.reportId]
+      );
+
+      // Non-silent Audit Log inside transaction
       const auditId = `audit_close_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      await pool.query(
+      await client.query(
         `INSERT INTO permission_audit_logs (
           id, actor_user_id, actor_name, action, target_user_id,
           permission_key, effect, scope_type, branch_code, reason, created_at
@@ -1114,15 +1229,19 @@ export class CompletionApprovalService {
           "REPORT_CLOSE",
           "ALLOW",
           "BRANCH",
-          report.branch || null,
+          lockedIncident.branch || null,
           `Case Closed oleh ${actorLabel}. Catatan: ${closingNotes}`,
         ]
       );
-    } catch (auditErr) {
-      console.warn("[CompletionApprovalService] Gagal mencatat audit log close:", auditErr);
-    }
 
-    return updatedIncident!;
+      await client.query("COMMIT");
+      return rowToIncident(updateIncRes.rows[0]);
+    } catch (txErr) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw txErr;
+    } finally {
+      client.release();
+    }
   }
 
   /**

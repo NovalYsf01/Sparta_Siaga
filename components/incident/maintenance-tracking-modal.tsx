@@ -153,7 +153,7 @@ export function MaintenanceTrackingModal({
   const [approveCoordinatorReason, setApproveCoordinatorReason] = useState("");
 
   // 3 Simplified Tabs
-  const [activeTab, setActiveTab] = useState<"ringkasan" | "dokumen" | "riwayat">("ringkasan");
+  const [activeTab, setActiveTab] = useState<"ringkasan" | "dokumentasi" | "riwayat">("ringkasan");
 
   // Photo Preview Lightbox
   const [previewPhoto, setPreviewPhoto] = useState<{
@@ -401,14 +401,14 @@ export function MaintenanceTrackingModal({
               </p>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0 pt-0.5 sm:pt-0">
+            <div className="flex items-center gap-2 shrink-0 pt-0.5 sm:pt-0">
               {incident.storeId && (
                 <a
                   href={`/map?storeId=${encodeURIComponent(incident.storeId)}`}
                   title="Lihat titik lokasi di peta"
-                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors shadow-2xs"
+                  className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
-                  <MapPin className="w-3.5 h-3.5 text-[#1D5AA6] dark:text-blue-400" />
+                  <MapPin className="w-4 h-4 text-[#1D5AA6] dark:text-blue-400" />
                   <span className="hidden sm:inline">Lihat di Peta</span>
                 </a>
               )}
@@ -418,9 +418,9 @@ export function MaintenanceTrackingModal({
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Unduh dokumen PDF laporan resmi"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1D5AA6] hover:bg-[#123B6D] text-white font-semibold text-xs transition-colors shadow-xs"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-[#1D5AA6] hover:bg-[#123B6D] text-white font-semibold text-xs transition-colors shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Unduh PDF</span>
                 <span className="sm:hidden">PDF</span>
               </a>
@@ -431,7 +431,7 @@ export function MaintenanceTrackingModal({
                 disabled={loading}
                 title="Segarkan data"
                 aria-label="Segarkan data"
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
               </button>
@@ -441,7 +441,7 @@ export function MaintenanceTrackingModal({
                 onClick={onClose}
                 title="Tutup (Esc)"
                 aria-label="Tutup detail laporan"
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -455,31 +455,31 @@ export function MaintenanceTrackingModal({
             <button
               type="button"
               onClick={() => setActiveTab("ringkasan")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 activeTab === "ringkasan"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
-              <ClipboardList className="w-3.5 h-3.5" />
+              <ClipboardList className="w-4 h-4" />
               <span>Ringkasan</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab("dokumen")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                activeTab === "dokumen"
+              onClick={() => setActiveTab("dokumentasi")}
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                activeTab === "dokumentasi"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
-              <Camera className="w-3.5 h-3.5" />
-              <span>Dokumen</span>
+              <Camera className="w-4 h-4" />
+              <span>Dokumentasi</span>
               {incident.fieldPhotos && incident.fieldPhotos.length > 0 && (
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-md ${
-                    activeTab === "dokumen"
+                    activeTab === "dokumentasi"
                       ? "bg-white/20 text-white"
                       : "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300"
                   }`}
@@ -492,13 +492,13 @@ export function MaintenanceTrackingModal({
             <button
               type="button"
               onClick={() => setActiveTab("riwayat")}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 activeTab === "riwayat"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
-              <Clock className="w-3.5 h-3.5" />
+              <Clock className="w-4 h-4" />
               <span>Riwayat</span>
               {isReportClosed && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
@@ -819,42 +819,35 @@ export function MaintenanceTrackingModal({
                 )}
               </div>
 
-              {/* COMPLETION APPROVAL STATUS (consolidated from old Tab 3) */}
-              {(completionApproval || completionHistory.length > 0) && (
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
-                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                    <div className="space-y-0.5">
-                      <strong>Status Approval Serah Terima</strong>
-                      <p>
-                        Detail persetujuan hanya untuk dilihat.
-                        Tindakan hanya dilakukan melalui menu Update Progress oleh akun yang berwenang.
-                      </p>
-                    </div>
+              {/* COMPLETION APPROVAL SUMMARY (CONCISE) */}
+              {completionApproval && (
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      Persetujuan Serah Terima:
+                    </span>
+                    <span className="font-bold text-blue-700 dark:text-blue-300">
+                      {completionApproval.status.replace(/_/g, " ")}
+                    </span>
                   </div>
-                  <CompletionApprovalCard
-                    incident={incident}
-                    approval={completionApproval}
-                    route={completionRoute}
-                    history={completionHistory}
-                    latestProgress={latestProgress}
-                    hasFinalEvidence={hasFinalEvidence}
-                    canSubmitCompletion={false}
-                    canApproveCoordinator={false}
-                    canClose={false}
-                    onRefresh={loadData}
-                    readOnly
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("riwayat")}
+                    className="text-xs text-blue-600 dark:text-blue-400 font-semibold hover:underline min-h-[44px] inline-flex items-center px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  >
+                    Lihat Detail di Riwayat &rarr;
+                  </button>
                 </div>
               )}
             </div>
           )}
 
           {/* ============================================================ */}
-          {/* TAB 2: DOKUMEN                                               */}
+          {/* TAB 2: DOKUMENTASI                                           */}
           {/* Photos, milestone docs, PDF downloads                        */}
           {/* ============================================================ */}
-          {activeTab === "dokumen" && (
+          {activeTab === "dokumentasi" && (
             <div className="space-y-6 animate-in fade-in">
               {/* INITIAL FIELD PHOTOS */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
@@ -1109,6 +1102,34 @@ export function MaintenanceTrackingModal({
           {/* ============================================================ */}
           {activeTab === "riwayat" && (
             <div className="space-y-6 animate-in fade-in">
+              {/* COMPLETION APPROVAL STATUS & HISTORY */}
+              {(completionApproval || completionHistory.length > 0) && (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                    <div className="space-y-0.5">
+                      <strong>Status & Riwayat Persetujuan Serah Terima</strong>
+                      <p>
+                        Catatan persetujuan resmi bersifat read-only. Tindakan persetujuan atau penolakan dilakukan melalui alur kerja berwenang di luar detail laporan.
+                      </p>
+                    </div>
+                  </div>
+                  <CompletionApprovalCard
+                    incident={incident}
+                    approval={completionApproval}
+                    route={completionRoute}
+                    history={completionHistory}
+                    latestProgress={latestProgress}
+                    hasFinalEvidence={hasFinalEvidence}
+                    canSubmitCompletion={false}
+                    canApproveCoordinator={false}
+                    canClose={false}
+                    onRefresh={loadData}
+                    readOnly
+                  />
+                </div>
+              )}
+
               {/* PROGRESS HISTORY TIMELINE */}
               {progressHistory.length > 0 && (
                 <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
@@ -1211,9 +1232,11 @@ export function MaintenanceTrackingModal({
                 <button
                   type="button"
                   onClick={() => setPreviewPhoto(null)}
-                  className="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors"
+                  title="Tutup pratinjau foto"
+                  aria-label="Tutup pratinjau foto"
+                  className="min-h-[44px] min-w-[44px] rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
@@ -1262,7 +1285,7 @@ export function MaintenanceTrackingModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors"
+            className="min-h-[44px] px-6 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             Tutup
           </button>

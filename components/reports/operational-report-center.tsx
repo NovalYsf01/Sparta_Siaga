@@ -16,11 +16,12 @@ import {
   X,
   RotateCcw,
 } from "lucide-react";
-import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
+import { IncidentRecord, DisasterType, IncidentStatus, RoleType } from "@/types/incident";
 import { UserIdentity } from "@/lib/identity";
 import { SelectReportModal } from "../incident/select-report-modal";
 import { EstimationModal } from "../incident/estimation-modal";
 import { ProgressUpdateModal } from "../incident/progress-update-modal";
+import { StoreVerificationModal } from "../incident/store-verification-modal";
 import { HoReportMonitoring } from "./ho-report-monitoring";
 import { getStandardizedOperationalStatus } from "@/lib/operational-status";
 import { getReportSourceInfo } from "@/lib/display-formatters";
@@ -112,9 +113,13 @@ export function OperationalReportCenter({
   const [selectReportPurpose, setSelectReportPurpose] = useState<"ESTIMATION" | "PROGRESS" | null>(null);
   const [selectedEstimationReport, setSelectedEstimationReport] = useState<IncidentRecord | null>(null);
   const [selectedProgressReport, setSelectedProgressReport] = useState<IncidentRecord | null>(null);
+  const [selectedVerificationReport, setSelectedVerificationReport] = useState<IncidentRecord | null>(null);
 
   useEffect(() => {
     setSelectedProgressReport((previous) =>
+      previous ? incidents.find((item) => item.id === previous.id) || previous : previous
+    );
+    setSelectedVerificationReport((previous) =>
       previous ? incidents.find((item) => item.id === previous.id) || previous : previous
     );
   }, [incidents]);
@@ -485,15 +490,34 @@ export function OperationalReportCenter({
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
-                          <button
-                            onClick={() => onSelectIncident(inc)}
-                            type="button"
-                            aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
-                            className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-slate-500" />
-                            Detail
-                          </button>
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            {!isHoViewer && inc.status !== "closed" && inc.status !== "resolved" && (
+                              <button
+                                onClick={() => {
+                                  if (["pending_confirmation", "verifying", "clarification_requested", "pending_bm_approval"].includes(inc.status)) {
+                                    setSelectedVerificationReport(inc);
+                                  } else {
+                                    setSelectedProgressReport(inc);
+                                  }
+                                }}
+                                type="button"
+                                aria-label={`Tindak lanjut laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
+                                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-[#1D5AA6] hover:bg-[#123B6D] text-white shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              >
+                                <Wrench className="w-3.5 h-3.5" />
+                                Tindak Lanjut
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onSelectIncident(inc)}
+                              type="button"
+                              aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
+                              className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              Detail
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -641,13 +665,30 @@ export function OperationalReportCenter({
                     </div>
                   )}
 
-                  {/* Action Button: Consistent Detail Button */}
-                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex justify-end">
+                  {/* Action Button: Consistent Detail Button & Tindak Lanjut */}
+                  <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end gap-2">
+                    {!isHoViewer && inc.status !== "closed" && inc.status !== "resolved" && (
+                      <button
+                        onClick={() => {
+                          if (["pending_confirmation", "verifying", "clarification_requested", "pending_bm_approval"].includes(inc.status)) {
+                            setSelectedVerificationReport(inc);
+                          } else {
+                            setSelectedProgressReport(inc);
+                          }
+                        }}
+                        type="button"
+                        aria-label={`Tindak lanjut laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-[#1D5AA6] hover:bg-[#123B6D] text-white shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <Wrench className="w-3.5 h-3.5" />
+                        Tindak Lanjut
+                      </button>
+                    )}
                     <button
                       onClick={() => onSelectIncident(inc)}
                       type="button"
                       aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <Eye className="w-3.5 h-3.5 text-slate-500" />
                       Lihat Detail
@@ -713,6 +754,20 @@ export function OperationalReportCenter({
         incident={selectedProgressReport}
         latestProgress={selectedProgressReport?.progress || 0}
         onUpdated={onReportUpdated}
+      />
+
+      {/* Sub-modal: Store Verification / Inspection */}
+      <StoreVerificationModal
+        incident={selectedVerificationReport}
+        activeRole={(identity?.role as RoleType | undefined) || undefined}
+        isOpen={selectedVerificationReport !== null}
+        onClose={() => setSelectedVerificationReport(null)}
+        onConfirmVerification={async () => {
+          setSelectedVerificationReport(null);
+          if (onReportUpdated) {
+            await onReportUpdated();
+          }
+        }}
       />
     </div>
   );

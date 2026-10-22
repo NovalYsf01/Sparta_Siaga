@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { generateMonitoringReportPdf } from "@/lib/pdf-generator";
-import { canViewReport } from "@/lib/report-permissions";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import { appendInspectionEvidencePages } from "@/lib/pdf-evidence-appendix";
 import { getInspectionPhotoFile } from "@/lib/inspection-storage";
 
@@ -22,8 +22,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     // Server-side permission checks, independent of hidden frontend controls.
-    if ((sessionUser.scope !== "HO" && sessionUser.systemRole !== "ADMIN" && !sessionUser.branch?.trim()) ||
-        !canViewReport(sessionUser, report)) {
+    if (!await canAccessReportAsync(sessionUser, report)) {
       return NextResponse.json({ error: "Akses dokumen laporan ditolak." }, { status: 403 });
     }
 

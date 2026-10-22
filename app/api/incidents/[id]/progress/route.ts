@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
-import { canViewReportAsync, checkUserPermission } from "@/lib/permission-service";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
+import { checkUserPermission } from "@/lib/permission-service";
 import { EstimationIntegrationService } from "@/lib/estimation-service";
 import { ProgressService, PhotoType } from "@/lib/progress-service";
 import { processAndWatermarkPhoto, validateImageMagicBytes } from "@/lib/watermark";
@@ -22,7 +23,7 @@ export async function GET(_: Request, { params }: RouteContext) {
     }
 
     // Role-based visibility
-    const canView = await canViewReportAsync(sessionUser, incident);
+    const canView = await canAccessReportAsync(sessionUser, incident);
     if (!canView) {
       return NextResponse.json(
         { error: "Unauthorized: Anda tidak memiliki izin untuk melihat laporan ini." },
@@ -315,6 +316,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       },
       photos: processedPhotos,
     });
+
+    try {
+      const { assignIncidentPicForPersistedAction } = await import("@/lib/incident-assignment");
+      const { getDbPool } = await import("@/lib/db");
+      await assignIncidentPicForPersistedAction(getDbPool(), {
+        incidentId: id,
+        userId: sessionUser.id,
+        branch: sessionUser.branch,
+        role: sessionUser.role,
+        action: "PROGRESS_UPDATED",
+      });
+    } catch (picErr) {
+      console.warn("[progress/route] Auto-assign PIC warning:", picErr);
+    }
 
     // Transform response photo paths to protected API URLs
     const protectedResult = {

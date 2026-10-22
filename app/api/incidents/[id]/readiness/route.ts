@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import { EstimationIntegrationService } from "@/lib/estimation-service";
 import { checkUserPermission } from "@/lib/permission-service";
 import {
@@ -24,6 +25,13 @@ export async function GET(request: Request, { params }: RouteContext) {
     const incident = await dbGetIncidentById(id);
     if (!incident) {
       return NextResponse.json({ error: "Laporan tidak ditemukan", code: "REPORT_NOT_FOUND" }, { status: 404 });
+    }
+
+    if (!await canAccessReportAsync(sessionUser, incident)) {
+      return NextResponse.json(
+        { error: "Anda tidak memiliki izin untuk melihat kesiapan kerja laporan ini.", code: "FORBIDDEN" },
+        { status: 403 }
+      );
     }
 
     const route = await EstimationIntegrationService.getRouteByReportId(id);
@@ -271,6 +279,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       booleanValue: booleanVal,
       notes: body.notes,
     });
+
+    try {
+      const { assignIncidentPicForPersistedAction } = await import("@/lib/incident-assignment");
+      const { getDbPool } = await import("@/lib/db");
+      await assignIncidentPicForPersistedAction(getDbPool(), {
+        incidentId: id,
+        userId: sessionUser.id,
+        branch: sessionUser.branch,
+        role: sessionUser.role,
+        action: "READINESS_UPDATED",
+      });
+    } catch (picErr) {
+      console.warn("[readiness/route] Auto-assign PIC warning:", picErr);
+    }
 
     return NextResponse.json({
       success: true,

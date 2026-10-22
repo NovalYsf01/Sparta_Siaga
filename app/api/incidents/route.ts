@@ -3,7 +3,8 @@ import { dbGetAllIncidents, dbCreateIncident } from "@/lib/incident-db";
 import { IncidentRecord } from "@/types/incident";
 import { getSessionUser } from "@/lib/auth";
 import { ReportDistributionService } from "@/lib/distribution-service";
-import { canViewReport, isReportVisibleToHo } from "@/lib/report-permissions";
+import { canAccessReport } from "@/lib/report-access-policy";
+import { isReportVisibleToHo } from "@/lib/report-permissions";
 import { checkUserPermission } from "@/lib/permission-service";
 
 export async function GET(request?: Request) {
@@ -37,9 +38,9 @@ export async function GET(request?: Request) {
       if (inc.id.startsWith("INC-TEST-")) return false;
       if (sessionUser.systemRole === "ADMIN") return true;
       if (hasGlobalViewOverride) {
-        return canViewReport(sessionUser, inc) || isReportVisibleToHo(inc);
+        return canAccessReport(sessionUser, inc) || isReportVisibleToHo(inc);
       }
-      return canViewReport(sessionUser, inc);
+      return canAccessReport(sessionUser, inc);
     });
 
     if (statusParam === "active") {

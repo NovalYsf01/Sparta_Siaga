@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { getReadinessEvidenceFile } from "@/lib/work-readiness-server";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 
 type RouteContext = { params: Promise<{ id: string; evidenceId: string }> };
 
@@ -42,26 +43,11 @@ export async function GET(request: Request, { params }: RouteContext) {
       );
     }
 
-    // 4. Scope & Permission Check
-    // System Admin (ADMIN): memiliki hak pemantauan nasional (audit / troubleshooting)
-    // HO Scope: memiliki hak pemantauan nasional
-    // Branch Scope: WAJIB sama dengan cabang laporan (Branch A tidak boleh membuka bukti Branch B)
-    if (sessionUser.systemRole !== "ADMIN") {
-      const cleanBranch = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
-      const userBranch = cleanBranch(sessionUser.branch);
-      const reportBranch = cleanBranch(incident.branch);
-
-      if (sessionUser.scope !== "HO") {
-        if (!reportBranch || userBranch !== reportBranch) {
-          return NextResponse.json(
-            {
-              error: `Anda tidak memiliki izin untuk melihat berkas bukti laporan cabang lain (Cabang Anda: '${sessionUser.branch || "N/A"}', Cabang Laporan: '${incident.branch}').`,
-              code: "FORBIDDEN",
-            },
-            { status: 403 }
-          );
-        }
-      }
+    if (!await canAccessReportAsync(sessionUser, incident)) {
+      return NextResponse.json(
+        { error: "Anda tidak memiliki izin untuk melihat bukti kesiapan laporan ini.", code: "FORBIDDEN" },
+        { status: 403 }
+      );
     }
 
     // 5. Lookup File dari Private Storage (Strictly scoped to this report)

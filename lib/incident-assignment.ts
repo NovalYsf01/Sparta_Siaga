@@ -1,5 +1,70 @@
 import { getDbPool } from "./db";
 
+export async function assignIncidentPicForPersistedAction(
+  client: { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number }> },
+  input: {
+    incidentId: string;
+    userId: string;
+    branch: string | null;
+    role?: string | null;
+    action: string;
+  }
+): Promise<{ assigned: boolean; currentPicUserId: string | null; reason?: string }> {
+  const locked = await client.query(
+    `SELECT primary_pic_user_id, location_kind, tkp_type, branch FROM incidents WHERE id = $1 FOR UPDATE`,
+    [input.incidentId]
+  );
+  if (!locked.rows[0]) {
+    return { assigned: false, currentPicUserId: null, reason: "INCIDENT_NOT_FOUND" };
+  }
+
+  const row = locked.rows[0];
+  if (row.primary_pic_user_id) {
+    return { assigned: false, currentPicUserId: row.primary_pic_user_id };
+  }
+
+  // Check branch
+  if (input.branch && row.branch) {
+    if (input.branch.trim().toLowerCase() !== row.branch.trim().toLowerCase()) {
+      return { assigned: false, currentPicUserId: null, reason: "BRANCH_MISMATCH" };
+    }
+  }
+
+  // Check role eligibility: BMS for store/non-facility, BES for DC/facility
+  const isFacility = row.location_kind === "FACILITY" || row.tkp_type === "dc";
+  const userRole = (input.role || "").toLowerCase();
+  if (userRole === "bms" && isFacility) {
+    return { assigned: false, currentPicUserId: null, reason: "BMS_STORE_ONLY" };
+  }
+  if (userRole === "bes" && !isFacility) {
+    return { assigned: false, currentPicUserId: null, reason: "BES_FACILITY_ONLY" };
+  }
+
+  // Only assign if role is eligible (bms or bes, or if not specified/admin)
+  if (userRole && !["bms", "bes"].includes(userRole)) {
+    return { assigned: false, currentPicUserId: null, reason: "ROLE_NOT_ELIGIBLE" };
+  }
+
+  await client.query(
+    `UPDATE incidents
+     SET primary_pic_user_id = $2,
+         primary_pic_claimed_at = NOW(),
+         updated_at = NOW()
+     WHERE id = $1 AND primary_pic_user_id IS NULL`,
+    [input.incidentId, input.userId]
+  );
+
+  const reasonText = `Aksi operasional: ${input.action}`;
+  await client.query(
+    `INSERT INTO incident_pic_history
+       (incident_id, action, to_user_id, actor_user_id, reason)
+     VALUES ($1, 'AUTO_ASSIGN', $2, $2, $3)`,
+    [input.incidentId, input.userId, reasonText]
+  );
+
+  return { assigned: true, currentPicUserId: input.userId };
+}
+
 export async function claimIncidentPic(input: {
   incidentId: string;
   userId: string;

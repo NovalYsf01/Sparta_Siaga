@@ -5,7 +5,8 @@ import {
   dbDeleteIncident,
 } from "@/lib/incident-db";
 import { getSessionUser } from "@/lib/auth";
-import { checkMutationAuthorization, canViewReportAsync } from "@/lib/permission-service";
+import { checkMutationAuthorization } from "@/lib/permission-service";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -23,7 +24,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     // Role-based visibility
-    const canView = await canViewReportAsync(sessionUser, incident);
+    const canView = await canAccessReportAsync(sessionUser, incident);
     if (!canView) {
       return NextResponse.json({ error: "Unauthorized: Akses laporan ditolak." }, { status: 403 });
     }

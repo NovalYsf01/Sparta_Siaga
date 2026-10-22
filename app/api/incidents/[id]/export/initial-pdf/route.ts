@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { canViewReport } from "@/lib/report-permissions";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { generateInitialReportPdf } from "@/lib/pdf-generator";
 import { appendInspectionEvidencePages } from "@/lib/pdf-evidence-appendix";
@@ -22,8 +22,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     // Deny unscoped branch accounts, and enforce the report's branch at the API boundary.
-    if ((sessionUser.scope !== "HO" && sessionUser.systemRole !== "ADMIN" && !sessionUser.branch?.trim()) ||
-        !canViewReport(sessionUser, report)) {
+    if (!await canAccessReportAsync(sessionUser, report)) {
       return NextResponse.json({ error: "Akses dokumen laporan ditolak." }, { status: 403 });
     }
 

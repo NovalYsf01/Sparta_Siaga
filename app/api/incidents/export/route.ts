@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { getReportAccessSql } from "@/lib/report-access-policy";
 
 export async function GET(request: Request) {
   try {
@@ -18,20 +19,18 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const search = searchParams.get("search");
 
-    const canExportAllBranches = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
-    
-    // Server-side branch enforcement
-    const targetBranch = canExportAllBranches 
-      ? (clientBranch && clientBranch !== "all" ? clientBranch : null)
-      : sessionUser.branch;
-
     const conditions: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
-    if (targetBranch) {
+    const access = getReportAccessSql(sessionUser, "incidents", paramIndex);
+    conditions.push(access.clause);
+    values.push(...access.values);
+    paramIndex += access.values.length;
+
+    if ((sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO") && clientBranch && clientBranch !== "all") {
       conditions.push(`branch = $${paramIndex++}`);
-      values.push(targetBranch);
+      values.push(clientBranch);
     }
 
     if (startDate) {

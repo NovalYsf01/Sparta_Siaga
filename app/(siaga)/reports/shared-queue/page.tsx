@@ -3,21 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ArrowRightLeft,
-  Building,
-  CheckCircle2,
   Clock3,
   History,
-  Info,
   Loader2,
   Search,
   ShieldCheck,
   UserCheck,
-  UserMinus,
-  UserPlus,
   UserRoundCheck,
   Users,
-  X
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -112,19 +106,15 @@ export default function SharedQueuePage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [working, setWorking] = useState<string | null>(null);
-
   // Filter & Navigation
   const [activeTab, setActiveTab] = useState<"unassigned" | "my" | "all">("unassigned");
   const [searchQuery, setSearchQuery] = useState("");
   const [locationTypeFilter, setLocationTypeFilter] = useState<"all" | "store" | "facility">("all");
 
-  // Modal State
+  // Modal State (Read-only Detail & Riwayat PIC)
   const [selected, setSelected] = useState<QueueItem | null>(null);
   const [details, setDetails] = useState<PicDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [nextUserId, setNextUserId] = useState("");
-  const [actionReason, setActionReason] = useState("");
 
   // Load Current User
   useEffect(() => {
@@ -173,8 +163,6 @@ export default function SharedQueuePage() {
   const loadDetails = useCallback(async (item: QueueItem) => {
     setSelected(item);
     setDetails(null);
-    setNextUserId("");
-    setActionReason("");
     setLoadingDetails(true);
     try {
       const response = await fetch(`/api/incidents/${item.id}/pic`, { cache: "no-store" });
@@ -194,64 +182,7 @@ export default function SharedQueuePage() {
     }
   }, []);
 
-  // Mutations: Claim, Assign/Transfer, Release
-  async function mutate(id: string, method: "POST" | "PATCH" | "DELETE", body?: object) {
-    setWorking(id);
-    try {
-      const response = await fetch(`/api/incidents/${id}/pic`, {
-        method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
-        body: body ? JSON.stringify(body) : undefined,
-      });
-      const text = await response.text();
-      let payload: any = {};
-      try {
-        payload = text ? JSON.parse(text) : {};
-      } catch {
-        throw new Error("Respon aksi PIC tidak valid");
-      }
 
-      if (!response.ok) {
-        if (response.status === 409 && method === "POST") {
-          throw new Error("Laporan sudah diambil atau ditugaskan ke petugas lain");
-        }
-        throw new Error(payload.error || "Gagal memperbarui status PIC");
-      }
-
-      if (method === "POST") {
-        toast.success("Anda berhasil mengambil tugas sebagai PIC utama");
-      } else if (method === "PATCH") {
-        toast.success("PIC berhasil ditetapkan / dialihkan");
-      } else {
-        toast.success("PIC berhasil dilepas kembali ke antrean");
-      }
-
-      await load();
-      if (selected && selected.id === id) {
-        await loadDetails({
-          ...selected,
-          primary_pic_user_id: method === "DELETE" ? null : (payload.data?.currentPicUserId ?? selected.primary_pic_user_id),
-        });
-      }
-    } catch (mutationError) {
-      toast.error(mutationError instanceof Error ? mutationError.message : "Perubahan PIC gagal");
-    } finally {
-      setWorking(null);
-    }
-  }
-
-  // Role permissions
-  const isBmmOrAdmin = useMemo(() => {
-    if (!currentUser) return false;
-    const r = (currentUser.businessRole || currentUser.role || "").toLowerCase();
-    return currentUser.systemRole === "ADMIN" || r === "bm";
-  }, [currentUser]);
-
-  const canClaim = useMemo(() => {
-    if (!currentUser) return false;
-    const r = (currentUser.businessRole || currentUser.role || "").toLowerCase();
-    return r === "bms" || r === "bes";
-  }, [currentUser]);
 
   // Tab Item Counts
   const counts = useMemo(() => {
@@ -519,43 +450,19 @@ export default function SharedQueuePage() {
                     </div>
 
                     {/* Mobile Action Buttons */}
+                    {/* Mobile Action Buttons */}
                     <div className="pt-1 flex items-center gap-2">
-                      {!item.primary_pic_user_id && canClaim && (
-                        <button
-                          onClick={() => mutate(item.id, "POST")}
-                          disabled={working === item.id}
-                          className="flex-1 py-2.5 px-3 bg-[#1D5AA6] text-white rounded-xl text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center justify-center gap-1.5 touch-target-min"
-                        >
-                          {working === item.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <UserPlus className="w-3.5 h-3.5" />
-                          )}
-                          <span>Ambil Tugas</span>
-                        </button>
-                      )}
-
-                      {!item.primary_pic_user_id && isBmmOrAdmin && !canClaim && (
-                        <button
-                          onClick={() => loadDetails(item)}
-                          className="flex-1 py-2.5 px-3 bg-[#1D5AA6] text-white rounded-xl text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center justify-center gap-1.5 touch-target-min"
-                        >
-                          <UserPlus className="w-3.5 h-3.5" />
-                          <span>Tunjuk PIC</span>
-                        </button>
-                      )}
-
                       <button
                         onClick={() => loadDetails(item)}
-                        className="flex-1 py-2.5 px-3 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 touch-target-min"
+                        className="flex-1 min-h-[44px] py-2.5 px-3 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         <History className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Kelola PIC</span>
+                        <span>Detail & Riwayat PIC</span>
                       </button>
 
                       <Link
                         href={`/reports?incidentId=${encodeURIComponent(item.id)}`}
-                        className="py-2.5 px-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center touch-target-min"
+                        className="min-h-[44px] py-2.5 px-4 bg-[#1D5AA6] text-white rounded-xl text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         title="Lihat Detail Laporan"
                       >
                         Detail
@@ -640,44 +547,19 @@ export default function SharedQueuePage() {
 
                         <td className="py-4 px-5 text-right">
                           <div className="inline-flex items-center gap-2">
-                            {!item.primary_pic_user_id && canClaim && (
-                              <button
-                                onClick={() => mutate(item.id, "POST")}
-                                disabled={working === item.id}
-                                className="px-3 py-1.5 bg-[#1D5AA6] text-white rounded-lg text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center gap-1 shadow-2xs"
-                              >
-                                {working === item.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <UserPlus className="w-3.5 h-3.5" />
-                                )}
-                                <span>Ambil Tugas</span>
-                              </button>
-                            )}
-
-                            {!item.primary_pic_user_id && isBmmOrAdmin && !canClaim && (
-                              <button
-                                onClick={() => loadDetails(item)}
-                                className="px-3 py-1.5 bg-[#1D5AA6] text-white rounded-lg text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center gap-1 shadow-2xs"
-                              >
-                                <UserPlus className="w-3.5 h-3.5" />
-                                <span>Tunjuk PIC</span>
-                              </button>
-                            )}
-
                             <button
                               onClick={() => loadDetails(item)}
-                              className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-1 shadow-2xs"
+                              className="min-h-[36px] px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             >
                               <History className="w-3.5 h-3.5 text-slate-500" />
-                              <span>Kelola PIC</span>
+                              <span>Detail & Riwayat PIC</span>
                             </button>
 
                             <Link
                               href={`/reports?incidentId=${encodeURIComponent(item.id)}`}
-                              className="px-2.5 py-1.5 text-slate-500 hover:text-slate-800 text-xs font-bold"
+                              className="min-h-[36px] px-3 py-1.5 bg-[#1D5AA6] text-white rounded-lg text-xs font-bold hover:bg-[#123B6D] transition-colors flex items-center gap-1 shadow-2xs focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                             >
-                              Detail →
+                              Detail Laporan &rarr;
                             </Link>
                           </div>
                         </td>
@@ -694,8 +576,8 @@ export default function SharedQueuePage() {
         <AppDialog
           open={Boolean(selected)}
           onClose={() => setSelected(null)}
-          title="Kelola PIC Laporan"
-          description={selected ? `${selected.location_name} • ${selected.id}` : "Kelola penugasan dan riwayat PIC"}
+          title="Detail & Riwayat PIC"
+          description={selected ? `${selected.location_name} • ${selected.id}` : "Detail penetapan dan riwayat PIC"}
           className="sm:!max-w-lg"
         >
           {selected && (
@@ -704,7 +586,7 @@ export default function SharedQueuePage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 shrink-0">
                 <div>
                   <h3 id="pic-modal-title" className="font-bold text-sm md:text-base text-slate-900 dark:text-white">
-                    Kelola PIC Laporan
+                    Detail & Riwayat PIC Laporan
                   </h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-xs md:max-w-sm">
                     {selected.location_name} • {selected.id}
@@ -714,7 +596,7 @@ export default function SharedQueuePage() {
                   type="button"
                   onClick={() => setSelected(null)}
                   aria-label="Tutup modal"
-                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -729,139 +611,48 @@ export default function SharedQueuePage() {
                   </div>
                 ) : (
                   <>
+                    {/* PIC Rule Notice */}
+                    <div className="p-3.5 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl flex items-start gap-2.5 text-xs text-blue-950 dark:text-blue-200">
+                      <ShieldCheck className="w-4 h-4 text-[#1D5AA6] dark:text-blue-400 shrink-0 mt-0.5" />
+                      <p className="text-[11px] leading-relaxed">
+                        Penetapan PIC bersifat <strong>otomatis & permanen (immutable)</strong>. Petugas BMS/BES yang pertama kali melakukan tindakan operasional sah di lapangan (konfirmasi inspeksi / progres) langsung ditetapkan sebagai PIC resmi dan tidak dapat dimutasi secara manual.
+                      </p>
+                    </div>
+
                     {/* Current PIC Card */}
-                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 rounded-xl">
                       <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                         PIC Aktif Saat Ini
                       </div>
                       <div className="mt-1 flex items-center justify-between">
-                        <div className="font-extrabold text-sm text-slate-800">
-                          {details?.primary_pic_name || "Belum Ditetapkan (Antrean Bebas)"}
+                        <div className="font-extrabold text-sm text-slate-800 dark:text-slate-200">
+                          {details?.primary_pic_name || "Belum Ditetapkan (Menunggu Tindakan Pertama)"}
                         </div>
                         {details?.primary_pic_user_id && (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px] font-bold">
-                            Aktif
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 rounded text-[10px] font-bold">
+                            PIC Resmi
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Operational Action Form */}
-                    {isBmmOrAdmin ? (
-                      <div className="p-4 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3">
-                        <div className="font-bold text-blue-950 flex items-center gap-1.5">
-                          <UserCheck className="w-4 h-4 text-blue-700" />
-                          <span>{details?.primary_pic_user_id ? "Alihkan PIC Laporan" : "Tunjuk PIC Laporan"}</span>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-semibold text-blue-900 mb-1">
-                            Pilih Petugas Berwenang ({selected.location_kind === "FACILITY" ? "Tim BES" : "Tim BMS"}):
-                          </label>
-                          <select
-                            value={nextUserId}
-                            onChange={(e) => setNextUserId(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-blue-600"
-                          >
-                            <option value="">-- Pilih Petugas PIC --</option>
-                            {(details?.eligibleUsers || []).map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.name} ({u.business_role?.toUpperCase()})
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-semibold text-blue-900 mb-1">
-                            Alasan Penunjukan / Pengalihan (Opsional):
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Contoh: Beban kerja toko, jadwal shift..."
-                            value={actionReason}
-                            onChange={(e) => setActionReason(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600"
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-1">
-                          <button
-                            onClick={() =>
-                              mutate(selected.id, "PATCH", {
-                                nextUserId,
-                                reason: actionReason,
-                              })
-                            }
-                            disabled={!nextUserId || working === selected.id}
-                            className="flex-1 py-2 px-3 bg-[#1D5AA6] text-white rounded-lg text-xs font-bold hover:bg-[#123B6D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5 shadow-2xs"
-                          >
-                            {working === selected.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <ArrowRightLeft className="w-3.5 h-3.5" />
-                            )}
-                            <span>{details?.primary_pic_user_id ? "Alihkan PIC" : "Tugaskan Petugas"}</span>
-                          </button>
-
-                          {details?.primary_pic_user_id && (
-                            <button
-                              onClick={() =>
-                                mutate(selected.id, "DELETE", {
-                                  reason: actionReason || "Dilepas oleh BnM Manajer/Admin",
-                                })
-                              }
-                              disabled={working === selected.id}
-                              className="py-2 px-3 bg-red-100 text-red-800 hover:bg-red-200 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
-                            >
-                              <UserMinus className="w-3.5 h-3.5" />
-                              <span>Lepas PIC</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Petugas Standar (Self-Service Release jika sedang menjadi PIC) */
-                      details?.primary_pic_user_id === currentUser?.id && (
-                        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
-                          <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                            <AlertTriangle className="w-4 h-4 text-amber-600" />
-                            <span>Lepaskan Tugas PIC Ini?</span>
-                          </div>
-                          <p className="text-[11px] text-amber-800 leading-relaxed">
-                            Jika Anda melepaskan tugas ini, laporan akan kembali ke antrean &apos;Belum Ditugaskan&apos; dan dapat diambil oleh petugas cabang lainnya.
-                          </p>
-                          <button
-                            onClick={() =>
-                              mutate(selected.id, "DELETE", {
-                                reason: "Dilepaskan mandiri oleh petugas",
-                              })
-                            }
-                            disabled={working === selected.id}
-                            className="w-full py-2 px-3 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 transition-colors flex items-center justify-center gap-1.5"
-                          >
-                            <UserMinus className="w-3.5 h-3.5" />
-                            <span>Lepaskan Tugas Saya</span>
-                          </button>
-                        </div>
-                      )
-                    )}
-
                     {/* PIC History Timeline */}
                     <div className="space-y-3 pt-2">
-                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                         <History className="w-4 h-4 text-slate-500" />
-                        <span>Riwayat Penugasan</span>
+                        <span>Riwayat Penugasan PIC</span>
                       </div>
 
                       {details?.history && details.history.length > 0 ? (
-                        <div className="space-y-2 border-l-2 border-slate-200 pl-3 ml-2">
+                        <div className="space-y-2 border-l-2 border-slate-200 dark:border-slate-700 pl-3 ml-2">
                           {details.history.map((h) => (
                             <div key={h.id} className="relative space-y-0.5 text-xs">
-                              <span className="absolute -left-[19px] top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white" />
+                              <span className="absolute -left-[19px] top-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" />
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-900">
-                                  {h.action === "CLAIM"
+                                <span className="font-bold text-slate-900 dark:text-white">
+                                  {h.action === "AUTO_ASSIGN"
+                                    ? "Penugasan Otomatis"
+                                    : h.action === "CLAIM"
                                     ? "Diambil Sendiri"
                                     : h.action === "ASSIGN"
                                     ? "Ditugaskan"
@@ -878,12 +669,12 @@ export default function SharedQueuePage() {
                                   })}
                                 </span>
                               </div>
-                              <div className="text-[11px] text-slate-600">
-                                Aktor: <span className="font-medium">{h.actor_name || "Sistem"}</span>
+                              <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                                Aktor: <span className="font-medium text-slate-800 dark:text-slate-200">{h.actor_name || "Sistem"}</span>
                                 {h.to_user_name && ` → PIC: ${h.to_user_name}`}
                               </div>
                               {h.reason && (
-                                <div className="text-[10px] text-slate-500 italic bg-slate-50 p-1.5 rounded">
+                                <div className="text-[10px] text-slate-500 italic bg-slate-50 dark:bg-slate-950/40 p-1.5 rounded">
                                   &quot;{h.reason}&quot;
                                 </div>
                               )}
@@ -891,8 +682,8 @@ export default function SharedQueuePage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="p-3 bg-slate-50 rounded-lg text-slate-400 text-center text-xs">
-                          Belum ada riwayat perubahan PIC untuk laporan ini.
+                        <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-lg text-slate-400 text-center text-xs">
+                          Belum ada riwayat penugasan PIC untuk laporan ini.
                         </div>
                       )}
                     </div>
@@ -905,7 +696,7 @@ export default function SharedQueuePage() {
                 <button
                   type="button"
                   onClick={() => setSelected(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors touch-target-min"
+                  className="min-h-[44px] px-5 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 >
                   Tutup
                 </button>

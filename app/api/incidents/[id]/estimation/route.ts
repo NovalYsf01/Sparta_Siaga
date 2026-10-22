@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import { checkUserPermission } from "@/lib/permission-service";
 import { EstimationIntegrationService, HandlerType } from "@/lib/estimation-service";
 
@@ -17,6 +18,13 @@ export async function GET(_: Request, { params }: RouteContext) {
     const incident = await dbGetIncidentById(id);
     if (!incident) {
       return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
+    }
+
+    if (!await canAccessReportAsync(sessionUser, incident)) {
+      return NextResponse.json(
+        { error: "Unauthorized: Anda tidak memiliki izin untuk melihat laporan ini." },
+        { status: 403 }
+      );
     }
 
     // Cek permission ESTIMATION_VIEW
@@ -168,6 +176,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       },
       report: incident,
     });
+
+    try {
+      const { assignIncidentPicForPersistedAction } = await import("@/lib/incident-assignment");
+      const { getDbPool } = await import("@/lib/db");
+      await assignIncidentPicForPersistedAction(getDbPool(), {
+        incidentId: id,
+        userId: sessionUser.id,
+        branch: sessionUser.branch,
+        role: sessionUser.role,
+        action: "ESTIMATION_TRIGGERED",
+      });
+    } catch (picErr) {
+      console.warn("[estimation/route] Auto-assign PIC warning:", picErr);
+    }
 
     return NextResponse.json(
       {

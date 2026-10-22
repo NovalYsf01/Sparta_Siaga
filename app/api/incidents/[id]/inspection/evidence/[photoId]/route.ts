@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { canViewReport } from "@/lib/report-permissions";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import { isEvidencePhotoLinked } from "@/lib/inspection-photo-access";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { getInspectionPhotoFile } from "@/lib/inspection-storage";
@@ -42,8 +42,7 @@ export async function GET(request: Request, { params }: RouteContext) {
     }
 
     // Read access alone is not enough: the photo must belong to this incident.
-    if ((sessionUser.systemRole !== "ADMIN" && sessionUser.scope !== "HO" && !sessionUser.branch?.trim()) ||
-        !canViewReport(sessionUser, incident)) {
+    if (!await canAccessReportAsync(sessionUser, incident)) {
       return NextResponse.json({ error: "Akses foto laporan ditolak." }, { status: 403 });
     }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
-import { canViewReportAsync } from "@/lib/permission-service";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import { getMilestoneDocumentFile } from "@/lib/milestone-storage";
 
 type RouteContext = { params: Promise<{ id: string; storageKey: string }> };
@@ -19,7 +19,7 @@ export async function GET(_: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
     }
 
-    const canView = await canViewReportAsync(sessionUser, incident);
+    const canView = await canAccessReportAsync(sessionUser, incident);
     if (!canView) {
       return NextResponse.json(
         { error: "Unauthorized: Anda tidak memiliki izin untuk mengakses dokumen laporan ini." },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { getReportAccessSql } from "@/lib/report-access-policy";
 
 export async function GET(request: Request) {
   try {
@@ -21,20 +22,18 @@ export async function GET(request: Request) {
     const limit = Math.max(1, Math.min(100, parseInt(searchParams.get("limit") || "10", 10)));
     const offset = (page - 1) * limit;
 
-    const canViewAllBranches = sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO";
-    
-    // Server-side branch enforcement
-    const targetBranch = canViewAllBranches 
-      ? (clientBranch && clientBranch !== "all" ? clientBranch : null)
-      : sessionUser.branch;
-
     const conditions: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
-    if (targetBranch) {
+    const access = getReportAccessSql(sessionUser, "incidents", paramIndex);
+    conditions.push(access.clause);
+    values.push(...access.values);
+    paramIndex += access.values.length;
+
+    if ((sessionUser.systemRole === "ADMIN" || sessionUser.scope === "HO") && clientBranch && clientBranch !== "all") {
       conditions.push(`branch = $${paramIndex++}`);
-      values.push(targetBranch);
+      values.push(clientBranch);
     }
 
     if (startDate) {
@@ -59,15 +58,6 @@ export async function GET(request: Request) {
 
     // Exclude test fixture namespace from normal runtime history
     conditions.push("id NOT LIKE 'INC-TEST-%'");
-
-    // HO Visibility Rule enforcement (TASK T05B)
-    if (sessionUser.scope === "HO" && sessionUser.systemRole !== "ADMIN") {
-      conditions.push(`(
-        report_origin = 'automatic_earthquake' OR 
-        status IN ('closed', 'resolved', 'archived', 'confirmed_affected', 'confirmed_safe') OR
-        (verification->'bmApproval'->>'decision') IN ('approved', 'safe')
-      )`);
-    }
 
     // ENFORCE HISTORY STATUSES (closed, resolved, archived)
     if (status && status !== "all") {

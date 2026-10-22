@@ -7,6 +7,7 @@ import {
   canApproveAsBmAsync,
   canViewReportAsync,
 } from "@/lib/permission-service";
+import { deriveWorkflowActions } from "@/lib/workflow-actions";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -59,32 +60,46 @@ export async function GET(_: Request, { params }: RouteContext) {
     );
     const actorRole = (sessionUser.role || "").toLowerCase();
     const operationalActor = sessionUser.systemRole !== "ADMIN" && sessionUser.scope !== "HO" && sameBranch;
+    const actionPermissions = {
+      canInspect: inspectionResult.authorized,
+      canApproveInitial: bmApprovalResult.authorized,
+      canCreateEstimation: triggerEstimationResult.authorized,
+      canUpdateReadiness: readinessResult.authorized,
+      canUpdateProgress: updateProgressResult.authorized,
+      canSubmitCompletion: operationalActor && ["bms", "bes", "bbs"].includes(actorRole) && submitCompletionResult.authorized,
+      canApproveCoordinator: operationalActor && ["bmc", "bec", "bbc"].includes(actorRole) && approveCoordinatorResult.authorized,
+      canFinalApprove: operationalActor && actorRole === "bm" && closeResult.authorized,
+      canClose: operationalActor && actorRole === "bm" && closeResult.authorized,
+      completionStatus: incident.completionApprovalStatus,
+    };
+    const actions = deriveWorkflowActions(sessionUser, incident, actionPermissions);
 
     return NextResponse.json({
       data: {
         incidentId: incident.id,
         branch: incident.branch,
-        canConfirm: inspectionResult.authorized,
+        actions,
+        canConfirm: actionPermissions.canInspect,
         confirmReason: inspectionResult.reason || "",
-        canBmApprove: bmApprovalResult.authorized,
+        canBmApprove: actionPermissions.canApproveInitial,
         bmApproveReason: bmApprovalResult.reason || "",
         canFollowUp: followUpResult.authorized,
         followUpReason: followUpResult.reason || "",
         canUpdateProgress: updateProgressResult.authorized,
         updateProgressReason: updateProgressResult.reason || "",
-        canFinalApprove: operationalActor && actorRole === "bm" && closeResult.authorized,
+        canFinalApprove: actionPermissions.canFinalApprove,
         finalApproveReason: closeResult.reason || "",
-        canClose: operationalActor && actorRole === "bm" && closeResult.authorized,
+        canClose: actionPermissions.canClose,
         closeReason: closeResult.reason || "",
         canCreateInstruction: instructionResult.authorized,
-        canTriggerEstimation: triggerEstimationResult.authorized,
+        canTriggerEstimation: actionPermissions.canCreateEstimation,
         triggerEstimationReason: triggerEstimationResult.reason || "",
         canViewEstimation: viewEstimationResult.authorized,
-        canUpdateReadiness: readinessResult.authorized,
+        canUpdateReadiness: actionPermissions.canUpdateReadiness,
         updateReadinessReason: readinessResult.reason || "",
-        canSubmitCompletion: operationalActor && ["bms", "bes", "bbs"].includes(actorRole) && submitCompletionResult.authorized,
+        canSubmitCompletion: actionPermissions.canSubmitCompletion,
         submitCompletionReason: submitCompletionResult.reason || "",
-        canApproveCoordinator: operationalActor && ["bmc", "bec", "bbc"].includes(actorRole) && approveCoordinatorResult.authorized,
+        canApproveCoordinator: actionPermissions.canApproveCoordinator,
         approveCoordinatorReason: approveCoordinatorResult.reason || "",
       },
     });

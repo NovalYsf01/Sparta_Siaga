@@ -401,6 +401,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       timeline: [...(report.timeline || []), timelineEntry],
     });
 
+    try {
+      const { assignIncidentPicForPersistedAction } = await import("@/lib/incident-assignment");
+      const { getDbPool } = await import("@/lib/db");
+      await assignIncidentPicForPersistedAction(getDbPool(), {
+        incidentId: id,
+        userId: sessionUser.id,
+        branch: sessionUser.branch,
+        role: sessionUser.role,
+        action: "INSPECTION_SUBMITTED",
+      });
+    } catch (picErr) {
+      console.warn("[confirm/route] Auto-assign PIC warning:", picErr);
+    }
+
     return NextResponse.json({
       data: {
         report_id: id,

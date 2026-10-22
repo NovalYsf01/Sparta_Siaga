@@ -16,62 +16,33 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   return NextResponse.json({ data });
 }
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser(request);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.scope === "HO" && user.systemRole !== "ADMIN") {
-    return NextResponse.json({ error: "HO hanya memiliki akses baca" }, { status: 403 });
-  }
-  if (user.systemRole !== "ADMIN" && !["bms", "bes"].includes(user.role || "")) {
-    return NextResponse.json({ error: "Role tidak berwenang mengambil PIC" }, { status: 403 });
-  }
-  const { id } = await context.params;
-  const result = await claimIncidentPic({
-    incidentId: id,
-    userId: user.id,
-    branch: user.branch,
-    systemRole: user.systemRole,
-    role: user.role,
-  });
-  if (result.error === "BMS_STORE_ONLY") {
-    return NextResponse.json({ error: "BMS hanya berwenang menangani insiden gerai toko" }, { status: 403 });
-  }
-  if (result.error === "BES_FACILITY_ONLY") {
-    return NextResponse.json({ error: "BES hanya berwenang menangani insiden fasilitas / DC" }, { status: 403 });
-  }
-  if (result.error === "INCIDENT_NOT_FOUND") {
-    return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
-  }
-  return NextResponse.json(result, { status: result.claimed ? 200 : 409 });
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: "Mutasi manual PIC dinonaktifkan. Penugasan PIC dilakukan secara otomatis setelah tindakan operasional pertama yang valid dan bersifat permanen.",
+      code: "MANUAL_PIC_MUTATION_DISABLED",
+    },
+    { status: 405 }
+  );
 }
 
-export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser(request);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!canManage(user)) return NextResponse.json({ error: "Hanya BnM Manajer/Admin yang dapat memindahkan PIC" }, { status: 403 });
-  const { id } = await context.params;
-  const body = await request.json();
-  if (!body.nextUserId) return NextResponse.json({ error: "PIC tujuan wajib diisi" }, { status: 400 });
-  try {
-    const data = await changeIncidentPic({ incidentId: id, actorUserId: user.id, nextUserId: body.nextUserId,
-      branch: user.branch, systemRole: user.systemRole, reason: body.reason });
-    return NextResponse.json({ data });
-  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Transfer gagal" }, { status: 409 }); }
+export async function PATCH() {
+  return NextResponse.json(
+    {
+      error: "Pengalihan manual PIC dinonaktifkan. PIC bersifat permanen (immutable) setelah ditetapkan otomatis.",
+      code: "MANUAL_PIC_MUTATION_DISABLED",
+    },
+    { status: 405 }
+  );
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser(request);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { id } = await context.params;
-  const details = await getIncidentPicDetails(id, user.systemRole === "ADMIN" || user.scope === "HO" ? undefined : user.branch);
-  if (!details) return NextResponse.json({ error: "Laporan tidak ditemukan" }, { status: 404 });
-  if (!canManage(user) && details.primary_pic_user_id !== user.id) {
-    return NextResponse.json({ error: "Hanya PIC aktif atau BnM Manajer/Admin yang dapat melepas PIC" }, { status: 403 });
-  }
-  try {
-    const body = await request.json().catch(() => ({}));
-    const data = await changeIncidentPic({ incidentId: id, actorUserId: user.id, nextUserId: null,
-      branch: user.branch, systemRole: user.systemRole, reason: body.reason });
-    return NextResponse.json({ data });
-  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Release gagal" }, { status: 409 }); }
+export async function DELETE() {
+  return NextResponse.json(
+    {
+      error: "Pelepasan manual PIC dinonaktifkan. PIC bersifat permanen (immutable) setelah ditetapkan otomatis.",
+      code: "MANUAL_PIC_MUTATION_DISABLED",
+    },
+    { status: 405 }
+  );
 }
+

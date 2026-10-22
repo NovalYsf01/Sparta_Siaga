@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
 import { getProgressPhotoFile } from "@/lib/progress-storage";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 
 type RouteContext = { params: Promise<{ id: string; photoId: string }> };
 
@@ -54,26 +55,11 @@ export async function GET(_: Request, { params }: RouteContext) {
       );
     }
 
-    // 4. Branch scope enforcement
-    // System Admin (ADMIN): monitoring access allowed (audit/troubleshooting)
-    // HO Scope: national monitoring access
-    // Branch Scope: MUST match report branch
-    if (sessionUser.systemRole !== "ADMIN") {
-      const cleanBranch = (b?: string | null) => (b ? b.trim().toLowerCase() : "");
-      const userBranch = cleanBranch(sessionUser.branch);
-      const reportBranch = cleanBranch(incident.branch);
-
-      if (sessionUser.scope !== "HO") {
-        if (!reportBranch || userBranch !== reportBranch) {
-          return NextResponse.json(
-            {
-              error: `Anda tidak memiliki izin untuk melihat foto progress laporan cabang lain (Cabang Anda: '${sessionUser.branch || "N/A"}', Cabang Laporan: '${incident.branch}').`,
-              code: "FORBIDDEN",
-            },
-            { status: 403 }
-          );
-        }
-      }
+    if (!await canAccessReportAsync(sessionUser, incident)) {
+      return NextResponse.json(
+        { error: "Anda tidak memiliki izin untuk melihat foto progress laporan ini.", code: "FORBIDDEN" },
+        { status: 403 }
+      );
     }
 
     // 5. Cross-report isolation: verify storage key belongs to this report

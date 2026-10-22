@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
 import { dbGetIncidentById } from "@/lib/incident-db";
-import { canViewReportAsync } from "@/lib/permission-service";
+import { canAccessReportAsync } from "@/lib/report-access-policy";
 import {
   getMilestones,
   submitMilestoneDocument,
@@ -25,7 +25,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: "Laporan tidak ditemukan." }, { status: 404 });
     }
 
-    const canView = await canViewReportAsync(sessionUser, incident);
+    const canView = await canAccessReportAsync(sessionUser, incident);
     if (!canView) {
       return NextResponse.json(
         { error: "Unauthorized: Anda tidak memiliki izin untuk melihat laporan ini." },
@@ -185,6 +185,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       notes,
       isTestSimulation: isSimulation,
     });
+
+    try {
+      const { assignIncidentPicForPersistedAction } = await import("@/lib/incident-assignment");
+      const { getDbPool } = await import("@/lib/db");
+      await assignIncidentPicForPersistedAction(getDbPool(), {
+        incidentId: id,
+        userId: sessionUser.id,
+        branch: sessionUser.branch,
+        role: sessionUser.role,
+        action: `MILESTONE_${stageKey}_SUBMITTED`,
+      });
+    } catch (picErr) {
+      console.warn("[milestones/route] Auto-assign PIC warning:", picErr);
+    }
 
     return NextResponse.json(
       {
