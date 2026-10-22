@@ -19,6 +19,20 @@ export async function POST(request: Request, { params }: RouteContext) {
       );
     }
 
+    if (sessionUser.systemRole === "ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden: Administrator sistem tidak berwenang melakukan tindakan operasional Case Close atas nama BnM Manajer." },
+        { status: 403 }
+      );
+    }
+
+    if ((sessionUser.role || "").toLowerCase() !== "bm") {
+      return NextResponse.json(
+        { error: "Forbidden: Tindakan Case Close hanya dapat dilakukan oleh BnM Manajer cabang bersangkutan." },
+        { status: 403 }
+      );
+    }
+
     const { id } = await params;
     const incident = await dbGetIncidentById(id);
     if (!incident) {

@@ -42,6 +42,16 @@ export function getStandardizedOperationalStatus(inc: IncidentRecord): Operation
     };
   }
 
+  // 1b. Approved Pending Close (Final Approval Disetujui, Menunggu Case Close)
+  if (approvalStatus === "APPROVED_PENDING_CLOSE" || s === "approved_pending_close") {
+    return {
+      label: "Menunggu Case Close",
+      color: "bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-800",
+      cls: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 border border-teal-200 dark:border-teal-800",
+      key: "APPROVED_PENDING_CLOSE",
+    };
+  }
+
   if (s === "confirmed_safe") {
     return {
       label: "Dinyatakan Aman",

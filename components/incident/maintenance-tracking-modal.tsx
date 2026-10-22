@@ -418,7 +418,7 @@ export function MaintenanceTrackingModal({
                   className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-xs transition-colors shadow-2xs"
                 >
                   <MapPin className="w-3.5 h-3.5 text-[#1D5AA6] dark:text-blue-400" />
-                  <span className="hidden sm:inline">Peta</span>
+                  <span className="hidden sm:inline">Lihat di Peta</span>
                 </a>
               )}
 

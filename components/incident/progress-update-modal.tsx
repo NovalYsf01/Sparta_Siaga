@@ -75,6 +75,8 @@ export function ProgressUpdateModal({
     submitCompletionReason?: string;
     canApproveCoordinator: boolean;
     approveCoordinatorReason?: string;
+    canFinalApprove?: boolean;
+    finalApproveReason?: string;
     canClose: boolean;
     closeReason?: string;
   } | null>(null);
@@ -342,6 +344,8 @@ export function ProgressUpdateModal({
               submitCompletionReason={workflowPermissions?.submitCompletionReason}
               canApproveCoordinator={Boolean(workflowPermissions?.canApproveCoordinator)}
               approveCoordinatorReason={workflowPermissions?.approveCoordinatorReason}
+              canFinalApprove={Boolean(workflowPermissions?.canFinalApprove ?? workflowPermissions?.canClose)}
+              finalApproveReason={workflowPermissions?.finalApproveReason ?? workflowPermissions?.closeReason}
               canClose={Boolean(workflowPermissions?.canClose)}
               closeReason={workflowPermissions?.closeReason}
               onRefresh={() => {

@@ -207,13 +207,24 @@ async function runUatLifecycleTests() {
   const finalAppr = await CompletionApprovalService.approveByManager({
     reportId: rep1Id,
     actor: bmActor,
+    notes: "Pekerjaan dinyatakan selesai dan memuaskan.",
+  });
+  assert.strictEqual(finalAppr.status, "approved_pending_close");
+  inc1 = await dbGetIncidentById(rep1Id);
+  assert.strictEqual(inc1?.status, "approved_pending_close");
+  assert.strictEqual(inc1?.progress, 100);
+  console.log("✔ Step 9a: BnM Manajer final approved. Incident status: APPROVED_PENDING_CLOSE (100%)");
+
+  // Step 9b: Case Close explicitly executed
+  const closeRes = await CompletionApprovalService.closeCase({
+    reportId: rep1Id,
+    actor: bmActor,
     notes: "Pekerjaan dinyatakan selesai dan memuaskan. Kasus ditutup.",
   });
-  assert.strictEqual(finalAppr.status, "closed");
+  assert.strictEqual(closeRes.status, "closed");
   inc1 = await dbGetIncidentById(rep1Id);
   assert.strictEqual(inc1?.status, "closed");
-  assert.strictEqual(inc1?.progress, 100);
-  console.log("✔ Step 9: BnM Manajer final approved. Incident status: CLOSED (100%)");
+  console.log("✔ Step 9b: BnM Manajer explicitly executed Case Close. Incident status: CLOSED (100%)");
 
   // Step 10: HO Admin read-only verification
   assert.ok(inc1?.closedAt, "ClosedAt date must be recorded");
@@ -264,15 +275,24 @@ async function runUatLifecycleTests() {
     notes: "Diverifikasi BEC Koordinator DC",
   });
 
-  // BnM approves DC
-  await CompletionApprovalService.approveByManager({
+  // BnM final approves DC
+  const dcFinalAppr = await CompletionApprovalService.approveByManager({
     reportId: dcRepId,
     actor: bmActor,
     notes: "Disetujui BnM Manajer untuk DC",
   });
+  assert.strictEqual(dcFinalAppr.status, "approved_pending_close");
+
+  // BnM explicitly closes DC case
+  const dcCloseRes = await CompletionApprovalService.closeCase({
+    reportId: dcRepId,
+    actor: bmActor,
+    notes: "Penutupan kasus perbaikan DC Bandung.",
+  });
+  assert.strictEqual(dcCloseRes.status, "closed");
   dcInc = await dbGetIncidentById(dcRepId);
   assert.strictEqual(dcInc?.status, "closed");
-  console.log("✔ Simulasi 2 Part A: DC incident completed via BES -> BEC -> BnM approval hierarchy.");
+  console.log("✔ Simulasi 2 Part A: DC incident completed via BES -> BEC -> BnM approval hierarchy and explicit Case Close.");
 
   // Part B: Automated Earthquake Incident
   let eqInc = await dbGetIncidentById(eqRepId);

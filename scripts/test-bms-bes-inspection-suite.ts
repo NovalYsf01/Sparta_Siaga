@@ -352,7 +352,16 @@ async function runTestSuite() {
     // SKENARIO 7: Manager Branch dapat menyetujui, menolak, atau meminta klarifikasi
     // =========================================================================
     {
-      const storeReport = await createTestIncident({ branch: "Bandung", tkpType: "toko" });
+      const storeReport = await createTestIncident({
+        branch: "Bandung",
+        tkpType: "toko",
+        status: "pending_bm_approval",
+        verification: {
+          confirmedBy: `${bmsBandung.name} (BMS)`,
+          confirmedAt: new Date().toISOString(),
+          isDamaged: true,
+        } as any,
+      });
       const bmAuth = await canApproveAsBmAsync(bmBandung, storeReport);
 
       // Skenario 7a: BM Approve Damage -> status confirmed_affected

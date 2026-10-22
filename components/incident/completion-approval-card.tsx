@@ -37,6 +37,8 @@ interface CompletionApprovalCardProps {
   submitCompletionReason?: string;
   canApproveCoordinator: boolean;
   approveCoordinatorReason?: string;
+  canFinalApprove?: boolean;
+  finalApproveReason?: string;
   canClose: boolean;
   closeReason?: string;
   onRefresh: () => void;
@@ -75,6 +77,8 @@ export function CompletionApprovalCard({
   submitCompletionReason,
   canApproveCoordinator,
   approveCoordinatorReason,
+  canFinalApprove,
+  finalApproveReason,
   canClose,
   closeReason,
   onRefresh,
@@ -85,11 +89,11 @@ export function CompletionApprovalCard({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Dialog State
-  const [activeModal, setActiveModal] = useState<"submit" | "approve" | "reject" | null>(null);
+  const [activeModal, setActiveModal] = useState<"submit" | "approve" | "reject" | "close" | null>(null);
   const [notesInput, setNotesInput] = useState("");
 
   const isCompleted = latestProgress === 100 && hasFinalEvidence;
-  const isResolved = incident.status === "resolved" || approval?.status === "CLOSED";
+  const isResolved = incident.status === "closed" || incident.status === "resolved" || approval?.status === "CLOSED";
   const status = approval?.status || "WAITING_PIC_SUBMISSION";
 
   const cleanUserBranch = (userBranch || "").trim().toLowerCase();
@@ -97,7 +101,7 @@ export function CompletionApprovalCard({
   const isSameBranch = cleanUserBranch === cleanReportBranch;
   const isSysAdmin = userSystemRole === "ADMIN";
 
-  const handleAction = async (actionType: "submit" | "approve" | "reject") => {
+  const handleAction = async (actionType: "submit" | "approve" | "reject" | "close") => {
     setActionLoading(true);
     setErrorMessage(null);
 
@@ -108,6 +112,8 @@ export function CompletionApprovalCard({
       if (actionType === "submit") {
         body = { notes: notesInput.trim() };
       } else if (actionType === "approve") {
+        body = { notes: notesInput.trim() };
+      } else if (actionType === "close") {
         body = { notes: notesInput.trim() };
       } else if (actionType === "reject") {
         if (!notesInput.trim()) {
@@ -359,6 +365,11 @@ export function CompletionApprovalCard({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   Selesai & Ditutup
                 </span>
+              ) : status === "APPROVED_PENDING_CLOSE" ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300 dark:border-teal-700">
+                  <Clock className="w-3.5 h-3.5 text-teal-600" />
+                  Menunggu Case Close
+                </span>
               ) : isRevision ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
                   <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
@@ -503,7 +514,7 @@ export function CompletionApprovalCard({
                       </span>
                       <span
                         className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                          approval?.managerApprovedAt
+                          approval?.managerApprovedAt || status === "APPROVED_PENDING_CLOSE" || isResolved
                             ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
                             : isRevisionByManager
                             ? "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
@@ -512,7 +523,7 @@ export function CompletionApprovalCard({
                             : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                         }`}
                       >
-                        {approval?.managerApprovedAt
+                        {approval?.managerApprovedAt || status === "APPROVED_PENDING_CLOSE" || isResolved
                           ? "Disetujui Final"
                           : isRevisionByManager
                           ? "Revisi"
@@ -550,21 +561,33 @@ export function CompletionApprovalCard({
                       className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
                         isResolved
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          : status === "APPROVED_PENDING_CLOSE"
+                          ? "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300"
                           : "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                       }`}
                     >
-                      {isResolved ? "CLOSED" : "Belum Ditutup"}
+                      {isResolved
+                        ? "CLOSED"
+                        : status === "APPROVED_PENDING_CLOSE"
+                        ? "Menunggu Case Close"
+                        : "Belum Ditutup"}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     {isResolved
-                      ? `Laporan resmi ditutup oleh ${approval?.managerUserName || `BnM Manajer (${incident.branch})`} pada ${safeFormatDate(incident.closedAt || approval?.managerApprovedAt)}.`
+                      ? `Laporan resmi ditutup oleh ${approval?.closedByUserName || approval?.managerUserName || `BnM Manajer (${incident.branch})`} pada ${safeFormatDate(incident.closedAt || approval?.closedAt || approval?.managerApprovedAt)}.`
+                      : status === "APPROVED_PENDING_CLOSE"
+                      ? "Pekerjaan telah disetujui final oleh BnM Manajer. Menunggu penutupan kasus (Case Close) oleh BnM Manajer."
                       : "Penutupan kasus dilakukan setelah persetujuan akhir BnM Manajer dinyatakan lengkap."}
                   </p>
                 </div>
 
                 <div className="text-[11px] font-mono text-slate-400 shrink-0">
-                  {isResolved ? `Waktu Close: ${safeFormatDate(incident.closedAt || approval?.managerApprovedAt)}` : "Status: Menunggu Selesai"}
+                  {isResolved
+                    ? `Waktu Close: ${safeFormatDate(incident.closedAt || approval?.closedAt || approval?.managerApprovedAt)}`
+                    : status === "APPROVED_PENDING_CLOSE"
+                    ? "Status: Menunggu Penutupan"
+                    : "Status: Menunggu Selesai"}
                 </div>
               </div>
 
@@ -651,7 +674,8 @@ export function CompletionApprovalCard({
     else if (status === "REVISION_REQUIRED") currentStep = 1;
     else if (status === "WAITING_COORDINATOR_APPROVAL") currentStep = 2;
     else if (status === "WAITING_MANAGER_APPROVAL") currentStep = 3;
-    else if (status === "CLOSED" || isResolved) currentStep = 4;
+    else if (status === "APPROVED_PENDING_CLOSE") currentStep = 4;
+    else if (status === "CLOSED" || isResolved) currentStep = 5;
   }
 
   return (
@@ -674,6 +698,11 @@ export function CompletionApprovalCard({
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               Case Closed
             </span>
+          ) : status === "APPROVED_PENDING_CLOSE" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">
+              <Clock className="w-3.5 h-3.5 text-teal-600" />
+              Menunggu Case Close
+            </span>
           ) : status === "REVISION_REQUIRED" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
               <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
@@ -685,8 +714,8 @@ export function CompletionApprovalCard({
               Menunggu Review {coordLabel}
             </span>
           ) : status === "WAITING_MANAGER_APPROVAL" ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+              <Clock className="w-3.5 h-3.5 text-purple-600" />
               Menunggu Approval BnM Manajer
             </span>
           ) : (
@@ -707,7 +736,7 @@ export function CompletionApprovalCard({
 
       {/* Stepped Visual Chain */}
       <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 space-y-3">
-        <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-bold">
+        <div className="grid grid-cols-5 gap-1.5 sm:gap-2 text-center text-[10px] font-bold">
           {/* Step 1: Fisik Selesai */}
           <div
             className={`p-2 rounded-lg border ${
@@ -775,13 +804,13 @@ export function CompletionApprovalCard({
             </span>
           </div>
 
-          {/* Step 4: BnM Manajer Close */}
+          {/* Step 4: Final BnM Manajer Approval */}
           <div
             className={`p-2 rounded-lg border ${
               currentStep >= 4
                 ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300"
                 : currentStep === 3
-                ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300"
+                ? "bg-purple-50 dark:bg-purple-950/40 border-purple-300 dark:border-purple-700 text-purple-800 dark:text-purple-300"
                 : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400"
             }`}
           >
@@ -791,10 +820,33 @@ export function CompletionApprovalCard({
               ) : (
                 <ShieldCheck className="w-3 h-3" />
               )}
-              <span>4. Final BnM Manajer</span>
+              <span>4. Final BnM</span>
             </div>
             <span className="text-[9px] font-normal block opacity-80">
-              {isResolved ? "Case Closed" : "Menunggu"}
+              {approval?.managerApprovedAt || currentStep >= 4 ? "Disetujui" : "Menunggu"}
+            </span>
+          </div>
+
+          {/* Step 5: Case Close */}
+          <div
+            className={`p-2 rounded-lg border ${
+              currentStep >= 5
+                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300"
+                : currentStep === 4
+                ? "bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300"
+                : "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400"
+            }`}
+          >
+            <div className="flex items-center justify-center gap-1 mb-0.5">
+              {currentStep >= 5 ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              ) : (
+                <Lock className="w-3 h-3" />
+              )}
+              <span>5. Case Close</span>
+            </div>
+            <span className="text-[9px] font-normal block opacity-80">
+              {isResolved ? "Selesai" : currentStep === 4 ? "Siap Tutup" : "Menunggu"}
             </span>
           </div>
         </div>
@@ -928,14 +980,14 @@ export function CompletionApprovalCard({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                  Tahap 3: Persetujuan Final BnM Manajer & Case Close
+                  Tahap 3: Persetujuan Final BnM Manajer
                 </p>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Koordinator ({coordLabel}) telah menyetujui. Menunggu persetujuan <span className="font-semibold text-emerald-600 dark:text-emerald-400">BnM Manajer</span> cabang {incident.branch}.
+                  Koordinator ({coordLabel}) telah menyetujui. Menunggu persetujuan final <span className="font-semibold text-emerald-600 dark:text-emerald-400">BnM Manajer</span> cabang {incident.branch}.
                 </p>
               </div>
 
-              {canClose && !isSysAdmin && isSameBranch && userRole?.toLowerCase() === "bm" ? (
+              {(canFinalApprove || canClose) && !isSysAdmin && isSameBranch && userRole?.toLowerCase() === "bm" ? (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -957,14 +1009,60 @@ export function CompletionApprovalCard({
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
                   >
                     <ShieldCheck className="w-4 h-4" />
-                    Final Approve & Case Close
+                    Setujui Final
                   </button>
                 </div>
               ) : (
-                <span className="text-xs text-slate-400 flex items-center gap-1" title={closeReason}>
-                  <Lock className="w-3.5 h-3.5" /> Menunggu Approval BnM Manajer ({incident.branch})
+                <span className="text-xs text-slate-400 flex items-center gap-1" title={finalApproveReason || closeReason}>
+                  <Lock className="w-3.5 h-3.5" /> Menunggu Persetujuan Final BnM Manajer ({incident.branch})
                 </span>
               )}
+            </div>
+          )}
+
+          {/* STAGE 4: APPROVED_PENDING_CLOSE (MENUNGGU CASE CLOSE) */}
+          {status === "APPROVED_PENDING_CLOSE" && (
+            <div className="p-3 bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-800 rounded-xl space-y-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Tahap 4: Penutupan Laporan (Case Close)
+                    </p>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                      Menunggu Penutupan
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-0.5">
+                    <p>
+                      <strong>Final Approval:</strong> <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Disetujui</span>
+                      {approval?.managerUserName ? ` oleh ${approval.managerUserName}` : ""}
+                      {approval?.managerApprovedAt ? ` (${safeFormatDate(approval.managerApprovedAt)})` : ""}
+                    </p>
+                    <p className="text-slate-500">
+                      <strong>Case Close:</strong> Menunggu tindakan penutupan resmi oleh BnM Manajer.
+                    </p>
+                  </div>
+                </div>
+
+                {canClose && !isSysAdmin && isSameBranch && userRole?.toLowerCase() === "bm" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotesInput("");
+                      setActiveModal("close");
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-colors shrink-0"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Case Close
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400 flex items-center gap-1 shrink-0" title={closeReason}>
+                    <Lock className="w-3.5 h-3.5" /> Menunggu Penutupan oleh BnM Manajer ({incident.branch})
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1024,14 +1122,17 @@ export function CompletionApprovalCard({
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
             <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
               {activeModal === "submit" && <Send className="w-4 h-4 text-blue-600" />}
-              {activeModal === "approve" && <Check className="w-4 h-4 text-emerald-600" />}
+              {activeModal === "approve" && <ShieldCheck className="w-4 h-4 text-emerald-600" />}
+              {activeModal === "close" && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
               {activeModal === "reject" && <XCircle className="w-4 h-4 text-rose-600" />}
               <span>
                 {activeModal === "submit"
                   ? "Ajukan Penyelesaian Pekerjaan"
+                  : activeModal === "close"
+                  ? "Konfirmasi Penutupan Laporan (Case Close)"
                   : activeModal === "approve"
                   ? (userRole?.toLowerCase() === "bm" || isSysAdmin)
-                    ? "Konfirmasi Final Approval & Case Close"
+                    ? "Konfirmasi Persetujuan Final (Final Approval)"
                     : "Persetujuan Koordinator"
                   : "Minta Revisi Pekerjaan"}
               </span>
@@ -1040,16 +1141,24 @@ export function CompletionApprovalCard({
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {activeModal === "submit"
                 ? "Pastikan pekerjaan fisik 100% selesai dan foto serah terima (HANDOVER) telah terlampir."
+                : activeModal === "close"
+                ? "Apakah Anda yakin ingin menutup laporan ini secara resmi? Tindakan Case Close akan mengubah status laporan menjadi CLOSED dan menandai seluruh tahapan penanganan selesai."
                 : activeModal === "approve"
                 ? (userRole?.toLowerCase() === "bm" || isSysAdmin)
-                  ? "Persetujuan BnM Manajer / Administrator akan mengubah status laporan menjadi RESOLVED dan menutup laporan secara resmi."
-                  : "Persetujuan Koordinator akan meneruskan laporan ke tahap akhir (Persetujuan BnM Manajer)."
+                  ? "Persetujuan final BnM Manajer menyatakan bahwa pekerjaan selesai dan dokumen serah terima lengkap. Tindakan ini BELUM menutup laporan. Laporan akan menunggu tindakan Case Close secara eksplisit."
+                  : "Persetujuan Koordinator akan meneruskan berkas serah terima ke tahap akhir (Persetujuan Final BnM Manajer)."
                 : "Tuliskan alasan atau bagian yang perlu direvisi secara jelas agar PIC dapat memperbaikinya."}
             </p>
 
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
-                {activeModal === "reject" ? "Alasan Revisi (Wajib):" : "Catatan (Opsional):"}
+                {activeModal === "reject"
+                  ? "Alasan Revisi (Wajib):"
+                  : activeModal === "close"
+                  ? "Catatan Penutupan Kasus (Opsional):"
+                  : activeModal === "approve"
+                  ? "Catatan Persetujuan Final (Opsional):"
+                  : "Catatan (Opsional):"}
               </label>
               <textarea
                 value={notesInput}
@@ -1058,6 +1167,10 @@ export function CompletionApprovalCard({
                 placeholder={
                   activeModal === "reject"
                     ? "Contoh: Foto serah terima bagian atap belum jelas, mohon foto ulang."
+                    : activeModal === "close"
+                    ? "Contoh: Pekerjaan diverifikasi selesai 100%, serah terima diterima tanpa catatan."
+                    : activeModal === "approve"
+                    ? "Contoh: Berkas serah terima lengkap dan disetujui."
                     : "Tuliskan catatan tambahan jika ada..."
                 }
                 className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
@@ -1080,12 +1193,20 @@ export function CompletionApprovalCard({
                 className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs disabled:opacity-50 flex items-center gap-1.5 ${
                   activeModal === "reject"
                     ? "bg-rose-600 hover:bg-rose-700"
+                    : activeModal === "close"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
                     : activeModal === "approve"
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
-                {actionLoading ? "Memproses..." : "Konfirmasi"}
+                {actionLoading
+                  ? "Memproses..."
+                  : activeModal === "close"
+                  ? "Tutup Laporan (Case Close)"
+                  : activeModal === "approve"
+                  ? "Setujui Final"
+                  : "Konfirmasi"}
               </button>
             </div>
           </div>

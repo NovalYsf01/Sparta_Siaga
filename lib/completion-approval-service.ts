@@ -34,6 +34,7 @@ export type CompletionApprovalStatus =
   | "WAITING_PIC_SUBMISSION"
   | "WAITING_COORDINATOR_APPROVAL"
   | "WAITING_MANAGER_APPROVAL"
+  | "APPROVED_PENDING_CLOSE"
   | "REVISION_REQUIRED"
   | "CLOSED";
 
@@ -42,6 +43,7 @@ export type CompletionApprovalStage =
   | "COORDINATOR_APPROVAL"
   | "MANAGER_APPROVAL"
   | "REVISION"
+  | "CASE_CLOSE"
   | "CLOSE";
 
 export type CompletionApprovalAction =
@@ -49,7 +51,8 @@ export type CompletionApprovalAction =
   | "APPROVE_COORDINATOR"
   | "REJECT_COORDINATOR"
   | "APPROVE_MANAGER"
-  | "REJECT_MANAGER";
+  | "REJECT_MANAGER"
+  | "CLOSE_CASE";
 
 export interface CompletionApprovalAttachment {
   url: string;
@@ -79,6 +82,10 @@ export interface CompletionApprovalRecord {
   managerUserName: string | null;
   managerApprovedAt: string | null;
   managerNotes: string | null;
+  closedAt?: string | null;
+  closedByUserId?: string | null;
+  closedByUserName?: string | null;
+  closingNotes?: string | null;
   rejectionReason: string | null;
   rejectedByRole: string | null;
   rejectedByUserId: string | null;
@@ -148,6 +155,10 @@ export async function ensureCompletionApprovalTables(): Promise<void> {
     );
 
     ALTER TABLE report_completion_approvals ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb;
+    ALTER TABLE report_completion_approvals ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
+    ALTER TABLE report_completion_approvals ADD COLUMN IF NOT EXISTS closed_by_user_id VARCHAR(64);
+    ALTER TABLE report_completion_approvals ADD COLUMN IF NOT EXISTS closed_by_user_name VARCHAR(255);
+    ALTER TABLE report_completion_approvals ADD COLUMN IF NOT EXISTS closing_notes TEXT;
 
     CREATE INDEX IF NOT EXISTS idx_comp_appr_report ON report_completion_approvals(report_id);
     CREATE INDEX IF NOT EXISTS idx_comp_appr_status ON report_completion_approvals(status);
@@ -236,7 +247,11 @@ export class CompletionApprovalService {
 
     const id = `appr_${reportId}_${Date.now()}`;
     const initialStatus: CompletionApprovalStatus =
-      report.status === "resolved" ? "CLOSED" : "WAITING_PIC_SUBMISSION";
+      report.status === "resolved" || report.status === "closed"
+        ? "CLOSED"
+        : report.status === "approved_pending_close"
+        ? "APPROVED_PENDING_CLOSE"
+        : "WAITING_PIC_SUBMISSION";
 
     const insertRes = await pool.query(
       `INSERT INTO report_completion_approvals (
@@ -316,7 +331,7 @@ export class CompletionApprovalService {
       const { getMilestones } = await import("./milestone-service");
       const milestones = await getMilestones(reportId);
       const st = milestones.find((m) => m.stageKey === "SERAH_TERIMA");
-      hasMilestoneSt = Boolean(st && st.status === "SUBMITTED" && st.documentStorageKey);
+      hasMilestoneSt = Boolean(st && st.status === "SUBMITTED" && (st.documentStorageKey || st.documentUrl));
     } catch {
       // ignore
     }
@@ -761,10 +776,11 @@ export class CompletionApprovalService {
   }
 
   /**
-   * STEP 3A: BRANCH MANAGER FINAL APPROVAL & CASE CLOSE
+   * STEP 3A: BUILDING & MAINTENANCE MANAGER FINAL APPROVAL
    * - Wajib telah melewati persetujuan Koordinator (status: WAITING_MANAGER_APPROVAL)
-   * - Direct Close oleh Branch Manager tanpa Koordinator DITOLAK KERAS!
-   * - Menghasilkan incident.status = resolved
+   * - Menghasilkan approval.status = APPROVED_PENDING_CLOSE
+   * - Menghasilkan incident.status = approved_pending_close
+   * - TIDAK menutup laporan (incident.status BUKAN closed, closedAt BELUM diisi)
    */
   static async approveByManager(params: {
     reportId: string;
@@ -778,7 +794,7 @@ export class CompletionApprovalService {
     };
     notes?: string;
   }): Promise<IncidentRecord> {
-    const { report, hasMilestoneSt } = await this.validateCompletionPrerequisites(params.reportId);
+    const { report } = await this.validateCompletionPrerequisites(params.reportId);
     const approval = await this.getOrCreateApproval(params.reportId);
 
     // 1. HO Role Substitution Blocked
@@ -793,24 +809,210 @@ export class CompletionApprovalService {
 
     const isSystemAdmin = params.actor.systemRole === "ADMIN";
 
-    // 2. Role Check: BnM Manajer ('bm') or Admin
+    // 2. Role Check: BnM Manajer ('bm') - Admin zero-bypass
     const actorRole = (params.actor.role || "").toLowerCase();
     if (isSystemAdmin || actorRole !== "bm") {
       const err: any = new Error(
-        `Persetujuan final dan penutupan laporan hanya dapat dilakukan oleh BnM Manajer, bukan '${actorRole.toUpperCase() || "N/A"}'.`
+        `Persetujuan final laporan hanya dapat dilakukan oleh BnM Manajer, bukan '${actorRole.toUpperCase() || "N/A"}'.`
       );
       err.status = 403;
       err.code = "ROLE_MISMATCH";
       throw err;
     }
 
-    // 3. Branch Scope Isolation (Admin is not restricted to single branch)
+    // 3. Branch Scope Isolation
     {
       const userBranch = cleanBranch(params.actor.branch);
       const reportBranch = cleanBranch(report.branch);
       if (!userBranch || userBranch !== reportBranch) {
         const err: any = new Error(
           `Aksi persetujuan final BnM Manajer hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
+        );
+        err.status = 403;
+        err.code = "BRANCH_SCOPE_VIOLATION";
+        throw err;
+      }
+    }
+
+    // 4. Central Permission Resolver check (REPORT_CLOSE / REPORT_BM_APPROVAL)
+    const permCheck = await checkUserPermission({
+      user: params.actor as any,
+      permission: "REPORT_CLOSE",
+      report,
+    });
+    if (!permCheck.authorized) {
+      const err: any = new Error(permCheck.reason || "Unauthorized: Anda tidak memiliki izin persetujuan final BnM Manajer.");
+      err.status = 403;
+      throw err;
+    }
+
+    // 5. Status Check: WAITING_MANAGER_APPROVAL
+    const isReadyForManager = approval.status === "WAITING_MANAGER_APPROVAL";
+
+    if (!isReadyForManager) {
+      const err: any = new Error(
+        `Persetujuan final ditolak: Status approval saat ini adalah '${approval.status}'. Serah Terima wajib disetujui Koordinator terlebih dahulu.`
+      );
+      err.status = 400;
+      err.code = "INVALID_APPROVAL_STATE";
+      throw err;
+    }
+
+    // 5b. Document Completeness Check (All 5 mandatory milestone documents must be complete!)
+    const { checkMilestoneCompleteness } = await import("./milestone-service");
+    const completeness = await checkMilestoneCompleteness(params.reportId);
+    if (!completeness.isDocumentComplete) {
+      const err: any = new Error(
+        `Persetujuan final ditolak. Seluruh 5 dokumen milestone wajib dilengkapi terlebih dahulu. Dokumen yang belum lengkap: ${completeness.missingDocuments.join(", ")}`
+      );
+      err.status = 400;
+      err.code = "MANDATORY_DOCUMENTS_INCOMPLETE";
+      throw err;
+    }
+
+    // 6. Update Approval State -> APPROVED_PENDING_CLOSE (TIDAK menjadi CLOSED)
+    const pool = getDbPool();
+    const managerNotes = (params.notes || "").trim() || "Pekerjaan dan dokumen serah terima disetujui final oleh BnM Manajer.";
+    const actorDisplayName = params.actor.name;
+
+    await pool.query(
+      `UPDATE report_completion_approvals SET
+        status = 'APPROVED_PENDING_CLOSE',
+        manager_role = 'bm',
+        manager_user_id = $1,
+        manager_user_name = $2,
+        manager_approved_at = NOW(),
+        manager_notes = $3,
+        updated_at = NOW()
+       WHERE report_id = $4`,
+      [params.actor.id, actorDisplayName, managerNotes, params.reportId]
+    );
+
+    // 7. Append History
+    const historyId = `hist_${params.reportId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    await pool.query(
+      `INSERT INTO report_completion_approval_history (
+        id, report_id, stage, action, actor_user_id, actor_name, actor_role, branch, notes, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+      [
+        historyId,
+        params.reportId,
+        "MANAGER_APPROVAL",
+        "APPROVE_MANAGER",
+        params.actor.id,
+        actorDisplayName,
+        actorRole.toUpperCase(),
+        report.branch || "",
+        managerNotes,
+      ]
+    );
+
+    // 8. Update Incident: status = approved_pending_close, progress = 100 (TIDAK CLOSED & closedAt NULL)
+    const nowWib = formatServerTimestampWib();
+    const actorLabel = `${params.actor.name} (BnM Manajer ${report.branch || ""})`;
+    const finalApprovalTimelineEntry = {
+      stage: "Persetujuan Final",
+      label: "Pekerjaan Disetujui Final oleh BnM Manajer (Menunggu Case Close)",
+      timestamp: nowWib,
+      actor: actorLabel,
+      notes: managerNotes,
+    };
+
+    const updatedIncident = await dbUpdateIncident(params.reportId, {
+      status: "approved_pending_close",
+      progress: 100,
+      timeline: [...(report.timeline || []), finalApprovalTimelineEntry],
+    });
+
+    // 9. Audit Log untuk Final Approval (bukan REPORT_CLOSED!)
+    try {
+      const auditId = `audit_fa_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await pool.query(
+        `INSERT INTO permission_audit_logs (
+          id, actor_user_id, actor_name, action, target_user_id,
+          permission_key, effect, scope_type, branch_code, reason, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+        [
+          auditId,
+          params.actor.id,
+          actorDisplayName,
+          "FINAL_APPROVAL_GRANTED",
+          params.reportId,
+          "REPORT_CLOSE",
+          "ALLOW",
+          "BRANCH",
+          report.branch || null,
+          `Final Approval disetujui oleh ${actorLabel}. Menunggu Case Close. Catatan: ${managerNotes}`,
+        ]
+      );
+    } catch (auditErr) {
+      console.warn("[CompletionApprovalService] Gagal mencatat audit log final approval:", auditErr);
+    }
+
+    return updatedIncident!;
+  }
+
+  /**
+   * STEP 4: CASE CLOSE OLEH BNM MANAJER (EKSPLISIT)
+   * - Hanya dapat dijalankan setelah Final Approval disetujui (status: APPROVED_PENDING_CLOSE)
+   * - Eksekusi sebelum Final Approval DITOLAK
+   * - Role: BnM Manajer cabang bersangkutan (Admin dan HO dilarang bypass)
+   * - Menghasilkan incident.status = closed dan closedAt
+   * - Idempoten: Jika laporan sudah closed, tidak membuat riwayat atau audit duplikat
+   */
+  static async closeCase(params: {
+    reportId: string;
+    actor: {
+      id: string;
+      name: string;
+      role?: string | null;
+      systemRole?: string;
+      scope?: string | null;
+      branch?: string | null;
+    };
+    notes?: string;
+  }): Promise<IncidentRecord> {
+    const report = await dbGetIncidentById(params.reportId);
+    if (!report) {
+      const err: any = new Error("Laporan tidak ditemukan.");
+      err.status = 404;
+      throw err;
+    }
+
+    // Idempotency: Jika laporan sudah ditutup sebelumnya, kembalikan data tanpa menduplikasi audit trail
+    if (report.status === "closed" || report.status === "resolved") {
+      return report;
+    }
+
+    // 1. HO Blocked
+    if (params.actor.scope === "HO" || ["ho_admin", "gm_ho", "sm_ho"].includes(params.actor.role || "")) {
+      const err: any = new Error(
+        "Forbidden: User dengan role atau scope Head Office (HO) tidak memiliki kewenangan menutup laporan cabang."
+      );
+      err.status = 403;
+      err.code = "HO_MANAGER_SUBSTITUTION_BLOCKED";
+      throw err;
+    }
+
+    // 2. Role Check: BnM Manajer ('bm') - Admin zero-bypass
+    const isSystemAdmin = params.actor.systemRole === "ADMIN";
+    const actorRole = (params.actor.role || "").toLowerCase();
+    if (isSystemAdmin || actorRole !== "bm") {
+      const err: any = new Error(
+        `Penutupan laporan (Case Close) hanya dapat dilakukan oleh BnM Manajer, bukan '${actorRole.toUpperCase() || "N/A"}'.`
+      );
+      err.status = 403;
+      err.code = "ROLE_MISMATCH";
+      throw err;
+    }
+
+    // 3. Branch Scope Isolation
+    {
+      const userBranch = cleanBranch(params.actor.branch);
+      const reportBranch = cleanBranch(report.branch);
+      if (!userBranch || userBranch !== reportBranch) {
+        const err: any = new Error(
+          `Aksi Case Close BnM Manajer hanya berlaku untuk cabang sendiri (${params.actor.branch || "N/A"}), bukan cabang ${report.branch?.toUpperCase() || "N/A"}.`
         );
         err.status = 403;
         err.code = "BRANCH_SCOPE_VIOLATION";
@@ -830,46 +1032,32 @@ export class CompletionApprovalService {
       throw err;
     }
 
-    // 5. Status Check: WAITING_MANAGER_APPROVAL or WAITING_COORDINATOR_APPROVAL for Admin
-    const isReadyForManager = approval.status === "WAITING_MANAGER_APPROVAL";
-
-    if (!isReadyForManager) {
+    // 5. Status Check: WAJIB telah disetujui Final (APPROVED_PENDING_CLOSE)
+    const approval = await this.getOrCreateApproval(params.reportId);
+    if (approval.status !== "APPROVED_PENDING_CLOSE" && report.status !== "approved_pending_close") {
       const err: any = new Error(
-        `Persetujuan final ditolak: Status approval saat ini adalah '${approval.status}'. Serah Terima wajib disetujui Koordinator terlebih dahulu.`
+        `Case Close ditolak: Laporan belum mendapatkan persetujuan final (Final Approval) dari BnM Manajer. Status saat ini adalah '${approval.status}'.`
       );
       err.status = 400;
       err.code = "INVALID_APPROVAL_STATE";
       throw err;
     }
 
-    // 5b. Document Completeness Check (All 5 mandatory milestone documents must be complete!)
-    const { checkMilestoneCompleteness } = await import("./milestone-service");
-    const completeness = await checkMilestoneCompleteness(params.reportId);
-    if (!completeness.isDocumentComplete) {
-      const err: any = new Error(
-        `Penutupan laporan ditolak. Seluruh 5 dokumen milestone wajib dilengkapi terlebih dahulu. Dokumen yang belum lengkap: ${completeness.missingDocuments.join(", ")}`
-      );
-      err.status = 400;
-      err.code = "MANDATORY_DOCUMENTS_INCOMPLETE";
-      throw err;
-    }
-
     // 6. Update Approval State -> CLOSED
     const pool = getDbPool();
-    const managerNotes = (params.notes || "").trim() || "Pekerjaan diverifikasi selesai 100% dan laporan resmi ditutup.";
-    const actorDisplayName = isSystemAdmin ? `${params.actor.name} (ADMIN)` : params.actor.name;
+    const closingNotes = (params.notes || "").trim() || "Pekerjaan dan serah terima telah diverifikasi lengkap. Laporan resmi ditutup.";
+    const actorDisplayName = params.actor.name;
 
     await pool.query(
       `UPDATE report_completion_approvals SET
         status = 'CLOSED',
-        manager_role = $1,
-        manager_user_id = $2,
-        manager_user_name = $3,
-        manager_approved_at = NOW(),
-        manager_notes = $4,
+        closed_at = NOW(),
+        closed_by_user_id = $1,
+        closed_by_user_name = $2,
+        closing_notes = $3,
         updated_at = NOW()
-       WHERE report_id = $5`,
-      [isSystemAdmin ? "ADMIN" : "bm", params.actor.id, actorDisplayName, managerNotes, params.reportId]
+       WHERE report_id = $4`,
+      [params.actor.id, actorDisplayName, closingNotes, params.reportId]
     );
 
     // 7. Append History
@@ -881,25 +1069,25 @@ export class CompletionApprovalService {
       [
         historyId,
         params.reportId,
-        "CLOSE",
-        "APPROVE_MANAGER",
+        "CASE_CLOSE",
+        "CLOSE_CASE",
         params.actor.id,
         actorDisplayName,
         actorRole.toUpperCase(),
         report.branch || "",
-        managerNotes,
+        closingNotes,
       ]
     );
 
     // 8. Update Incident: status = closed, progress = 100, closedAt
     const nowWib = formatServerTimestampWib();
-    const actorLabel = isSystemAdmin ? `${params.actor.name} (ADMIN)` : `${params.actor.name} (BnM Manajer ${report.branch || ""})`;
+    const actorLabel = `${params.actor.name} (BnM Manajer ${report.branch || ""})`;
     const closeTimelineEntry = {
       stage: "Laporan Ditutup",
-      label: `Pekerjaan Disetujui Final & Laporan Resmi Ditutup (${isSystemAdmin ? "Admin SPARTA SIAGA" : "BnM Manajer"})`,
+      label: "Laporan Resmi Ditutup (Case Close) oleh BnM Manajer",
       timestamp: nowWib,
       actor: actorLabel,
-      notes: managerNotes,
+      notes: closingNotes,
     };
 
     const updatedIncident = await dbUpdateIncident(params.reportId, {
@@ -925,9 +1113,9 @@ export class CompletionApprovalService {
           params.reportId,
           "REPORT_CLOSE",
           "ALLOW",
-          isSystemAdmin ? "ALL_BRANCHES" : "BRANCH",
+          "BRANCH",
           report.branch || null,
-          `Case Closed oleh ${actorLabel}. Catatan: ${managerNotes}`,
+          `Case Closed oleh ${actorLabel}. Catatan: ${closingNotes}`,
         ]
       );
     } catch (auditErr) {
@@ -1104,6 +1292,10 @@ export class CompletionApprovalService {
       managerUserName: row.manager_user_name || null,
       managerApprovedAt: row.manager_approved_at ? (row.manager_approved_at.toISOString ? row.manager_approved_at.toISOString() : new Date(row.manager_approved_at).toISOString()) : null,
       managerNotes: row.manager_notes || null,
+      closedAt: row.closed_at ? (row.closed_at.toISOString ? row.closed_at.toISOString() : new Date(row.closed_at).toISOString()) : null,
+      closedByUserId: row.closed_by_user_id || null,
+      closedByUserName: row.closed_by_user_name || null,
+      closingNotes: row.closing_notes || null,
       rejectionReason: row.rejection_reason || null,
       rejectedByRole: row.rejected_by_role || null,
       rejectedByUserId: row.rejected_by_user_id || null,

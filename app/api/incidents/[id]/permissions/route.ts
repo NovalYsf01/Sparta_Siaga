@@ -72,6 +72,8 @@ export async function GET(_: Request, { params }: RouteContext) {
         followUpReason: followUpResult.reason || "",
         canUpdateProgress: updateProgressResult.authorized,
         updateProgressReason: updateProgressResult.reason || "",
+        canFinalApprove: operationalActor && actorRole === "bm" && closeResult.authorized,
+        finalApproveReason: closeResult.reason || "",
         canClose: operationalActor && actorRole === "bm" && closeResult.authorized,
         closeReason: closeResult.reason || "",
         canCreateInstruction: instructionResult.authorized,

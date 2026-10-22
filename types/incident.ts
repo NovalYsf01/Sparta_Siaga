@@ -45,6 +45,7 @@ export type IncidentStatus =
   | "spk_issued"            // SPK sudah diterbitkan
   | "awaiting_st"           // Menunggu Serah Terima
   | "pending_final_approval" // Serah Terima 100% diajukan, menunggu persetujuan final BnM Manajer
+  | "approved_pending_close" // Disetujui final BnM Manajer, menunggu tindakan Case Close
   | "revision_requested"    // BnM Manajer meminta revisi pada persetujuan final
   | "resolved"              // Selesai (legacy status)
   | "closed"                // Laporan resmi disetujui final BnM Manajer & ditutup

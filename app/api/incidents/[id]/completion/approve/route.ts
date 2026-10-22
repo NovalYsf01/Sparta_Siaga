@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: RouteContext) {
       });
 
       return NextResponse.json({
-        message: "Laporan berhasil disetujui final oleh BnM Manajer / Administrator dan resmi ditutup.",
+        message: "Persetujuan final berhasil diberikan oleh BnM Manajer. Laporan kini menunggu tindakan Case Close.",
         data: result,
       });
     }

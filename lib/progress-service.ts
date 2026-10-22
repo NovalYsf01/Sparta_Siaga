@@ -503,7 +503,7 @@ export class ProgressService {
     reason?: string;
   }): Promise<IncidentRecord> {
     const { CompletionApprovalService } = await import("./completion-approval-service");
-    return await CompletionApprovalService.approveByManager({
+    return await CompletionApprovalService.closeCase({
       reportId: params.reportId,
       actor: params.actor,
       notes: params.reason,

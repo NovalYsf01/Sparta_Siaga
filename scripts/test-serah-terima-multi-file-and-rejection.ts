@@ -127,12 +127,24 @@ async function runTest() {
     notes: "Foto revisi telah diperiksa lengkap oleh koordinator",
   });
 
-  // 7. Manager approves -> Case Closed!
-  await CompletionApprovalService.approveByManager({
+  // 7. Manager approves -> Final Approval granted (approved_pending_close)
+  const approvalRes = await CompletionApprovalService.approveByManager({
     reportId: testReportId,
     actor: actorManager as any,
     notes: "Semua dokumen dan foto perbaikan telah lengkap dan disetujui",
   });
+  assert.strictEqual(approvalRes.status, "approved_pending_close");
+
+  const pendingCloseInc = await dbGetIncidentById(testReportId);
+  assert.strictEqual(pendingCloseInc?.status, "approved_pending_close");
+
+  // 8. Manager closes case -> Case Closed!
+  const closeRes = await CompletionApprovalService.closeCase({
+    reportId: testReportId,
+    actor: actorManager as any,
+    notes: "Pekerjaan fisik dan dokumen serah terima diverifikasi penuh. Laporan ditutup.",
+  });
+  assert.strictEqual(closeRes.status, "closed");
 
   const finalInc = await dbGetIncidentById(testReportId);
   assert.strictEqual(finalInc?.status, "closed", "Final incident status must be closed");
