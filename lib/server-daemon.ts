@@ -201,6 +201,14 @@ export async function runAutonomousDisasterCycle(): Promise<void> {
       }
     }
 
+    // 5. Automatic Report Expiration and 24h Reminder Evaluation
+    try {
+      const { processReportLifecycles } = await import('./report-lifecycle-service');
+      await processReportLifecycles();
+    } catch (lifecycleErr) {
+      console.warn('[Autonomous Daemon] Warning evaluating report lifecycles:', lifecycleErr);
+    }
+
     const elapsed = Date.now() - cycleStart;
     console.log(
       `[Autonomous Daemon] Cycle finished in ${elapsed}ms | Quakes evaluated: ${earthquakes.length} | Branches checked: ${branches.length} | Dispatches: ${dispatchedEarthquakeAlerts} EQ, ${dispatchedRainAlerts} Flood`

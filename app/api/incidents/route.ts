@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbGetAllIncidents, dbCreateIncident } from "@/lib/incident-db";
-import { IncidentRecord } from "@/types/incident";
+import { IncidentRecord, isActiveStatus, isHistoryStatus } from "@/types/incident";
 import { getSessionUser } from "@/lib/auth";
 import { ReportDistributionService } from "@/lib/distribution-service";
 import { canAccessReport } from "@/lib/report-access-policy";
@@ -45,11 +45,11 @@ export async function GET(request?: Request) {
 
     if (statusParam === "active") {
       filteredIncidents = filteredIncidents.filter(
-        (inc) => inc.status !== "closed" && inc.status !== "resolved" && inc.status !== "archived"
+        (inc) => isActiveStatus(inc.status)
       );
     } else if (statusParam === "history" || statusParam === "closed") {
       filteredIncidents = filteredIncidents.filter(
-        (inc) => inc.status === "closed" || inc.status === "resolved" || inc.status === "archived"
+        (inc) => isHistoryStatus(inc.status)
       );
     }
 

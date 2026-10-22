@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Info, X } from "lucide-react";
 import { Store, StoreStatus } from "@/types/store";
 import { Earthquake, DisasterFeedResponse } from "@/types/disaster";
-import { RoleType, IncidentRecord, DamageReport } from "@/types/incident";
+import { RoleType, IncidentRecord, DamageReport, isActiveStatus, isHistoryStatus } from "@/types/incident";
 import {
   calculateIncidentStats,
 } from "@/lib/incident-store";
@@ -158,11 +158,11 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
 
   // Active vs History partition: CLOSED, RESOLVED, and ARCHIVED automatically go to history
   const activeIncidents = useMemo(() => {
-    return filteredIncidentsByRole.filter((i) => i.status !== "closed" && i.status !== "resolved" && i.status !== "archived");
+    return filteredIncidentsByRole.filter((i) => isActiveStatus(i.status));
   }, [filteredIncidentsByRole]);
 
   const archivedIncidents = useMemo(() => {
-    return filteredIncidentsByRole.filter((i) => i.status === "closed" || i.status === "resolved" || i.status === "archived");
+    return filteredIncidentsByRole.filter((i) => isHistoryStatus(i.status));
   }, [filteredIncidentsByRole]);
 
   // Initialize theme from localStorage & apply to document.documentElement

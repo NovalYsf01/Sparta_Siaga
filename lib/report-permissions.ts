@@ -59,6 +59,7 @@ export function isReportVisibleToHo(report: IncidentRecord): boolean {
     "clarification_requested",
     "rejected_invalid",
     "investigating",
+    "expired_unhandled",
   ];
   if (unapprovedStatuses.includes(report.status)) {
     return false;

@@ -94,6 +94,9 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
       case "closed": return { label: "Ditutup (CLOSED)", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800" };
       case "resolved": return { label: "Selesai", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" };
       case "archived": return { label: "Arsip", color: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
+      case "expired_unhandled": return { label: "Tidak Ditindaklanjuti", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700" };
+      case "confirmed_safe": return { label: "Dinyatakan Aman", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800" };
+      case "rejected_invalid": return { label: "Ditolak", color: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800" };
       default: return { label: "Unknown", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
     }
   };
@@ -161,6 +164,9 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
             <option value="closed">Ditutup (CLOSED)</option>
             <option value="resolved">Selesai (Resolved)</option>
             <option value="archived">Diarsipkan</option>
+            <option value="expired_unhandled">Tidak Ditindaklanjuti</option>
+            <option value="confirmed_safe">Dinyatakan Aman</option>
+            <option value="rejected_invalid">Ditolak</option>
           </select>
           <select
             value={disasterType}

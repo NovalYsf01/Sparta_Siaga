@@ -55,6 +55,16 @@ export function rowToIncident(row: Record<string, unknown>): IncidentRecord {
         ? (row.closed_at as Date).toISOString()
         : (row.closed_at as string)
       : undefined,
+    reminder24hSentAt: row.reminder_24h_sent_at
+      ? row.reminder_24h_sent_at instanceof Date
+        ? (row.reminder_24h_sent_at as Date).toISOString()
+        : (row.reminder_24h_sent_at as string)
+      : undefined,
+    expiredAt: row.expired_at
+      ? row.expired_at instanceof Date
+        ? (row.expired_at as Date).toISOString()
+        : (row.expired_at as string)
+      : undefined,
   };
 }
 
@@ -185,9 +195,11 @@ async function ensureReporterColumn(pool: ReturnType<typeof getDbPool>) {
   if (isReporterColumnEnsured) return;
   try {
     await pool.query(`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS reporter JSONB;`);
+    await pool.query(`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS reminder_24h_sent_at TIMESTAMP WITH TIME ZONE;`);
+    await pool.query(`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP WITH TIME ZONE;`);
     isReporterColumnEnsured = true;
   } catch (err) {
-    console.warn("[incident-db] Failed to alter table incidents for reporter column:", err);
+    console.warn("[incident-db] Failed to alter table incidents for reporter/lifecycle columns:", err);
   }
 }
 
@@ -319,6 +331,8 @@ export async function dbUpdateIncident(
     externalSystem: "external_system",
     externalWorkStatus: "external_work_status",
     externalSyncedAt: "external_synced_at",
+    reminder24hSentAt: "reminder_24h_sent_at",
+    expiredAt: "expired_at",
   };
 
   for (const [key, col] of Object.entries(scalarFieldMap)) {

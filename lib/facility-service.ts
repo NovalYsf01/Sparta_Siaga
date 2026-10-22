@@ -93,7 +93,7 @@ export async function listSharedQueue(user: {
   branch: string | null;
 }) {
   const values: unknown[] = [];
-  const where = ["i.closed_at IS NULL", "i.status NOT IN ('closed', 'resolved', 'archived')"];
+  const where = ["i.closed_at IS NULL", "i.status NOT IN ('closed', 'resolved', 'archived', 'confirmed_safe', 'rejected_invalid', 'expired_unhandled')"];
   if (user.systemRole !== "ADMIN" && user.scope !== "HO") {
     values.push(user.branch);
     where.push(`i.branch = $${values.length}`);

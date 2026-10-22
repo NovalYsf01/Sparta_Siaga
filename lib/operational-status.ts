@@ -70,6 +70,15 @@ export function getStandardizedOperationalStatus(inc: IncidentRecord): Operation
     };
   }
 
+  if (s === "expired_unhandled") {
+    return {
+      label: "Tidak Ditindaklanjuti",
+      color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700",
+      cls: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700",
+      key: "EXPIRED_UNHANDLED",
+    };
+  }
+
   // 2. Completion & Handover Lifecycle (Distinct stages)
   if (approvalStatus === "WAITING_MANAGER_APPROVAL" || s === "pending_final_approval") {
     return {

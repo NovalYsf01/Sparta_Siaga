@@ -16,7 +16,7 @@ import {
   X,
   RotateCcw,
 } from "lucide-react";
-import { IncidentRecord, DisasterType, IncidentStatus, RoleType } from "@/types/incident";
+import { IncidentRecord, DisasterType, IncidentStatus, RoleType, isActiveStatus, isHistoryStatus } from "@/types/incident";
 import { UserIdentity } from "@/lib/identity";
 import { SelectReportModal } from "../incident/select-report-modal";
 import { EstimationModal } from "../incident/estimation-modal";
@@ -126,8 +126,8 @@ export function OperationalReportCenter({
 
   const filteredIncidents = useMemo(() => {
     return incidents.filter((inc) => {
-      // Exclude closed/resolved/archived permanently from active operational center
-      if (!isHoViewer && (inc.status === "closed" || inc.status === "resolved" || inc.status === "archived")) return false;
+      // Exclude history reports permanently from active operational center
+      if (!isHoViewer && isHistoryStatus(inc.status)) return false;
 
       // Detailed active status filter
       if (filterStatus !== "all" && inc.status !== filterStatus) return false;
@@ -167,10 +167,10 @@ export function OperationalReportCenter({
     return filteredIncidents.slice(start, start + pageSize);
   }, [filteredIncidents, currentPage, pageSize]);
 
-  const activeCount = incidents.filter(i => i.status !== "closed" && i.status !== "resolved" && i.status !== "archived").length;
-  const pendingCount = incidents.filter(i => i.status === "pending_confirmation").length;
+  const activeCount = incidents.filter(i => isActiveStatus(i.status)).length;
+  const pendingCount = incidents.filter(i => i.status === "pending_confirmation" || i.status === "verifying").length;
   const maintenanceCount = incidents.filter(i => i.status === "in_maintenance").length;
-  const resolvedCount = incidents.filter(i => i.status === "closed" || i.status === "resolved" || i.status === "archived").length;
+  const resolvedCount = incidents.filter(i => isHistoryStatus(i.status)).length;
 
   const getStatusBadge = (status: IncidentStatus) => {
     switch (status) {
@@ -192,6 +192,10 @@ export function OperationalReportCenter({
         return { label: "Penanganan", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" };
       case "confirmed_safe":
         return { label: "Dinyatakan Aman", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" };
+      case "rejected_invalid":
+        return { label: "Ditolak", color: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" };
+      case "expired_unhandled":
+        return { label: "Tidak Ditindaklanjuti", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" };
       case "closed":
       case "archived":
       case "resolved":

@@ -1,6 +1,6 @@
 import type { IncidentRecord, IncidentStatus } from "@/types/incident";
 
-const TERMINAL = new Set<IncidentStatus>(["closed", "resolved", "archived", "confirmed_safe", "rejected_invalid"]);
+const TERMINAL = new Set<IncidentStatus>(["closed", "resolved", "archived", "confirmed_safe", "rejected_invalid", "expired_unhandled"]);
 
 export function isReportFinalized(report: IncidentRecord): boolean {
   return TERMINAL.has(report.status);
@@ -38,6 +38,7 @@ export function reportStatusLabel(status: IncidentStatus): string {
     resolved: "Selesai",
     closed: "Ditutup",
     archived: "Diarsipkan",
+    expired_unhandled: "Tidak Ditindaklanjuti",
   };
   return labels[status] || status;
 }

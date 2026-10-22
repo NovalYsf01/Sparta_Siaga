@@ -49,7 +49,35 @@ export type IncidentStatus =
   | "revision_requested"    // BnM Manajer meminta revisi pada persetujuan final
   | "resolved"              // Selesai (legacy status)
   | "closed"                // Laporan resmi disetujui final BnM Manajer & ditutup
-  | "archived";             // Diarsipkan
+  | "archived"              // Diarsipkan
+  | "expired_unhandled";    // Kedaluwarsa otomatis (48 jam tanpa pemeriksaan awal, ditampilkan sebagai 'Tidak Ditindaklanjuti')
+
+/**
+ * Pengelompokan status Riwayat (History) vs Aktif (Active)
+ * Sesuai SPARTA SIAGA Report Lifecycle:
+ * - History: closed, resolved, archived, confirmed_safe, rejected_invalid, expired_unhandled
+ * - Active: status lainnya (pending_confirmation, verifying, clarification_requested, pending_bm_approval,
+ *   confirmed_affected, in_estimation, awaiting_spk, spk_issued, in_maintenance, in_construction,
+ *   awaiting_st, pending_final_approval, approved_pending_close, revision_requested, dsb.)
+ */
+export const HISTORY_STATUSES: IncidentStatus[] = [
+  "closed",
+  "resolved",
+  "archived",
+  "confirmed_safe",
+  "rejected_invalid",
+  "expired_unhandled",
+];
+
+export function isHistoryStatus(status?: string | null): boolean {
+  if (!status) return false;
+  return (HISTORY_STATUSES as string[]).includes(status);
+}
+
+export function isActiveStatus(status?: string | null): boolean {
+  if (!status) return false;
+  return !isHistoryStatus(status);
+}
 
 /**
  * Tipe lokasi TKP sesuai flowchart
@@ -168,11 +196,12 @@ export interface MaintenanceTicket {
 }
 
 export interface TimelineEvent {
-  stage: string;
-  label: string;
+  stage?: string;
+  label?: string;
   timestamp: string;
   actor: string;
   notes?: string;
+  activity?: string;
 }
 
 /**
@@ -318,6 +347,8 @@ export interface IncidentRecord {
   createdAt: string;
   updatedAt: string;
   closedAt?: string;
+  reminder24hSentAt?: string;
+  expiredAt?: string;
 }
 
 export interface IncidentStats {

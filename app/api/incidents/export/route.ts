@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
 import { getReportAccessSql } from "@/lib/report-access-policy";
+import { HISTORY_STATUSES, isHistoryStatus } from "@/types/incident";
 
 export async function GET(request: Request) {
   try {
@@ -56,7 +57,7 @@ export async function GET(request: Request) {
     // ENFORCE HISTORY STATUSES (closed, resolved, archived)
     if (status && status !== "all") {
       // If user passes a specific status, ensure it's a history status
-      if (status === "closed" || status === "resolved" || status === "archived") {
+      if (isHistoryStatus(status)) {
         conditions.push(`status = $${paramIndex++}`);
         values.push(status);
       } else {
@@ -65,9 +66,9 @@ export async function GET(request: Request) {
         values.push("invalid_status_for_history");
       }
     } else {
-      // Default: only show closed, resolved, and archived
-      conditions.push(`status IN ($${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
-      values.push("closed", "resolved", "archived");
+      // Default: show all history statuses (closed, resolved, archived, confirmed_safe, rejected_invalid, expired_unhandled)
+      conditions.push(`status = ANY($${paramIndex++}::text[])`);
+      values.push([...HISTORY_STATUSES]);
     }
 
     if (search && search.trim() !== "") {

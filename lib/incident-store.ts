@@ -1,4 +1,4 @@
-import { IncidentRecord, IncidentStats, DamageReport, MaintenanceTicket } from "@/types/incident";
+import { IncidentRecord, IncidentStats, DamageReport, MaintenanceTicket, isHistoryStatus } from "@/types/incident";
 
 const LOCAL_STORAGE_KEY = "sparta_siaga_incidents_v2";
 
@@ -209,16 +209,12 @@ export function calculateIncidentStats(incidents: IncidentRecord[]): IncidentSta
       ((inc.progress ?? 0) > 0 && (inc.progress ?? 0) < 100)
     ) {
       stats.inHandling = (stats.inHandling || 0) + 1;
-    } else if (
-      inc.status === "closed" ||
-      inc.status === "resolved" ||
-      inc.status === "confirmed_safe"
-    ) {
+    } else if (isHistoryStatus(inc.status)) {
       stats.closed = (stats.closed || 0) + 1;
     }
 
     // Legacy statusBreakdown
-    if (inc.status === "resolved" || inc.status === "archived" || inc.status === "closed") {
+    if (isHistoryStatus(inc.status)) {
       stats.statusBreakdown.resolved++;
     } else if (inc.status === "in_maintenance") {
       stats.statusBreakdown.inMaintenance++;
