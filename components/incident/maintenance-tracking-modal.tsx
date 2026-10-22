@@ -5,25 +5,17 @@ import {
   X,
   CheckCircle2,
   Clock,
-  AlertTriangle,
   ShieldCheck,
   ShieldAlert,
-  Store,
-  Calendar,
   Lock,
   Layers,
-  FileCheck,
   Camera,
-  Eye,
   User,
   Bot,
-  Wrench,
   RefreshCw,
   Download,
   FileText,
-  Image as ImageIcon,
   Maximize2,
-  ChevronRight,
   ClipboardList,
   Info,
   MapPin,
@@ -160,10 +152,10 @@ export function MaintenanceTrackingModal({
   const [canApproveCoordinator, setCanApproveCoordinator] = useState(false);
   const [approveCoordinatorReason, setApproveCoordinatorReason] = useState("");
 
-  // 5 Logical Sections Tab State
-  const [activeTab, setActiveTab] = useState<"ringkasan" | "pemeriksaan" | "approval" | "progres" | "dokumen">("ringkasan");
+  // 3 Simplified Tabs
+  const [activeTab, setActiveTab] = useState<"ringkasan" | "dokumen" | "riwayat">("ringkasan");
 
-  // Initial & Inspection Photo Preview Lightbox
+  // Photo Preview Lightbox
   const [previewPhoto, setPreviewPhoto] = useState<{
     url: string;
     title: string;
@@ -370,7 +362,7 @@ export function MaintenanceTrackingModal({
   return (
     <AppDialog open={isOpen} onClose={onClose} title={"Detail Laporan"} className="sm:!max-w-4xl">
       <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[92dvh] sm:max-h-[88dvh] min-h-0 overflow-hidden touch-auto select-text">
-        {/* COMPACT & FOCUSED DETAIL HEADER */}
+        {/* COMPACT HEADER */}
         <div className="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 shrink-0">
           <div className="flex items-start sm:items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -410,7 +402,6 @@ export function MaintenanceTrackingModal({
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0 pt-0.5 sm:pt-0">
-              {/* Navigasi Titik Lokasi di Peta */}
               {incident.storeId && (
                 <a
                   href={`/map?storeId=${encodeURIComponent(incident.storeId)}`}
@@ -458,37 +449,37 @@ export function MaintenanceTrackingModal({
           </div>
         </div>
 
-        {/* 5 LOGICAL SECTIONS NAVIGATION BAR */}
+        {/* 3-TAB NAVIGATION */}
         <div className="px-5 pt-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
           <div className="flex items-center gap-2 overflow-x-auto pb-3 scrollbar-none overscroll-x-contain">
             <button
               type="button"
               onClick={() => setActiveTab("ringkasan")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
                 activeTab === "ringkasan"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
               <ClipboardList className="w-3.5 h-3.5" />
-              <span>1. Ringkasan</span>
+              <span>Ringkasan</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab("pemeriksaan")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                activeTab === "pemeriksaan"
+              onClick={() => setActiveTab("dokumen")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === "dokumen"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>2. Pemeriksaan & Bukti Awal</span>
+              <span>Dokumen</span>
               {incident.fieldPhotos && incident.fieldPhotos.length > 0 && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                    activeTab === "pemeriksaan"
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                    activeTab === "dokumen"
                       ? "bg-white/20 text-white"
                       : "bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300"
                   }`}
@@ -500,52 +491,17 @@ export function MaintenanceTrackingModal({
 
             <button
               type="button"
-              onClick={() => setActiveTab("approval")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                activeTab === "approval"
+              onClick={() => setActiveTab("riwayat")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                activeTab === "riwayat"
                   ? "bg-[#1D5AA6] text-white shadow-xs"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>3. Approval</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("progres")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                activeTab === "progres"
-                  ? "bg-[#1D5AA6] text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>4. Progres & Milestone</span>
-              <span
-                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
-                  activeTab === "progres"
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300"
-                }`}
-              >
-                {latestProgress}%
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("dokumen")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
-                activeTab === "dokumen"
-                  ? "bg-[#1D5AA6] text-white shadow-xs"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>5. Riwayat & Dokumen</span>
+              <Clock className="w-3.5 h-3.5" />
+              <span>Riwayat</span>
               {isReportClosed && (
-                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
                   CLOSED
                 </span>
               )}
@@ -553,12 +509,15 @@ export function MaintenanceTrackingModal({
           </div>
         </div>
 
-        {/* SCROLLABLE MODAL CONTENT BODY */}
+        {/* SCROLLABLE CONTENT */}
         <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain flex-1 min-h-0 space-y-6">
-          {/* TAB 1: RINGKASAN */}
+          {/* ============================================================ */}
+          {/* TAB 1: RINGKASAN                                             */}
+          {/* Consolidates: report info, PIC, status, inspection, approval */}
+          {/* ============================================================ */}
           {activeTab === "ringkasan" && (
             <div className="space-y-4 animate-in fade-in">
-              {/* OPERATIONAL PIC & TARGET BANNER (READ-ONLY) */}
+              {/* PIC & TARGET BANNER */}
               {(() => {
                 const targetDateVal = incident.targetCompletionDate || incident.maintenanceTicket?.completedAt;
                 const isOverdue = Boolean(
@@ -606,7 +565,7 @@ export function MaintenanceTrackingModal({
                 );
               })()}
 
-              {/* INFORMASI OPERASIONAL & STATUS PENANGANAN */}
+              {/* STATUS & OPERATIONAL INFO */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
                 <div className="flex items-start gap-3 p-3.5 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40 text-xs">
                   <Info className="w-4 h-4 text-[#1D5AA6] dark:text-blue-400 shrink-0 mt-0.5" />
@@ -666,7 +625,7 @@ export function MaintenanceTrackingModal({
                   </div>
                 </div>
 
-                {/* PARAMETER GEMPA / BENCANA JIKA ADA */}
+                {/* DISASTER PARAMETERS */}
                 {incident.disasterMetadata && (
                   <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
@@ -701,13 +660,203 @@ export function MaintenanceTrackingModal({
                   </div>
                 )}
               </div>
+
+              {/* INSPECTION RESULTS (consolidated from old Tab 2) */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                      Hasil Pemeriksaan Fisik Cabang (BMS / BES)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Verifikasi langsung di TKP untuk menentukan kondisi aman atau rusak.
+                    </p>
+                  </div>
+                </div>
+
+                {incident.verification ? (
+                  <div className="space-y-3 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/80 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Kondisi Fisik</span>
+                        <span
+                          className={`font-bold block mt-0.5 ${
+                            incident.verification.isDamaged
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          }`}
+                        >
+                          {incident.verification.isDamaged ? "RUSAK / TERDAMPAK" : "AMAN / TIDAK RUSAK"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Metode Pemeriksaan</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
+                          {incident.verification.inspectionMethod === "informasi_petugas"
+                            ? "Informasi Petugas"
+                            : "Kunjungan Langsung"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Petugas Pemeriksa</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
+                          {incident.verification.confirmedBy || "-"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Waktu Pemeriksaan</span>
+                        <span className="text-slate-700 dark:text-slate-300 font-medium block mt-0.5">
+                          {safeFormatDate(incident.verification.confirmedAt)}
+                        </span>
+                      </div>
+                      {incident.verification.severity && (
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block">Tingkat Kerusakan</span>
+                          <span className="font-bold text-slate-900 dark:text-white block mt-0.5">
+                            {incident.verification.severity}
+                          </span>
+                        </div>
+                      )}
+                      {incident.verification.operationalStatus && (
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-semibold block">Status Operasional</span>
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
+                            {incident.verification.operationalStatus}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {incident.verification.categories && incident.verification.categories.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                          Kategori Area Kerusakan:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {incident.verification.categories.map((cat, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            >
+                              {cat}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {incident.verification.notes && (
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                          Catatan Pemeriksaan Lapangan:
+                        </span>
+                        <p className="text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 leading-relaxed">
+                          {incident.verification.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
+                    Pemeriksaan kondisi lapangan belum diinput. Petugas BMS/BES cabang terkait akan melakukan inspeksi fisik.
+                  </div>
+                )}
+              </div>
+
+              {/* BnM MANAGER INITIAL APPROVAL (consolidated from old Tab 2) */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-indigo-600" />
+                      Persetujuan Awal BnM Manajer Cabang
+                    </h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Persetujuan manajerial untuk menentukan apakah laporan masuk penanganan pekerjaan atau selesai.
+                    </p>
+                  </div>
+                </div>
+
+                {incident.verification?.bmApproval ? (
+                  <div className="bg-slate-50/80 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60 space-y-2 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Keputusan Manajer</span>
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400 block mt-0.5 uppercase">
+                          {incident.verification.bmApproval.decision}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Pemberi Persetujuan</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
+                          {incident.verification.bmApproval.decidedBy || `BnM Manajer (${incident.branch})`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-semibold block">Waktu Keputusan</span>
+                        <span className="text-slate-700 dark:text-slate-300 font-medium block mt-0.5">
+                          {safeFormatDate(incident.verification.bmApproval.decidedAt)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {(incident.verification.bmApproval.decisionNotes || incident.verification.bmApproval.rejectionReason) && (
+                      <div className="pt-2 border-t border-slate-200/40 dark:border-slate-800/40">
+                        <span className="text-[10px] font-bold text-slate-400 block mb-0.5">Catatan BnM Manajer:</span>
+                        <p className="text-slate-800 dark:text-slate-200 italic">
+                          {incident.verification.bmApproval.decisionNotes || incident.verification.bmApproval.rejectionReason}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
+                    {incident.status === "pending_bm_approval"
+                      ? "Hasil pemeriksaan telah diajukan dan sedang menunggu review & persetujuan awal BnM Manajer."
+                      : "Persetujuan awal BnM Manajer akan aktif setelah petugas cabang menginput hasil pemeriksaan fisik."}
+                  </div>
+                )}
+              </div>
+
+              {/* COMPLETION APPROVAL STATUS (consolidated from old Tab 3) */}
+              {(completionApproval || completionHistory.length > 0) && (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                    <div className="space-y-0.5">
+                      <strong>Status Approval Serah Terima</strong>
+                      <p>
+                        Detail persetujuan hanya untuk dilihat.
+                        Tindakan hanya dilakukan melalui menu Update Progress oleh akun yang berwenang.
+                      </p>
+                    </div>
+                  </div>
+                  <CompletionApprovalCard
+                    incident={incident}
+                    approval={completionApproval}
+                    route={completionRoute}
+                    history={completionHistory}
+                    latestProgress={latestProgress}
+                    hasFinalEvidence={hasFinalEvidence}
+                    canSubmitCompletion={false}
+                    canApproveCoordinator={false}
+                    canClose={false}
+                    onRefresh={loadData}
+                    readOnly
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {/* TAB 2: PEMERIKSAAN & BUKTI AWAL */}
-          {activeTab === "pemeriksaan" && (
+          {/* ============================================================ */}
+          {/* TAB 2: DOKUMEN                                               */}
+          {/* Photos, milestone docs, PDF downloads                        */}
+          {/* ============================================================ */}
+          {activeTab === "dokumen" && (
             <div className="space-y-6 animate-in fade-in">
-              {/* SUB-SECTION A: FOTO BUKTI AWAL (report.fieldPhotos) */}
+              {/* INITIAL FIELD PHOTOS */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div>
@@ -814,199 +963,7 @@ export function MaintenanceTrackingModal({
                 )}
               </div>
 
-              {/* SUB-SECTION B: HASIL PEMERIKSAAN KONDISI LAPANGAN */}
-              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      Hasil Pemeriksaan Fisik Cabang (BMS / BES)
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Verifikasi langsung di TKP untuk menentukan kondisi aman atau rusak.
-                    </p>
-                  </div>
-                </div>
-
-                {incident.verification ? (
-                  <div className="space-y-3 text-xs">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/80 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Kondisi Fisik</span>
-                        <span
-                          className={`font-bold block mt-0.5 ${
-                            incident.verification.isDamaged
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          }`}
-                        >
-                          {incident.verification.isDamaged ? "RUSAK / TERDAMPAK" : "AMAN / TIDAK RUSAK"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Metode Pemeriksaan</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
-                          {incident.verification.inspectionMethod === "informasi_petugas"
-                            ? "Informasi Petugas"
-                            : "Kunjungan Langsung"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Petugas Pemeriksa</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
-                          {incident.verification.confirmedBy || "-"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Waktu Pemeriksaan</span>
-                        <span className="text-slate-700 dark:text-slate-300 font-medium block mt-0.5">
-                          {safeFormatDate(incident.verification.confirmedAt)}
-                        </span>
-                      </div>
-                      {incident.verification.severity && (
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-semibold block">Tingkat Kerusakan</span>
-                          <span className="font-bold text-slate-900 dark:text-white block mt-0.5">
-                            {incident.verification.severity}
-                          </span>
-                        </div>
-                      )}
-                      {incident.verification.operationalStatus && (
-                        <div>
-                          <span className="text-[10px] text-slate-400 font-semibold block">Status Operasional</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
-                            {incident.verification.operationalStatus}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {incident.verification.categories && incident.verification.categories.length > 0 && (
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                          Kategori Area Kerusakan:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {incident.verification.categories.map((cat, i) => (
-                            <span
-                              key={i}
-                              className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
-                            >
-                              {cat}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {incident.verification.notes && (
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                          Catatan Pemeriksaan Lapangan:
-                        </span>
-                        <p className="text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/60 leading-relaxed">
-                          {incident.verification.notes}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
-                    Pemeriksaan kondisi lapangan belum diinput. Petugas BMS/BES cabang terkait akan melakukan inspeksi fisik.
-                  </div>
-                )}
-              </div>
-
-              {/* SUB-SECTION C: KEPUTUSAN AWAL BnM MANAJER */}
-              <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                      <ShieldAlert className="w-4 h-4 text-indigo-600" />
-                      Persetujuan Awal BnM Manajer Cabang
-                    </h4>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      Persetujuan manajerial untuk menentukan apakah laporan masuk penanganan pekerjaan atau selesai.
-                    </p>
-                  </div>
-                </div>
-
-                {incident.verification?.bmApproval ? (
-                  <div className="bg-slate-50/80 dark:bg-slate-950/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800/60 space-y-2 text-xs">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Keputusan Manajer</span>
-                        <span className="font-bold text-indigo-600 dark:text-indigo-400 block mt-0.5 uppercase">
-                          {incident.verification.bmApproval.decision}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Pemberi Persetujuan</span>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200 block mt-0.5">
-                          {incident.verification.bmApproval.decidedBy || `BnM Manajer (${incident.branch})`}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-semibold block">Waktu Keputusan</span>
-                        <span className="text-slate-700 dark:text-slate-300 font-medium block mt-0.5">
-                          {safeFormatDate(incident.verification.bmApproval.decidedAt)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {(incident.verification.bmApproval.decisionNotes || incident.verification.bmApproval.rejectionReason) && (
-                      <div className="pt-2 border-t border-slate-200/40 dark:border-slate-800/40">
-                        <span className="text-[10px] font-bold text-slate-400 block mb-0.5">Catatan BnM Manajer:</span>
-                        <p className="text-slate-800 dark:text-slate-200 italic">
-                          {incident.verification.bmApproval.decisionNotes || incident.verification.bmApproval.rejectionReason}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
-                    {incident.status === "pending_bm_approval"
-                      ? "Hasil pemeriksaan telah diajukan dan sedang menunggu review & persetujuan awal BnM Manajer."
-                      : "Persetujuan awal BnM Manajer akan aktif setelah petugas cabang menginput hasil pemeriksaan fisik."}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: APPROVAL STATUS (DETAIL IS ALWAYS READ-ONLY) */}
-          {activeTab === "approval" && (
-            <div className="space-y-4 animate-in fade-in">
-              <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-                <div className="space-y-1">
-                  <strong>Status & Riwayat Approval</strong>
-                  <p>
-                    Halaman Detail hanya untuk melihat persetujuan dan riwayatnya.
-                    Pemeriksaan, persetujuan koordinator, keputusan BnM Manajer, dan Case Close
-                    hanya dilakukan melalui menu Update Progress oleh akun yang berwenang.
-                  </p>
-                </div>
-              </div>
-              <CompletionApprovalCard
-                incident={incident}
-                approval={completionApproval}
-                route={completionRoute}
-                history={completionHistory}
-                latestProgress={latestProgress}
-                hasFinalEvidence={hasFinalEvidence}
-                canSubmitCompletion={false}
-                canApproveCoordinator={false}
-                canClose={false}
-                onRefresh={loadData}
-                readOnly
-              />
-            </div>
-          )}
-
-          {/* TAB 4: PROGRES & MILESTONE (Task 6: RepairLinksCard REMOVED) */}
-          {activeTab === "progres" && (
-            <div className="space-y-6 animate-in fade-in">
+              {/* MILESTONE & PROGRESS DOCUMENTATION */}
               <MilestoneProgressionCard
                 incident={incident}
                 identity={identity}
@@ -1014,29 +971,7 @@ export function MaintenanceTrackingModal({
                 onMilestoneUpdated={loadData}
               />
 
-              {/* Progress History Timeline */}
-              {progressHistory.length > 0 ? (
-                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h5 className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-600" />
-                      Log Pembaruan Fisik Tambahan ({progressHistory.length})
-                    </h5>
-                  </div>
-                  <ProgressTimeline history={progressHistory} loading={loading} />
-                </div>
-              ) : (
-                <div className="p-4 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 bg-slate-50/50 dark:bg-slate-900/30">
-                  Belum ada catatan pembaruan fisik tambahan di luar dokumen milestone penanganan.
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 5: RIWAYAT & DOKUMEN */}
-          {activeTab === "dokumen" && (
-            <div className="space-y-6 animate-in fade-in">
-              {/* SECTION A: UNDUH DOKUMEN RESMI (PDF AWAL & PDF FINAL) */}
+              {/* OFFICIAL PDF DOCUMENTS */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div>
@@ -1165,14 +1100,40 @@ export function MaintenanceTrackingModal({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* SECTION B: APPEND-ONLY TIMELINE AUDIT HISTORY */}
+          {/* ============================================================ */}
+          {/* TAB 3: RIWAYAT                                               */}
+          {/* Audit chronology, progress history, approval history         */}
+          {/* ============================================================ */}
+          {activeTab === "riwayat" && (
+            <div className="space-y-6 animate-in fade-in">
+              {/* PROGRESS HISTORY TIMELINE */}
+              {progressHistory.length > 0 && (
+                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <h5 className="font-bold text-xs text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-blue-600" />
+                      Log Pembaruan Progres ({progressHistory.length})
+                    </h5>
+                    <span
+                      className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300"
+                    >
+                      {latestProgress}%
+                    </span>
+                  </div>
+                  <ProgressTimeline history={progressHistory} loading={loading} />
+                </div>
+              )}
+
+              {/* AUDIT CHRONOLOGY */}
               <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2">
                       <Clock className="w-4 h-4 text-blue-600" />
-                      Log Kronologi Audit Laporan (Append-Only)
+                      Log Kronologi Audit Laporan
                     </h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                       Catatan jejak aktivitas resmi dari pembuatan laporan hingga selesai.
