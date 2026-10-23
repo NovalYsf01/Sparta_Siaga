@@ -6,6 +6,18 @@ const nextConfig = {
   poweredByHeader: false,
   devIndicators: false,
   output: 'standalone',
+  outputFileTracingExcludes: {
+    '*': [
+      'tests/**/*',
+      'docs/**/*',
+      'artifacts/**/*',
+      'scratch/**/*',
+      'backups/**/*',
+      'graphify-out/**/*',
+      'public/simulasi-uat/**/*',
+      'public/uploads/progress/**/*',
+    ],
+  },
   turbopack: {
     root: fileURLToPath(new URL('.', import.meta.url)),
   },

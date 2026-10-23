@@ -17,6 +17,21 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Defense-in-depth: Prune non-production, test, and simulation artifacts before build
+RUN rm -rf \
+    tests \
+    playwright.config.ts \
+    test-api.mjs \
+    sparta_p1_qa_report.md \
+    public/simulasi-uat \
+    public/uploads/progress/orig_INC-TEST* \
+    public/uploads/progress/wm_INC-TEST* \
+    docs \
+    artifacts \
+    scratch \
+    backups \
+    graphify-out \
+    .graphify*
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN pnpm run build

@@ -21,7 +21,15 @@ export function calculateHaversineDistance(
     !Number.isFinite(lat1) ||
     !Number.isFinite(lon1) ||
     !Number.isFinite(lat2) ||
-    !Number.isFinite(lon2)
+    !Number.isFinite(lon2) ||
+    lat1 < -90 ||
+    lat1 > 90 ||
+    lat2 < -90 ||
+    lat2 > 90 ||
+    lon1 < -180 ||
+    lon1 > 180 ||
+    lon2 < -180 ||
+    lon2 > 180
   ) {
     return NaN;
   }
@@ -109,6 +117,10 @@ export function assessStoreRisk(
     store.longitude == null ||
     !Number.isFinite(store.latitude) ||
     !Number.isFinite(store.longitude) ||
+    store.latitude < -90 ||
+    store.latitude > 90 ||
+    store.longitude < -180 ||
+    store.longitude > 180 ||
     !activeEarthquakes ||
     activeEarthquakes.length === 0
   ) {
@@ -128,7 +140,11 @@ export function assessStoreRisk(
       event.latitude == null ||
       event.longitude == null ||
       !Number.isFinite(event.latitude) ||
-      !Number.isFinite(event.longitude)
+      !Number.isFinite(event.longitude) ||
+      event.latitude < -90 ||
+      event.latitude > 90 ||
+      event.longitude < -180 ||
+      event.longitude > 180
     ) {
       continue;
     }
@@ -144,8 +160,13 @@ export function assessStoreRisk(
 
     let currentEventRisk: SpatialRisk = "SAFE";
 
-    const priorityR = (event as any).priorityRadiusKm ?? (event as any).dangerRadiusKm ?? 50;
-    const monitorR = (event as any).monitoringRadiusKm ?? (event as any).warningRadiusKm ?? 120;
+    let priorityR = (event as any).priorityRadiusKm ?? (event as any).dangerRadiusKm;
+    let monitorR = (event as any).monitoringRadiusKm ?? (event as any).warningRadiusKm;
+    if (priorityR == null || monitorR == null) {
+      const zones = calculateSpartaMonitoringZone(event.magnitude, event.depthKm);
+      priorityR = priorityR ?? zones.priorityRadiusKm;
+      monitorR = monitorR ?? zones.monitoringRadiusKm;
+    }
 
     if (dist <= priorityR) {
       currentEventRisk = "PRIORITY_MONITOR";
@@ -238,6 +259,31 @@ export function evaluateAffectedLocations<T extends LocationItem>(
     ? { priorityRadiusKm: earthquake.priorityRadiusKm, monitoringRadiusKm: earthquake.monitoringRadiusKm }
     : calculateSpartaMonitoringZone(earthquake.magnitude, depth);
 
+  if (
+    earthquake.latitude == null ||
+    earthquake.longitude == null ||
+    !Number.isFinite(earthquake.latitude) ||
+    !Number.isFinite(earthquake.longitude) ||
+    earthquake.latitude < -90 ||
+    earthquake.latitude > 90 ||
+    earthquake.longitude < -180 ||
+    earthquake.longitude > 180
+  ) {
+    return {
+      earthquakeId: earthquake.id,
+      magnitude: earthquake.magnitude,
+      depthKm: depth,
+      priorityRadiusKm: radii.priorityRadiusKm,
+      monitoringRadiusKm: radii.monitoringRadiusKm,
+      priorityLocations: [],
+      monitoringLocations: [],
+      allAffectedLocations: [],
+      totalAffected: 0,
+      totalEvaluated: 0,
+      invalidLocationCount: 0,
+    };
+  }
+
   const priorityLocations: EvaluatedLocation<T>[] = [];
   const monitoringLocations: EvaluatedLocation<T>[] = [];
   const allAffectedLocations: EvaluatedLocation<T>[] = [];
@@ -265,7 +311,8 @@ export function evaluateAffectedLocations<T extends LocationItem>(
       continue;
     }
 
-    const code = loc.code || loc.kode_toko || loc.id || `loc_${totalEvaluated}`;
+    const rawCode = (loc.code || loc.kode_toko || loc.id || "").toString().trim();
+    const code = rawCode.length > 0 ? rawCode : `loc_${totalEvaluated}`;
     if (seenCodes.has(code)) {
       continue; // Deduplicate duplicate locations
     }
@@ -283,9 +330,10 @@ export function evaluateAffectedLocations<T extends LocationItem>(
       continue;
     }
 
-    const id = loc.id || loc.code || loc.kode_toko || code;
-    const name = loc.name || loc.nama_toko || code;
-    const branch = loc.cabang || loc.branch_id || "Nasional";
+    const id = (loc.id || loc.code || loc.kode_toko || code).toString();
+    const name = (loc.name || loc.nama_toko || code).toString();
+    const rawBranch = (loc.cabang || loc.branch_id || "").toString().trim();
+    const branch = rawBranch || "Belum dipetakan";
 
     if (distanceKm <= radii.priorityRadiusKm) {
       const evaluated: EvaluatedLocation<T> = {

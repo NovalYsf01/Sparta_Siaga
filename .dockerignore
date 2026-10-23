@@ -1,15 +1,59 @@
+# ============================================================================
+# SPARTA SIAGA — Docker Build Ignore Configuration
+# PROD-CLEAN-01: Production Packaging Optimization & Artifact Exclusion
+# ============================================================================
+
+# Version control, agent metadata & local configs
 .git
 .gitignore
 .gitmodules
 .worktrees
 .superpowers
+.agents
+.claude
+.codex
+.opencode
+anti-slop
+.idea
+.vscode
+
+# Secrets & environment files
 .env*
 !.env.example
+
+# Build caches & outputs
 node_modules
 .next
 coverage
 storage
 tmp
 *.log
+*.tsbuildinfo
+
+# Documentation & internal analysis
 docs
-scripts/test-*
+artifacts
+scratch
+backups
+graphify-out
+.graphify*
+*.md
+!README.md
+
+# QA reports & standalone test files
+sparta_p1_qa_report.md
+test-api.mjs
+
+# Playwright & E2E browser tests
+tests
+playwright.config.ts
+
+# Non-production scripts (Preserve essential production migration & worker daemon)
+scripts/*
+!scripts/migrate-production.mjs
+!scripts/worker-daemon.ts
+
+# UAT simulation & test uploads in public directory
+public/simulasi-uat
+public/uploads/progress/orig_INC-TEST*
+public/uploads/progress/wm_INC-TEST*

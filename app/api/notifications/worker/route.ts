@@ -5,6 +5,7 @@ import { calculateHaversineDistance, calculateSpartaMonitoringZone } from '@/lib
 import { getDbPool } from '@/lib/db';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
+import { NotificationLog, AffectedStoreSummary } from '@/types/notification';
 import { dbUpsertEarthquakeEvent } from '@/lib/earthquake-db';
 import { ensureEarthquakeReport } from '@/lib/earthquake-report-service';
 import { 
@@ -13,7 +14,12 @@ import {
   recordNotificationLog, 
   generateEmergencyEmailHtml 
 } from '@/lib/notification-service';
-import { AffectedStoreSummary, NotificationLog } from '@/types/notification';
+import {
+  AUTO_EARTHQUAKE_MAX_AGE_MINUTES,
+  AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES,
+  AUTO_EARTHQUAKE_BACKFILL_MAX_AGE_MINUTES,
+} from '@/lib/server-daemon';
+import { dispatchEarthquakePushNotifications } from '@/lib/web-push-service';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,9 +68,11 @@ export async function POST(request: Request) {
 
   try {
     let forceSimulation = false;
+    let allowBackfill = false;
     try {
       const body = await request.json();
       forceSimulation = !!body.forceSimulation;
+      allowBackfill = !!body.allowBackfill;
     } catch {
       // no body or non-json
     }
@@ -112,6 +120,17 @@ export async function POST(request: Request) {
 
     if (isEligibleForAlert && disasterFeed.activeEarthquakes && disasterFeed.activeEarthquakes.length > 0) {
       for (const eq of disasterFeed.activeEarthquakes) {
+        const eventTimestamp = eq.timestamp || (eq.time ? new Date(eq.time).getTime() : Date.now());
+        const eventAgeMinutes = (Date.now() - eventTimestamp) / (1000 * 60);
+        if (!forceSimulation && !allowBackfill && eventAgeMinutes > AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES) {
+          continue;
+        }
+        if (!forceSimulation && eventAgeMinutes > AUTO_EARTHQUAKE_BACKFILL_MAX_AGE_MINUTES) {
+          continue;
+        }
+
+        const isAlertFresh = forceSimulation || (eventAgeMinutes <= AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES);
+
         await dbUpsertEarthquakeEvent(eq);
         // Calculate SPARTA zones
         const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(eq.magnitude, eq.depthKm);
@@ -121,6 +140,7 @@ export async function POST(request: Request) {
       const affectedFacilitiesByBranch = new Map<string, AffectedStoreSummary[]>();
 
       for (const st of stores) {
+        if (!st.cabang || !st.cabang.trim()) continue;
         const dist = calculateHaversineDistance(eq.latitude, eq.longitude, st.latitude, st.longitude);
         if (dist <= monitoringRadiusKm) {
           const status = dist <= priorityRadiusKm ? 'PRIORITY_MONITOR' : 'MONITOR';
@@ -142,24 +162,41 @@ export async function POST(request: Request) {
       }
 
       for (const facility of facilityRes.rows) {
+        if (
+          facility.latitude == null ||
+          facility.longitude == null ||
+          !Number.isFinite(Number(facility.latitude)) ||
+          !Number.isFinite(Number(facility.longitude))
+        ) {
+          continue;
+        }
         const distanceKm = calculateHaversineDistance(
           eq.latitude,
           eq.longitude,
           Number(facility.latitude),
           Number(facility.longitude)
         );
-        if (distanceKm > monitoringRadiusKm) continue;
+        if (isNaN(distanceKm) || distanceKm > monitoringRadiusKm) continue;
+
+        const branchKey = facility.branch_id?.trim();
+        // EQ-03 Requirement 5: Never use "Nasional" as substitute operational branch.
+        // Unmapped facilities are logged, flagged, and excluded from branch-specific dispatch until mapped.
+        if (!branchKey) {
+          console.warn(`[SPARTA SIAGA][Worker] Unmapped facility detected: ${facility.code} (${facility.name}) has no operational branch mapping. Flagging and excluding from branch-specific notification dispatch.`);
+          continue;
+        }
+
         const facilitySummary: AffectedStoreSummary = {
           kode_toko: facility.code,
           nama_toko: facility.name,
-          cabang: facility.branch_id,
+          cabang: branchKey,
           distance_km: Math.round(distanceKm * 10) / 10,
           status: distanceKm <= priorityRadiusKm ? 'PRIORITY_MONITOR' : 'MONITOR',
           fr_type: facility.facility_type,
         };
-        const branchFacilities = affectedFacilitiesByBranch.get(facility.branch_id) ?? [];
+        const branchFacilities = affectedFacilitiesByBranch.get(branchKey) ?? [];
         branchFacilities.push(facilitySummary);
-        affectedFacilitiesByBranch.set(facility.branch_id, branchFacilities);
+        affectedFacilitiesByBranch.set(branchKey, branchFacilities);
         const reportHash = crypto
           .createHash('sha256')
           .update(`${eq.id}:FACILITY:${facility.id}`)
@@ -177,85 +214,102 @@ export async function POST(request: Request) {
             code: facility.code,
             name: facility.name,
             type: facility.facility_type,
-            branch: facility.branch_id,
+            branch: branchKey,
             latitude: Number(facility.latitude),
             longitude: Number(facility.longitude),
           },
         });
       }
 
-      for (const [branch, facilities] of affectedFacilitiesByBranch) {
-        facilities.sort((a, b) => a.distance_km - b.distance_km);
-        const priorityCount = facilities.filter((item) => item.status === 'PRIORITY_MONITOR').length;
-        const log = await recordNotificationLog({
-          disasterId: eq.id,
-          canonicalEventId: eq.id,
-          disasterType: 'earthquake',
-          channel: 'pwa_only',
-          branch,
-          recipientGroup: 'BES',
-          category: 'ASSIGNMENT',
-          recipientContact: `in-app://bes/${branch.toLowerCase().replace(/\s+/g, '-')}`,
-          title: `Pemeriksaan fasilitas · Gempa M ${eq.magnitude}`,
-          message: `${facilities.length} fasilitas perlu diperiksa; ${priorityCount} berada di Zona Prioritas Pantau. Buka Shared Queue untuk mengambil PIC.`,
-          affectedStores: facilities,
-        });
-        dispatchedLogs.push(log);
-      }
+      if (isAlertFresh) {
+        for (const [branch, facilities] of affectedFacilitiesByBranch) {
+          facilities.sort((a, b) => a.distance_km - b.distance_km);
+          const priorityCount = facilities.filter((item) => item.status === 'PRIORITY_MONITOR').length;
+          const log = await recordNotificationLog({
+            disasterId: eq.id,
+            canonicalEventId: eq.id,
+            disasterType: 'earthquake',
+            channel: 'pwa_only',
+            branch,
+            recipientGroup: 'BES',
+            category: 'ASSIGNMENT',
+            recipientContact: `in-app://bes/${branch.toLowerCase().replace(/\s+/g, '-')}`,
+            title: `Pemeriksaan fasilitas · Gempa M ${eq.magnitude}`,
+            message: `${facilities.length} fasilitas perlu diperiksa; ${priorityCount} berada di Zona Prioritas Pantau. Buka Shared Queue untuk mengambil PIC.`,
+            affectedStores: facilities,
+          });
+          dispatchedLogs.push(log);
+        }
 
-      // If simulated or actually has affected stores in priority monitor
-      for (const [branch, branchStores] of affectedByBranch.entries()) {
-        const priorityStores = branchStores.filter(s => s.status === 'PRIORITY_MONITOR');
-        
-        // Dispatch alert if there are stores in priority monitor, or high magnitude, or forced simulation
-        if (priorityStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0) || forceSimulation) {
-          const isProcessed = !forceSimulation && await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
-          const inCooldown = !forceSimulation && await isNotificationCooldownActive('earthquake', branch);
+        // If simulated or actually has affected stores in priority monitor
+        for (const [branch, branchStores] of affectedByBranch.entries()) {
+          const priorityStores = branchStores.filter(s => s.status === 'PRIORITY_MONITOR');
+          
+          // Dispatch alert if there are stores in priority monitor, or high magnitude, or forced simulation
+          if (priorityStores.length > 0 || (eq.magnitude >= 5.0 && branchStores.length > 0) || forceSimulation) {
+            const isProcessed = !forceSimulation && await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
+            const inCooldown = !forceSimulation && await isNotificationCooldownActive('earthquake', branch);
 
-          if (!isProcessed && !inCooldown) {
-            // Sort stores by distance
-            branchStores.sort((a, b) => a.distance_km - b.distance_km);
+            if (!isProcessed && !inCooldown) {
+              // Sort stores by distance
+              branchStores.sort((a, b) => a.distance_km - b.distance_km);
 
-            const ticketNumber = `ESC-${branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-            const disasterTitle = forceSimulation
-              ? `[SIMULATION] ⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`
-              : `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
-            const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Zona Prioritas Pantau SPARTA terhitung ${priorityRadiusKm} km. ${priorityStores.length} gerai toko cabang Anda berada di Zona Prioritas Pantau SPARTA.`;
+              const ticketNumber = `ESC-${branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+              const disasterTitle = forceSimulation
+                ? `[SIMULATION] ⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`
+                : `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
+              const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Zona Prioritas Pantau SPARTA terhitung ${priorityRadiusKm} km. ${priorityStores.length} gerai toko cabang Anda berada di Zona Prioritas Pantau SPARTA.`;
 
-            const instructions = [
-              'Duty Officer DC Cabang segera melakukan panggilan radio/telepon siaga ke Area Coordinator (AC) terkait.',
-              'Instruksikan personil toko melakukan evakuasi pelanggan dan kru jika struktur bangunan menunjukkan keretakan.',
-              'Matikan aliran listrik utama (MCB) dan amankan tabung gas jika tercium bau kebocoran.',
-              'Laporkan status operasional (Buka / Tutup Sementara / Kerusakan) melalui Command Center SPARTA.'
-            ];
+              const instructions = [
+                'Duty Officer DC Cabang segera melakukan panggilan radio/telepon siaga ke Area Coordinator (AC) terkait.',
+                'Instruksikan personil toko melakukan evakuasi pelanggan dan kru jika struktur bangunan menunjukkan keretakan.',
+                'Matikan aliran listrik utama (MCB) dan amankan tabung gas jika tercium bau kebocoran.',
+                'Laporkan status operasional (Buka / Tutup Sementara / Kerusakan) melalui Command Center SPARTA.'
+              ];
 
-            const emailHtml = generateEmergencyEmailHtml({
-              ticketNumber,
-              branch,
-              disasterTitle,
-              disasterDetail,
-              affectedCount: branchStores.length,
-              stores: branchStores,
-              instructions,
-              sentAt: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
-            });
+              const emailHtml = generateEmergencyEmailHtml({
+                ticketNumber,
+                branch,
+                disasterTitle,
+                disasterDetail,
+                affectedCount: branchStores.length,
+                stores: branchStores,
+                instructions,
+                sentAt: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+              });
 
-            const log = await recordNotificationLog({
-              disasterId: forceSimulation ? `sim_eq_${eq.id}_${Date.now()}` : eq.id,
-              disasterType: 'earthquake',
-              channel: 'email_and_pwa',
-              branch,
-              recipientContact: `dc.${branch.toLowerCase().replace(/\s+/g, '')}@alfamart.co.id`,
-              title: disasterTitle,
-              message: disasterDetail,
-              affectedStores: branchStores,
-              ticketNumber,
-            });
+              const log = await recordNotificationLog({
+                disasterId: forceSimulation ? `sim_eq_${eq.id}_${Date.now()}` : eq.id,
+                disasterType: 'earthquake',
+                channel: 'email_and_pwa',
+                branch,
+                recipientContact: `dc.${branch.toLowerCase().replace(/\s+/g, '')}@alfamart.co.id`,
+                title: disasterTitle,
+                message: disasterDetail,
+                affectedStores: branchStores,
+                ticketNumber,
+              });
 
-            log.email_html_preview = emailHtml;
-            dispatchedLogs.push(log);
+              // Deliver real background Web Push to registered devices (Android, iOS PWA, Desktop)
+              await dispatchEarthquakePushNotifications({
+                title: disasterTitle,
+                body: disasterDetail,
+                branch,
+                eventId: eq.id,
+                magnitude: eq.magnitude,
+                priorityStoresCount: priorityStores.length,
+                url: `/monitoring?disasterId=${encodeURIComponent(eq.id)}`,
+              }).catch((pushErr) => {
+                console.error('[SPARTA SIAGA][Worker] Error during background Web Push dispatch:', pushErr);
+              });
+
+              log.email_html_preview = emailHtml;
+              dispatchedLogs.push(log);
+            }
           }
         }
+      } else {
+        console.log(`[SPARTA SIAGA][Worker] Suppressed outdated emergency alert for event ${eq.id} (event age: ${eventAgeMinutes.toFixed(1)}m > ${AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES}m)`);
       }
     }
     } // Close if (isEligibleForAlert)

@@ -236,7 +236,7 @@ async function run() {
     const multiStores = [storeDago, storeRiau, storeCirebon];
 
     // Clean up before starting
-    await client.query("DELETE FROM incidents WHERE earthquake_event_id LIKE 'EQ-E2E-%';");
+    await client.query("DELETE FROM incidents WHERE earthquake_event_id LIKE 'EQ-E2E-%' OR store_id IN ('T-BDG-DAGO', 'T-BDG-RIAU', 'T-CRB-KJSN');");
     await client.query("DELETE FROM notification_logs WHERE disaster_id LIKE 'EQ-E2E-%';");
 
     // -------------------------------------------------------------------------
@@ -312,8 +312,8 @@ async function run() {
 
     const cycleNewEvent = await processEarthquakeAlertsAndReports([testEarthquake2], [storeDago], true);
     const dagoReportsTotal = await client.query(
-      `SELECT id, earthquake_event_id FROM incidents WHERE store_id = $1;`,
-      [storeDago.kode_toko]
+      `SELECT id, earthquake_event_id FROM incidents WHERE store_id = $1 AND earthquake_event_id IN ($2, $3);`,
+      [storeDago.kode_toko, eqEvent1Id, eqEvent2Id]
     );
     const hasBothEvents = dagoReportsTotal.rows.length === 2;
     recordTest(

@@ -143,6 +143,8 @@ self.addEventListener("push", (event) => {
     badge: data.badge,
     tag: data.tag || "sparta-siaga-alert",
     renotify: true,
+    requireInteraction: true,
+    vibrate: [200, 100, 200, 100, 400],
     data: data.data,
     actions: [
       { action: "open_app", title: "Buka Aplikasi" },

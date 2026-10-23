@@ -30,14 +30,15 @@ async function main() {
   `);
   console.log("[SPARTA SIAGA] ✓ incidents: new columns added (report_origin, earthquake linkage, affected_stores, instructions)");
 
-  // 2. Add UNIQUE index on earthquake_event_id + branch for deduplication
+  // 2. Drop obsolete branch-level unique index and preserve location-level unique deduplication
   await pool.query(`
+    DROP INDEX IF EXISTS idx_incidents_unique_auto_eq_branch;
     DROP INDEX IF EXISTS idx_incidents_eq_event_branch;
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_incidents_unique_auto_eq_branch
+    CREATE INDEX IF NOT EXISTS idx_incidents_auto_eq_branch
       ON incidents(earthquake_event_id, branch)
       WHERE report_origin = 'automatic_earthquake' AND earthquake_event_id IS NOT NULL;
   `);
-  console.log("[SPARTA SIAGA] ✓ incidents: unique deduplication index on (earthquake_event_id, branch) created");
+  console.log("[SPARTA SIAGA] ✓ incidents: branch lookup index (non-unique) on (earthquake_event_id, branch) ensured");
 
   // 3. Add index on report_origin for filtering
   await pool.query(`

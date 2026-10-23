@@ -448,15 +448,15 @@ async function runTests() {
     const emptyCandidates = await dbFindUnlinkedManualEarthquakeCandidates("NON-EXISTENT-BRANCH", Date.now(), 120);
     assert(emptyCandidates.length === 0, "D4", "When zero candidates exist, normal auto-report proceeds");
 
-    // D5: DB unique index idx_incidents_unique_auto_eq_branch protects against race condition
+    // D5: DB unique index protects against race condition
     const indexCheck = await pool.query(
       `SELECT indexname FROM pg_indexes 
-       WHERE tablename = 'incidents' AND indexname = 'idx_incidents_unique_auto_eq_branch'`
+       WHERE tablename = 'incidents' AND indexname IN ('idx_incidents_unique_earthquake_location', 'idx_incidents_unique_auto_eq_branch')`
     );
     assert(
       (indexCheck.rowCount ?? 0) > 0,
       "D5",
-      "Database unique partial index idx_incidents_unique_auto_eq_branch exists and protects against race conditions"
+      "Database unique partial index idx_incidents_unique_earthquake_location exists and protects against race conditions"
     );
   } catch (dbErr) {
     console.error("DB error in Suite 6:", dbErr);

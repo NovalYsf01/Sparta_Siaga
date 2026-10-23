@@ -68,6 +68,14 @@ export async function requestDesktopNotificationPermission(): Promise<Notificati
     if (typeof window !== "undefined") {
       localStorage.setItem("sparta_notif_permission_prompted", "true");
     }
+    if (permission === "granted") {
+      try {
+        const { registerPushSubscription } = await import("./pwa-push-client");
+        await registerPushSubscription();
+      } catch (pushErr) {
+        console.warn("[Desktop Notification] Push registration sync warning:", pushErr);
+      }
+    }
     return permission;
   } catch (err) {
     console.warn("[Desktop Notification] Error requesting permission:", err);

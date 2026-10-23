@@ -22,6 +22,7 @@ import { AffectedStoreSummary } from '@/types/notification';
 import { ReportAffectedStore } from '@/types/incident';
 import { Store } from '@/types/store';
 import { Earthquake } from '@/types/disaster';
+import { dispatchEarthquakePushNotifications } from './web-push-service';
 
 import { 
   syncStoresFromGoogleSheets, 
@@ -29,7 +30,9 @@ import {
   StoreSyncHistoryRecord 
 } from './google-sheets-sync';
 
-export const AUTO_EARTHQUAKE_MAX_AGE_MINUTES = parseInt(process.env.AUTO_EARTHQUAKE_MAX_AGE_MINUTES || '60', 10);
+export const AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES = parseInt(process.env.AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES || '60', 10);
+export const AUTO_EARTHQUAKE_BACKFILL_MAX_AGE_MINUTES = parseInt(process.env.AUTO_EARTHQUAKE_BACKFILL_MAX_AGE_MINUTES || '1440', 10);
+export const AUTO_EARTHQUAKE_MAX_AGE_MINUTES = AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES;
 export const MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES = parseInt(process.env.MANUAL_EARTHQUAKE_MATCH_WINDOW_MINUTES || '120', 10);
 export const STORE_SYNC_INTERVAL_HOURS = parseInt(process.env.STORE_SYNC_INTERVAL_HOURS || '24', 10);
 export const STORE_SYNC_INTERVAL_MS = STORE_SYNC_INTERVAL_HOURS * 60 * 60 * 1000;
@@ -374,7 +377,8 @@ export async function stopServerDaemon(gracePeriodMs: number = 5000): Promise<vo
 export async function processEarthquakeAlertsAndReports(
   earthquakes: Earthquake[],
   stores: Store[],
-  isEligibleForAlert: boolean = true
+  isEligibleForAlert: boolean = true,
+  allowBackfill: boolean = false
 ): Promise<{ dispatchedAlerts: number; createdReports: number }> {
   let dispatchedAlerts = 0;
   let createdReports = 0;
@@ -386,9 +390,21 @@ export async function processEarthquakeAlertsAndReports(
   for (const eq of earthquakes) {
     const eventTimestamp = eq.timestamp || (eq.time ? new Date(eq.time).getTime() : Date.now());
     const eventAgeMinutes = (Date.now() - eventTimestamp) / (1000 * 60);
-    if (eventAgeMinutes > AUTO_EARTHQUAKE_MAX_AGE_MINUTES) {
+
+    // If backfill is not requested, strictly enforce the 60-minute freshness cutoff for report creation and alerts
+    if (!allowBackfill && eventAgeMinutes > AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES) {
       continue;
     }
+
+    // Bounded backfill: events older than AUTO_EARTHQUAKE_BACKFILL_MAX_AGE_MINUTES (default 24h = 1440m)
+    // are strictly excluded to avoid treating all 72-hour map monitoring events as new incidents.
+    if (eventAgeMinutes > AUTO_EARTHQUAKE_BACKFILL_MAX_AGE_MINUTES) {
+      continue;
+    }
+
+    // Outdated emergency alerts are strictly prevented for events older than 60m.
+    const isAlertEligible = isEligibleForAlert && (eventAgeMinutes <= AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES);
+    const isBackfill = eventAgeMinutes > AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES;
 
     const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(eq.magnitude, eq.depthKm);
 
@@ -433,52 +449,70 @@ export async function processEarthquakeAlertsAndReports(
       const priorityStores = priorityStoresByBranch.get(branch) || [];
 
       // Branch DC Notification (Email & PWA alert log)
-      const isProcessed = await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
-      const inCooldown = await isNotificationCooldownActive('earthquake', branch);
+      // Only dispatch emergency alert if event is fresh (<= 60m); suppress during downtime recovery
+      if (isAlertEligible) {
+        const isProcessed = await hasEventAlreadyBeenProcessed(eq.id, 'earthquake', branch);
+        const inCooldown = await isNotificationCooldownActive('earthquake', branch);
 
-      branchStores.sort((a, b) => a.distance_km - b.distance_km);
-      const disasterTitle = `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
-      const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Zona Prioritas Pantau SPARTA terhitung ${priorityRadiusKm} km. ${priorityStores.length} gerai toko cabang Anda berada di Zona Prioritas Pantau SPARTA.`;
+        branchStores.sort((a, b) => a.distance_km - b.distance_km);
+        const disasterTitle = `⚠️ PERINGATAN DARURAT GEMPA M ${eq.magnitude} - CABANG ${branch.toUpperCase()}`;
+        const disasterDetail = `Gempa bumi tektonik terdeteksi oleh BMKG/USGS dengan Magnitudo ${eq.magnitude} pada kedalaman ${eq.depthKm} km di wilayah ${eq.title}. Zona Prioritas Pantau SPARTA terhitung ${priorityRadiusKm} km. ${priorityStores.length} gerai toko cabang Anda berada di Zona Prioritas Pantau SPARTA.`;
 
-      if (isProcessed) {
-        await updateNotificationLogForEvent(eq.id, branch, {
-          title: disasterTitle,
-          message: disasterDetail,
-          affectedStores: branchStores,
-        });
-      } else if (!inCooldown) {
-        const ticketNumber = `ESC-${branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-        const instructions = [
-          'Duty Officer DC Cabang segera melakukan panggilan radio/telepon siaga ke Area Coordinator (AC) terkait.',
-          'Instruksikan personil toko melakukan evakuasi pelanggan dan kru jika struktur bangunan menunjukkan keretakan.',
-          'Matikan aliran listrik utama (MCB) dan amankan tabung gas jika tercium bau kebocoran.',
-          'Laporkan status operasional (Buka / Tutup Sementara / Kerusakan) melalui Command Center SPARTA.',
-        ];
+        if (isProcessed) {
+          await updateNotificationLogForEvent(eq.id, branch, {
+            title: disasterTitle,
+            message: disasterDetail,
+            affectedStores: branchStores,
+          });
+        } else if (!inCooldown) {
+          const ticketNumber = `ESC-${branch.substring(0, 3).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+          const instructions = [
+            'Duty Officer DC Cabang segera melakukan panggilan radio/telepon siaga ke Area Coordinator (AC) terkait.',
+            'Instruksikan personil toko melakukan evakuasi pelanggan dan kru jika struktur bangunan menunjukkan keretakan.',
+            'Matikan aliran listrik utama (MCB) dan amankan tabung gas jika tercium bau kebocoran.',
+            'Laporkan status operasional (Buka / Tutup Sementara / Kerusakan) melalui Command Center SPARTA.',
+          ];
 
-        generateEmergencyEmailHtml({
-          ticketNumber,
-          branch,
-          disasterTitle,
-          disasterDetail,
-          affectedCount: branchStores.length,
-          stores: branchStores,
-          instructions,
-          sentAt: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
-        });
+          generateEmergencyEmailHtml({
+            ticketNumber,
+            branch,
+            disasterTitle,
+            disasterDetail,
+            affectedCount: branchStores.length,
+            stores: branchStores,
+            instructions,
+            sentAt: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
+          });
 
-        await recordNotificationLog({
-          disasterId: eq.id,
-          disasterType: 'earthquake',
-          channel: 'email_and_pwa',
-          branch,
-          recipientContact: `dc.${branch.toLowerCase().replace(/\s+/g, '')}@alfamart.co.id`,
-          title: disasterTitle,
-          message: disasterDetail,
-          affectedStores: branchStores,
-          ticketNumber,
-        });
+          await recordNotificationLog({
+            disasterId: eq.id,
+            disasterType: 'earthquake',
+            channel: 'email_and_pwa',
+            branch,
+            recipientContact: `dc.${branch.toLowerCase().replace(/\s+/g, '')}@alfamart.co.id`,
+            title: disasterTitle,
+            message: disasterDetail,
+            affectedStores: branchStores,
+            ticketNumber,
+          });
 
-        dispatchedAlerts++;
+          // Deliver real background Web Push to registered PWA devices (Android, iOS PWA, Desktop)
+          await dispatchEarthquakePushNotifications({
+            title: disasterTitle,
+            body: disasterDetail,
+            branch,
+            eventId: eq.id,
+            magnitude: eq.magnitude,
+            priorityStoresCount: priorityStores.length,
+            url: `/monitoring?disasterId=${encodeURIComponent(eq.id)}`,
+          }).catch((pushErr) => {
+            console.error('[Autonomous Daemon] Error during background Web Push dispatch:', pushErr);
+          });
+
+          dispatchedAlerts++;
+        }
+      } else {
+        console.log(`[Autonomous Daemon] Suppressed outdated emergency alert for event ${eq.id} at branch ${branch} (event age: ${eventAgeMinutes.toFixed(1)}m > ${AUTO_EARTHQUAKE_ALERT_MAX_AGE_MINUTES}m)`);
       }
 
       // Operational Reports for stores in Priority Monitoring Zone
@@ -551,7 +585,9 @@ export async function processEarthquakeAlertsAndReports(
             reportOrigin: 'automatic_earthquake',
             earthquakeEventId: eq.id,
             earthquakeSource: eq.source || 'BMKG/USGS',
-            earthquakeProvenance: `Estimasi area dampak berdasarkan data gempa ${eq.source || 'BMKG/USGS'} dan perhitungan SPARTA.`,
+            earthquakeProvenance: isBackfill
+              ? `Estimasi area dampak berdasarkan data gempa ${eq.source || 'BMKG/USGS'} dan perhitungan SPARTA (Pemulihan pasca-downtime, usia event: ${Math.round(eventAgeMinutes)}m).`
+              : `Estimasi area dampak berdasarkan data gempa ${eq.source || 'BMKG/USGS'} dan perhitungan SPARTA.`,
             tkpType: 'toko',
             storeId: store.kode_toko,
             storeName: store.nama_toko,
@@ -572,8 +608,10 @@ export async function processEarthquakeAlertsAndReports(
             fieldPhotos: [],
             timeline: [
               {
-                stage: 'Laporan Otomatis Dibuat',
-                label: `Gempa M${eq.magnitude} terdeteksi oleh ${eq.source || 'BMKG/USGS'}. Gerai ${store.nama_toko} (${store.kode_toko}) berada dalam radius zona prioritas pantau (${store.distance_km.toFixed(1)} km) dan memerlukan konfirmasi kondisi lapangan.`,
+                stage: isBackfill ? 'Laporan Otomatis Di-backfill (Pasca-Downtime)' : 'Laporan Otomatis Dibuat',
+                label: isBackfill
+                  ? `Laporan gempa dipulihkan pasca-downtime (usia event ${Math.round(eventAgeMinutes)} menit). Gerai ${store.nama_toko} (${store.kode_toko}) berada dalam radius zona prioritas (${store.distance_km.toFixed(1)} km) dan memerlukan konfirmasi lapangan.`
+                  : `Gempa M${eq.magnitude} terdeteksi oleh ${eq.source || 'BMKG/USGS'}. Gerai ${store.nama_toko} (${store.kode_toko}) berada dalam radius zona prioritas pantau (${store.distance_km.toFixed(1)} km) dan memerlukan konfirmasi kondisi lapangan.`,
                 timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) + ' WIB',
                 actor: 'SPARTA Siaga — Autonomous Engine',
                 notes: `Event ID: ${eq.id}`,
@@ -583,7 +621,7 @@ export async function processEarthquakeAlertsAndReports(
             updatedAt: new Date().toISOString(),
           });
           createdReports++;
-          console.log(`[Autonomous Daemon] Auto-report created: ${reportId} for store ${store.kode_toko}`);
+          console.log(`[Autonomous Daemon] Auto-report created: ${reportId} for store ${store.kode_toko}${isBackfill ? ' (Downtime Recovery Backfill)' : ''}`);
         } catch (err: unknown) {
           const pgError = err as { code?: string };
           if (pgError?.code === '23505') {

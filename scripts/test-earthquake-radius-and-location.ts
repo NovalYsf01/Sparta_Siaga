@@ -108,6 +108,22 @@ async function runTestSuite() {
     "NaN returned safely for non-finite coordinates"
   );
 
+  // Benchmark 6: Latitude out-of-bounds (>90 or <-90) returns NaN
+  const distOobLat = calculateHaversineDistance(95.0, 106.8, -6.2, 106.8);
+  check(
+    "HAV-06: Out-of-bounds latitude handling",
+    isNaN(distOobLat),
+    "NaN returned safely for latitude > 90"
+  );
+
+  // Benchmark 7: Longitude out-of-bounds (>180 or <-180) returns NaN
+  const distOobLon = calculateHaversineDistance(-6.2, 185.0, -6.2, 106.8);
+  check(
+    "HAV-07: Out-of-bounds longitude handling",
+    isNaN(distOobLon),
+    "NaN returned safely for longitude > 180"
+  );
+
   // ===========================================================================
   // SECTION 2: SPARTA RADIUS FORMULA (MAGNITUDE & DEPTH ATTENUATION)
   // ===========================================================================
@@ -239,6 +255,41 @@ async function runTestSuite() {
     "BND-05: Distance outside monitoring zone (77.2 km > 77 km)",
     riskOutsideMonitoring.spatialRisk === "SAFE",
     `Zone: ${riskOutsideMonitoring.spatialRisk}, Distance: ${riskOutsideMonitoring.distanceFromEventKm} km`
+  );
+
+  // Point F: Dynamic radius calculation when event lacks precomputed radii
+  const eqWithoutRadii: Earthquake = {
+    id: "EQ-NO-RADII",
+    source: "BMKG",
+    title: "M 2.5 Dynamic Radius Test",
+    magnitude: 2.5,
+    depth: "5 km",
+    depthKm: 5,
+    latitude: 0.0,
+    longitude: 100.0,
+    time: "2026-10-22",
+    timestamp: Date.now(),
+    potensiTsunami: false,
+    priorityRadiusKm: undefined as any,
+    monitoringRadiusKm: undefined as any,
+  };
+  const storeNearM25 = { latitude: 10.0 * kmToDeg, longitude: 100.0 }; // 10 km <= 15 km -> PRIORITY_MONITOR
+  const storeFarM25 = { latitude: 50.0 * kmToDeg, longitude: 100.0 };  // 50 km > 35 km -> SAFE
+  const riskNearM25 = assessStoreRisk(storeNearM25, [eqWithoutRadii]);
+  const riskFarM25 = assessStoreRisk(storeFarM25, [eqWithoutRadii]);
+  check(
+    "BND-06: Dynamic zone resolution when event radii are omitted",
+    riskNearM25.spatialRisk === "PRIORITY_MONITOR" && riskFarM25.spatialRisk === "SAFE",
+    `10km: ${riskNearM25.spatialRisk} (expected PRIORITY_MONITOR), 50km: ${riskFarM25.spatialRisk} (expected SAFE)`
+  );
+
+  // Point G: Store with out-of-bounds coordinates safely returns SAFE
+  const storeInvalidCoords = { latitude: 120.0, longitude: 100.0 };
+  const riskInvalidStore = assessStoreRisk(storeInvalidCoords, [eqBoundary]);
+  check(
+    "BND-07: Out-of-bounds store coordinates safety",
+    riskInvalidStore.spatialRisk === "SAFE",
+    `Zone: ${riskInvalidStore.spatialRisk} (expected SAFE for lat 120)`
   );
 
   // ===========================================================================
@@ -461,6 +512,17 @@ async function runTestSuite() {
     "INT-03: Distance monotonicity",
     syntheticSummary.allAffectedLocations.every((loc, i, arr) => i === 0 || arr[i - 1].distanceKm <= loc.distanceKm),
     "Affected locations list is strictly sorted ascending by distanceKm"
+  );
+
+  // Invalid earthquake coordinates return empty list safely
+  const invalidEqSummary = evaluateAffectedLocations(
+    { id: "EQ-INVALID", latitude: 999, longitude: 106.80, magnitude: 5.0 },
+    mixedLocations
+  );
+  check(
+    "INT-04: Invalid earthquake coordinates return 0 affected safely",
+    invalidEqSummary.totalAffected === 0 && invalidEqSummary.allAffectedLocations.length === 0,
+    `Total affected: ${invalidEqSummary.totalAffected} (expected 0)`
   );
 
   // ===========================================================================

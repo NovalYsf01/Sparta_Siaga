@@ -33,6 +33,11 @@ async function main() {
   );
   console.log("\nALL_PUBLIC_TABLES:", tableListRes.rows.map((r) => r.table_name));
 
+  const idxRes = await pool.query(
+    "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'incidents'"
+  );
+  console.log("\nINCIDENTS_INDEXES:", JSON.stringify(idxRes.rows, null, 2));
+
   process.exit(0);
 }
 
