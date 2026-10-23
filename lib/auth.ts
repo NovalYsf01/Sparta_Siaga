@@ -1,56 +1,24 @@
 import { cookies } from "next/headers";
 import { UserContext } from "./report-permissions";
 import { SpartaRole } from "@/types/incident";
-import { dbGetUserById, dbUpsertUser } from "./user-db";
+import { dbGetUserById, dbUpsertUser, UserModel } from "./user-db";
 import { verifySession } from "./jwt";
+import { 
+  rotateDeviceSession 
+} from "./session-service";
+import { 
+  ACCESS_TOKEN_COOKIE, 
+  REFRESH_TOKEN_COOKIE, 
+  getAccessTokenCookieOptions, 
+  getRefreshTokenCookieOptions 
+} from "./session-config";
 
 /**
- * SPARTA SIAGA — Trusted Server-Side Identity Helper
- * 
- * Extracts authenticated user context from the active session.
- * Database is the single source of truth for authorization.
+ * Transforms a database UserModel into authenticated UserContext.
  */
-export async function getSessionUser(req?: Request): Promise<UserContext | null> {
-  let sessionToken: string | undefined;
-
-  if (req) {
-    const cookieHeader = req.headers.get("cookie") || "";
-    const match = cookieHeader.match(/siaga_session=([^;]+)/);
-    if (match) {
-      sessionToken = match[1];
-    }
-  }
-
-  if (!sessionToken) {
-    try {
-      const cookieStore = await cookies();
-      sessionToken = cookieStore.get("siaga_session")?.value;
-    } catch {
-      // Handled when called outside Next.js requestAsyncStorage
-    }
-  }
-
-  if (!sessionToken) {
-    return null;
-  }
-
-  // Verify the JWT token
-  const payload = await verifySession(sessionToken);
-  if (!payload || !payload.id) {
-    return null;
-  }
-
-  // Fetch the latest user record directly from database (Source of Truth)
-  const dbUser = await dbGetUserById(payload.id);
-
-  if (!dbUser || dbUser.status === "INACTIVE") {
-    console.warn("[Auth] User is missing or inactive in Siaga DB:", payload.id);
-    return null;
-  }
-
-  // Multi-device session revocation check: if user's token version was bumped, old tokens are invalidated
-  if (dbUser.tokenVersion && payload.v && payload.v < dbUser.tokenVersion) {
-    console.warn(`[Auth] User ${dbUser.id} session revoked (token version ${payload.v} < ${dbUser.tokenVersion})`);
+function buildUserContext(dbUser: UserModel): UserContext | null {
+  if (dbUser.status === "INACTIVE") {
+    console.warn("[Auth] User is inactive in Siaga DB:", dbUser.id);
     return null;
   }
 
@@ -73,4 +41,80 @@ export async function getSessionUser(req?: Request): Promise<UserContext | null>
     scope: isSystemAdmin ? null : dbUser.scope,
     branch: isSystemAdmin ? null : dbUser.branch,
   };
+}
+
+/**
+ * SPARTA SIAGA — Trusted Server-Side Identity Helper
+ * 
+ * Extracts authenticated user context from the active session.
+ * Supports persistent per-device sessions with transparent Refresh Token Rotation.
+ * Database is the single source of truth for authorization.
+ */
+export async function getSessionUser(req?: Request): Promise<UserContext | null> {
+  let sessionToken: string | undefined;
+  let refreshToken: string | undefined;
+
+  if (req) {
+    const cookieHeader = req.headers.get("cookie") || "";
+    const sessionMatch = cookieHeader.match(/siaga_session=([^;]+)/);
+    if (sessionMatch) {
+      sessionToken = sessionMatch[1];
+    }
+    const refreshMatch = cookieHeader.match(/siaga_refresh=([^;]+)/);
+    if (refreshMatch) {
+      refreshToken = refreshMatch[1];
+    }
+  }
+
+  if (!sessionToken || !refreshToken) {
+    try {
+      const cookieStore = await cookies();
+      if (!sessionToken) {
+        sessionToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
+      }
+      if (!refreshToken) {
+        refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+      }
+    } catch {
+      // Handled when called outside Next.js requestAsyncStorage
+    }
+  }
+
+  // 1. First, attempt to verify short-lived access token
+  if (sessionToken) {
+    const payload = await verifySession(sessionToken);
+    if (payload && payload.id) {
+      const dbUser = await dbGetUserById(payload.id);
+
+      if (dbUser && dbUser.status === "ACTIVE") {
+        // Multi-device session revocation check: if user's token version was bumped, old tokens are invalidated
+        if (!dbUser.tokenVersion || !payload.v || payload.v >= dbUser.tokenVersion) {
+          return buildUserContext(dbUser);
+        }
+        console.warn(`[Auth] User ${dbUser.id} session revoked (token version ${payload.v} < ${dbUser.tokenVersion})`);
+      }
+    }
+  }
+
+  // 2. If access token is missing or expired, attempt transparent renewal via persistent refresh token
+  if (refreshToken) {
+    const userAgent = req?.headers.get("user-agent") || null;
+    const ipAddress = req?.headers.get("x-forwarded-for") || null;
+
+    const refreshResult = await rotateDeviceSession(refreshToken, { userAgent, ipAddress });
+    if (refreshResult) {
+      // Try updating the cookies in response headers if running within Next.js async storage
+      try {
+        const cookieStore = await cookies();
+        cookieStore.set(ACCESS_TOKEN_COOKIE, refreshResult.accessToken, getAccessTokenCookieOptions());
+        cookieStore.set(REFRESH_TOKEN_COOKIE, refreshResult.refreshToken, getRefreshTokenCookieOptions());
+      } catch {
+        // Context might be read-only (e.g. middleware or static rendering); user is still verified
+      }
+
+      return buildUserContext(refreshResult.user);
+    }
+  }
+
+  return null;
 }

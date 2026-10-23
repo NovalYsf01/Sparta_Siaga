@@ -87,7 +87,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
   // Load incidents from database API on mount
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-  useEffect(() => {
+  const checkAndRenewSession = useCallback(() => {
     fetch("/api/auth/me")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -100,6 +100,19 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         }
       })
       .catch((err) => console.error("[Layout] Failed to load user session:", err));
+  }, []);
+
+  useEffect(() => {
+    checkAndRenewSession();
+
+    // Re-verify and renew session transparently when PWA returns to foreground
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAndRenewSession();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
 
     fetch("/api/incidents")
       .then((res) => res.json())
@@ -107,7 +120,12 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
         if (json.data) setIncidents(json.data);
       })
       .catch((err) => console.error("[Sparta Siaga] Failed to load incidents from DB:", err));
-  }, []);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleVisibilityChange);
+    };
+  }, [checkAndRenewSession]);
 
   const refreshIncidents = useCallback(async () => {
     const response = await fetch("/api/incidents", { cache: "no-store" });

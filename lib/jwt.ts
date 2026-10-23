@@ -14,7 +14,7 @@ export interface SessionPayload {
   v?: number;
 }
 
-export async function signSession(payload: SessionPayload): Promise<string> {
+export async function signSession(payload: SessionPayload, expiresIn: string = "15m"): Promise<string> {
   const jwt = await new SignJWT({
     id: payload.id,
     nik: payload.nik,
@@ -23,7 +23,7 @@ export async function signSession(payload: SessionPayload): Promise<string> {
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("24h")
+    .setExpirationTime(expiresIn)
     .sign(getEncodedJwtSecret());
   return jwt;
 }

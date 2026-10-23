@@ -49,25 +49,39 @@ export async function POST(request: Request) {
       );
     }
 
-    const token = await signSession({
-      id: user.id,
-      nik: user.nik,
-      systemRole: user.systemRole,
-      v: user.tokenVersion || 1,
+    const userAgent = request.headers.get("user-agent") || null;
+    const ipAddress = request.headers.get("x-forwarded-for") || null;
+
+    const { createDeviceSession } = await import("@/lib/session-service");
+    const { 
+      ACCESS_TOKEN_COOKIE, 
+      REFRESH_TOKEN_COOKIE, 
+      getAccessTokenCookieOptions, 
+      getRefreshTokenCookieOptions 
+    } = await import("@/lib/session-config");
+
+    const sessionResult = await createDeviceSession({
+      userId: user.id,
+      userAgent,
+      ipAddress,
+      tokenVersion: user.tokenVersion || 1,
     });
 
+    if (!sessionResult) {
+      return NextResponse.json(
+        { error: "Gagal membuat sesi login perangkat" },
+        { status: 500 }
+      );
+    }
+
     const response = NextResponse.json({ success: true, redirect: "/" });
-    response.cookies.set("siaga_session", token, {
-      ...getSessionCookieOptions(),
-      maxAge: 60 * 60 * 24, // 24 hours
-    });
+    response.cookies.set(ACCESS_TOKEN_COOKIE, sessionResult.accessToken, getAccessTokenCookieOptions());
+    response.cookies.set(REFRESH_TOKEN_COOKIE, sessionResult.refreshToken, getRefreshTokenCookieOptions());
 
     try {
       const cookieStore = await cookies();
-      cookieStore.set("siaga_session", token, {
-        ...getSessionCookieOptions(),
-        maxAge: 60 * 60 * 24,
-      });
+      cookieStore.set(ACCESS_TOKEN_COOKIE, sessionResult.accessToken, getAccessTokenCookieOptions());
+      cookieStore.set(REFRESH_TOKEN_COOKIE, sessionResult.refreshToken, getRefreshTokenCookieOptions());
     } catch {
       // Handled when called outside Next.js request async storage
     }

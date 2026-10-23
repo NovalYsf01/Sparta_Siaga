@@ -33,10 +33,58 @@ export async function GET(request: Request) {
 
     console.log("[Sparta Siaga SSO] Exchange success for user:", user?.email);
 
+    const userAgent = request.headers.get("user-agent") || null;
+    const ipAddress = request.headers.get("x-forwarded-for") || null;
+
+    let localUser = null;
+    if (user?.id || user?.email || user?.nik) {
+      const { dbGetUserByIdentifier, dbUpsertUser } = await import("@/lib/user-db");
+      localUser = await dbGetUserByIdentifier(user.id || user.email || user.nik);
+      if (!localUser && user.id) {
+        localUser = await dbUpsertUser({
+          id: user.id,
+          externalUserId: user.id,
+          name: user.name || user.email || "SSO User",
+          email: user.email || null,
+          nik: user.nik || null,
+          systemRole: user.systemRole === "ADMIN" ? "ADMIN" : "USER",
+          businessRole: user.businessRole || "bms",
+          scope: user.scope || "BRANCH",
+          branch: user.branch || null,
+          status: "ACTIVE",
+          source: "SSO",
+        });
+      }
+    }
+
+    const { 
+      ACCESS_TOKEN_COOKIE, 
+      REFRESH_TOKEN_COOKIE, 
+      getAccessTokenCookieOptions, 
+      getRefreshTokenCookieOptions 
+    } = await import("@/lib/session-config");
+
     const response = NextResponse.redirect(new URL("/", baseUrl));
-    response.cookies.set("siaga_session", sessionToken, {
-      ...getSessionCookieOptions(),
-      maxAge: 8 * 60 * 60, // 8 hours
+
+    if (localUser) {
+      const { createDeviceSession } = await import("@/lib/session-service");
+      const sessionResult = await createDeviceSession({
+        userId: localUser.id,
+        userAgent,
+        ipAddress,
+        tokenVersion: localUser.tokenVersion || 1,
+      });
+
+      if (sessionResult) {
+        response.cookies.set(ACCESS_TOKEN_COOKIE, sessionResult.accessToken, getAccessTokenCookieOptions());
+        response.cookies.set(REFRESH_TOKEN_COOKIE, sessionResult.refreshToken, getRefreshTokenCookieOptions());
+        return response;
+      }
+    }
+
+    response.cookies.set(ACCESS_TOKEN_COOKIE, sessionToken, {
+      ...getAccessTokenCookieOptions(),
+      maxAge: 8 * 60 * 60, // 8 hours external token window
     });
 
     return response;
