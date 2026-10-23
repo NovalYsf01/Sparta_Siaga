@@ -296,8 +296,8 @@ export function HoReportMonitoring({ incidents }: { incidents: IncidentRecord[] 
                   <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">{getReportSourceInfo(inc.reportOrigin).label}</div>
                 </td>
                 <td className="p-3"><span className={`inline-block rounded-md px-2 py-1 text-[11px] font-medium ${statusStyle(inc.status)}`}>{reportStatusLabel(inc.status)}</span></td>
-                <td className="p-3">{inc.primaryPicName || "—"}</td>
-                <td className="p-3">{target ? formatReportDate(target) : "—"}</td>
+                <td className="p-3">{inc.primaryPicName || "-"}</td>
+                <td className="p-3">{target ? formatReportDate(target) : "-"}</td>
                 <td className="p-3 text-right"><button type="button" onClick={() => setSelectedId(inc.id)} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-[#1D5AA6] hover:bg-blue-50 dark:border-slate-700 dark:text-blue-300"><Eye className="h-3.5 w-3.5"/> Lihat Detail</button></td>
               </tr>;
             })}</tbody>

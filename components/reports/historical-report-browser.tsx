@@ -15,6 +15,14 @@ import {
 } from "lucide-react";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
 import { getReportSourceInfo } from "@/lib/display-formatters";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface HistoricalReportBrowserProps {
   activeRole: string;
@@ -113,13 +121,13 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
             Telusuri dan ekspor histori seluruh laporan kejadian bencana.
           </p>
         </div>
-        <button
+        <Button
           onClick={handleExport}
-          className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-10 px-4 gap-1.5 shadow-sm"
         >
           <Download className="w-4 h-4" />
           Export Data (CSV)
-        </button>
+        </Button>
       </div>
 
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
@@ -155,39 +163,77 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
-          <select
+          <Select
             value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none text-slate-700 dark:text-slate-300"
+            onValueChange={(val) => {
+              if (val) {
+                setStatus(val);
+                setPage(1);
+              }
+            }}
           >
-            <option value="all">Semua Status Riwayat</option>
-            <option value="closed">Ditutup (CLOSED)</option>
-            <option value="resolved">Selesai (Resolved)</option>
-            <option value="archived">Diarsipkan</option>
-            <option value="expired_unhandled">Tidak Ditindaklanjuti</option>
-            <option value="confirmed_safe">Dinyatakan Aman</option>
-            <option value="rejected_invalid">Ditolak</option>
-          </select>
-          <select
+            <SelectTrigger
+              aria-label="Filter status riwayat"
+              className="w-full h-9 px-3 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300"
+            >
+              <SelectValue placeholder="Semua Status Riwayat" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Status Riwayat</SelectItem>
+              <SelectItem value="closed">Ditutup (CLOSED)</SelectItem>
+              <SelectItem value="resolved">Selesai (Resolved)</SelectItem>
+              <SelectItem value="archived">Diarsipkan</SelectItem>
+              <SelectItem value="expired_unhandled">Tidak Ditindaklanjuti</SelectItem>
+              <SelectItem value="confirmed_safe">Dinyatakan Aman</SelectItem>
+              <SelectItem value="rejected_invalid">Ditolak</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
             value={disasterType}
-            onChange={(e) => { setDisasterType(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none text-slate-700 dark:text-slate-300"
+            onValueChange={(val) => {
+              if (val) {
+                setDisasterType(val);
+                setPage(1);
+              }
+            }}
           >
-            <option value="all">Semua Jenis Kejadian</option>
-            <option value="earthquake">Gempa Bumi</option>
-            <option value="flood">Banjir</option>
-            <option value="fire">Kebakaran</option>
-            <option value="other">Lainnya</option>
-          </select>
-          <select
+            <SelectTrigger
+              aria-label="Filter jenis kejadian"
+              className="w-full h-9 px-3 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300"
+            >
+              <SelectValue placeholder="Semua Jenis Kejadian" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Jenis Kejadian</SelectItem>
+              <SelectItem value="earthquake">Gempa Bumi</SelectItem>
+              <SelectItem value="flood">Banjir</SelectItem>
+              <SelectItem value="fire">Kebakaran</SelectItem>
+              <SelectItem value="other">Lainnya</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
             value={reportOrigin}
-            onChange={(e) => { setReportOrigin(e.target.value); setPage(1); }}
-            className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none text-slate-700 dark:text-slate-300"
+            onValueChange={(val) => {
+              if (val) {
+                setReportOrigin(val);
+                setPage(1);
+              }
+            }}
           >
-            <option value="all">Semua Asal Laporan</option>
-            <option value="manual">Manual (Cabang)</option>
-            <option value="automatic_earthquake">Otomatis (Sistem)</option>
-          </select>
+            <SelectTrigger
+              aria-label="Filter asal laporan"
+              className="w-full h-9 px-3 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-700 dark:text-slate-300"
+            >
+              <SelectValue placeholder="Semua Asal Laporan" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Asal Laporan</SelectItem>
+              <SelectItem value="manual">Manual (Cabang)</SelectItem>
+              <SelectItem value="automatic_earthquake">Otomatis (Sistem)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -249,13 +295,15 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => onSelectIncident(inc)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors"
+                          className="h-8 gap-1.5 px-3 text-xs font-semibold text-slate-700 dark:text-slate-300"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           Lihat Data
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -272,20 +320,26 @@ export function HistoricalReportBrowser({ activeRole, onSelectIncident }: Histor
               Menampilkan <span className="font-bold text-slate-900 dark:text-white">{(page - 1) * limit + 1}</span> - <span className="font-bold text-slate-900 dark:text-white">{Math.min(page * limit, total)}</span> dari <span className="font-bold text-slate-900 dark:text-white">{total}</span>
             </div>
             <div className="flex gap-1">
-              <button
+              <Button
+                variant="outline"
+                size="icon"
                 disabled={page === 1}
                 onClick={() => setPage(p => Math.max(1, p - 1))}
-                className="p-1.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-slate-800"
+                aria-label="Halaman sebelumnya"
+                className="h-8 w-8 p-0"
               >
                 <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
                 disabled={page === totalPages}
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                className="p-1.5 rounded border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white dark:hover:bg-slate-800"
+                aria-label="Halaman berikutnya"
+                className="h-8 w-8 p-0"
               >
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
           </div>
         )}

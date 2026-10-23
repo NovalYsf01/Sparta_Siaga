@@ -25,6 +25,14 @@ import { StoreVerificationModal } from "../incident/store-verification-modal";
 import { HoReportMonitoring } from "./ho-report-monitoring";
 import { getStandardizedOperationalStatus } from "@/lib/operational-status";
 import { getReportSourceInfo } from "@/lib/display-formatters";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 const DISASTER_ID_MAP: Record<string, string> = {
   earthquake: "Gempa Bumi",
@@ -317,38 +325,55 @@ export function OperationalReportCenter({
           )}
         </div>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-          <select
+        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap">
+          <Select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
-            aria-label="Filter status laporan"
-            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[40px] cursor-pointer"
+            onValueChange={(val) => {
+              if (val) setFilterStatus(val as IncidentStatus | "all");
+            }}
           >
-            <option value="all">Semua Status Aktif</option>
-            <option value="pending_confirmation">Perlu Konfirmasi</option>
-            <option value="pending_bm_approval">Menunggu Persetujuan BnM</option>
-            <option value="clarification_requested">Perlu Klarifikasi</option>
-            <option value="confirmed_affected">Disetujui BnM</option>
-            <option value="in_estimation">Dalam Estimasi</option>
-            <option value="investigating">Investigasi</option>
-            <option value="in_maintenance">Penanganan</option>
-          </select>
-          <select
+            <SelectTrigger
+              aria-label="Filter status laporan"
+              className="flex-1 sm:flex-initial h-10 px-3 text-xs font-medium bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 min-w-[160px]"
+            >
+              <SelectValue placeholder="Semua Status Aktif" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Status Aktif</SelectItem>
+              <SelectItem value="pending_confirmation">Perlu Konfirmasi</SelectItem>
+              <SelectItem value="pending_bm_approval">Menunggu Persetujuan BnM</SelectItem>
+              <SelectItem value="clarification_requested">Perlu Klarifikasi</SelectItem>
+              <SelectItem value="confirmed_affected">Disetujui BnM</SelectItem>
+              <SelectItem value="in_estimation">Dalam Estimasi</SelectItem>
+              <SelectItem value="investigating">Investigasi</SelectItem>
+              <SelectItem value="in_maintenance">Penanganan</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
             value={filterType}
-            onChange={(e) => setFilterType(e.target.value as any)}
-            aria-label="Filter jenis kejadian"
-            className="flex-1 sm:flex-initial px-3 py-2 text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 min-h-[40px] cursor-pointer"
+            onValueChange={(val) => {
+              if (val) setFilterType(val as "all" | DisasterType);
+            }}
           >
-            <option value="all">Semua Kejadian</option>
-            <option value="earthquake">Gempa Bumi</option>
-            <option value="flood">Banjir</option>
-            <option value="fire">Kebakaran</option>
-            <option value="heavy_rain">Hujan/Badai</option>
-            <option value="strong_wind">Angin Kencang</option>
-            <option value="theft">Kemalingan</option>
-            <option value="severe_building_damage">Kerusakan Bangunan</option>
-            <option value="other">Lainnya</option>
-          </select>
+            <SelectTrigger
+              aria-label="Filter jenis kejadian"
+              className="flex-1 sm:flex-initial h-10 px-3 text-xs font-medium bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 min-w-[150px]"
+            >
+              <SelectValue placeholder="Semua Kejadian" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Kejadian</SelectItem>
+              <SelectItem value="earthquake">Gempa Bumi</SelectItem>
+              <SelectItem value="flood">Banjir</SelectItem>
+              <SelectItem value="fire">Kebakaran</SelectItem>
+              <SelectItem value="heavy_rain">Hujan/Badai</SelectItem>
+              <SelectItem value="strong_wind">Angin Kencang</SelectItem>
+              <SelectItem value="theft">Kemalingan</SelectItem>
+              <SelectItem value="severe_building_damage">Kerusakan Bangunan</SelectItem>
+              <SelectItem value="other">Lainnya</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -389,14 +414,10 @@ export function OperationalReportCenter({
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-700">
                   <tr>
-                    <th className="px-4 py-3 whitespace-nowrap">No. Laporan</th>
-                    <th className="px-3 py-3 whitespace-nowrap">Tanggal</th>
-                    <th className="px-4 py-3">Toko / Lokasi</th>
-                    <th className="px-3 py-3">Kejadian</th>
+                    <th className="px-4 py-3 whitespace-nowrap">No. Laporan & Tanggal</th>
+                    <th className="px-4 py-3">Lokasi / Cabang</th>
+                    <th className="px-3 py-3">Kejadian & Sumber</th>
                     <th className="px-3 py-3">Status Penanganan</th>
-                    <th className="px-3 py-3">PIC</th>
-                    <th className="px-3 py-3">Progres</th>
-                    <th className="px-3 py-3">Target</th>
                     <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -413,26 +434,18 @@ export function OperationalReportCenter({
                     const isDc = inc.locationKind === "FACILITY" || inc.tkpType === "dc";
                     const isBuilding = inc.tkpType === "building";
 
-                    const targetDateStr = inc.maintenanceTicket?.completedAt
-                      ? formatIndonesianDate(inc.maintenanceTicket.completedAt)
-                      : "—";
-
-                    const isOverdue =
-                      Boolean(inc.maintenanceTicket?.completedAt) &&
-                      inc.status !== "resolved" &&
-                      inc.status !== "closed" &&
-                      new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
-
                     return (
                       <tr key={inc.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap font-mono font-semibold text-[#1D5AA6] dark:text-blue-400">
-                          {inc.maintenanceTicket?.ticketId || inc.id}
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap text-[11px] text-slate-500 dark:text-slate-400">
-                          {formattedDate}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="font-mono font-semibold text-[#1D5AA6] dark:text-blue-400">
+                            {inc.maintenanceTicket?.ticketId || inc.id}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {formattedDate}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 max-w-[220px]">
+                          <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-1.5 max-w-[240px]">
                             {isDc ? (
                               <span className="text-[9px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-200/80 dark:border-amber-800 shrink-0">
                                 DC BES
@@ -446,7 +459,7 @@ export function OperationalReportCenter({
                               {inc.storeName}
                             </span>
                           </div>
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[220px]">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[240px] mt-0.5">
                             {inc.branch} • {displayCity}
                           </div>
                         </td>
@@ -454,8 +467,8 @@ export function OperationalReportCenter({
                           <div className="font-medium text-slate-800 dark:text-slate-200 text-xs">
                             {disasterLabel}
                           </div>
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                            {getReportSourceInfo(inc.reportOrigin).label}
+                          <div className="mt-1">
+                            {getOriginBadge(inc)}
                           </div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
@@ -463,40 +476,11 @@ export function OperationalReportCenter({
                             {handlingStatus.label}
                           </span>
                         </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <span className={`text-[11px] ${inc.primaryPicName ? "font-medium text-slate-800 dark:text-slate-200" : "text-slate-400 italic"}`}>
-                            {inc.primaryPicName || "Belum Ditugaskan"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap min-w-[100px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-14 bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                className="bg-[#1D5AA6] h-full rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, Math.max(0, inc.progress ?? 0))}%` }}
-                              />
-                            </div>
-                            <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                              {(inc.progress ?? 0) > 0 ? `${inc.progress}%` : "0%"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <div className="flex flex-col">
-                            <span className={`text-[11px] ${isOverdue ? "text-rose-600 font-semibold" : "text-slate-600 dark:text-slate-400"}`}>
-                              {targetDateStr}
-                            </span>
-                            {isOverdue && (
-                              <span className="text-[9px] font-medium text-rose-600 dark:text-rose-400">
-                                Melewati Target
-                              </span>
-                            )}
-                          </div>
-                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
                           <div className="inline-flex items-center gap-1.5 justify-end">
                             {!isHoViewer && inc.status !== "closed" && inc.status !== "resolved" && (
-                              <button
+                              <Button
+                                size="sm"
                                 onClick={() => {
                                   if (["pending_confirmation", "verifying", "clarification_requested", "pending_bm_approval"].includes(inc.status)) {
                                     setSelectedVerificationReport(inc);
@@ -504,23 +488,23 @@ export function OperationalReportCenter({
                                     setSelectedProgressReport(inc);
                                   }
                                 }}
-                                type="button"
                                 aria-label={`Tindak lanjut laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
-                                className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-[#1D5AA6] hover:bg-[#123B6D] text-white shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                className="bg-[#1D5AA6] hover:bg-[#123B6D] text-white shadow-2xs font-semibold"
                               >
-                                <Wrench className="w-3.5 h-3.5" />
+                                <Wrench className="w-3.5 h-3.5 mr-1" />
                                 Tindak Lanjut
-                              </button>
+                              </Button>
                             )}
-                            <button
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => onSelectIncident(inc)}
-                              type="button"
                               aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
-                              className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              className="text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
                             >
-                              <Eye className="w-3.5 h-3.5 text-slate-500" />
+                              <Eye className="w-3.5 h-3.5 mr-1 text-slate-500" />
                               Detail
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -581,18 +565,6 @@ export function OperationalReportCenter({
               const isDc = inc.locationKind === "FACILITY" || inc.tkpType === "dc";
               const isBuilding = inc.tkpType === "building";
 
-              const targetDateStr = inc.maintenanceTicket?.completedAt
-                ? formatIndonesianDate(inc.maintenanceTicket.completedAt)
-                : "Belum Ditentukan";
-
-              const isOverdue =
-                Boolean(inc.maintenanceTicket?.completedAt) &&
-                inc.status !== "resolved" &&
-                inc.status !== "closed" &&
-                new Date(inc.maintenanceTicket!.completedAt as string) < new Date();
-
-              const sourceInfo = getReportSourceInfo(inc.reportOrigin);
-
               return (
                 <div
                   key={inc.id}
@@ -629,50 +601,17 @@ export function OperationalReportCenter({
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                       <span>{inc.branch} • {displayCity}</span>
-                      <span>—</span>
+                      <span>-</span>
                       <span className="font-medium text-slate-700 dark:text-slate-300">{disasterLabel}</span>
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700">
-                        {sourceInfo.label}
-                      </span>
+                      {getOriginBadge(inc)}
                     </div>
                   </div>
-
-                  {/* Summary Grid: PIC & Target */}
-                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50/80 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                    <div>
-                      <span className="text-slate-400 dark:text-slate-500 text-[10px] block">PIC Penanganan:</span>
-                      <span className="font-medium text-slate-800 dark:text-slate-200 truncate block">
-                        {inc.primaryPicName || "Belum Ditugaskan"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 dark:text-slate-500 text-[10px] block">Target Selesai:</span>
-                      <span className={`font-medium block ${isOverdue ? "text-rose-600 dark:text-rose-400" : "text-slate-800 dark:text-slate-200"}`}>
-                        {targetDateStr}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Progress bar if ongoing */}
-                  {(inc.progress ?? 0) > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-[10px] text-slate-500">
-                        <span>Progres Penanganan</span>
-                        <span className="font-mono font-medium">{inc.progress}%</span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                        <div
-                          className="bg-[#1D5AA6] h-full rounded-full transition-all duration-300"
-                          style={{ width: `${Math.min(100, Math.max(0, inc.progress ?? 0))}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {/* Action Button: Consistent Detail Button & Tindak Lanjut */}
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-end gap-2">
                     {!isHoViewer && inc.status !== "closed" && inc.status !== "resolved" && (
-                      <button
+                      <Button
+                        size="sm"
                         onClick={() => {
                           if (["pending_confirmation", "verifying", "clarification_requested", "pending_bm_approval"].includes(inc.status)) {
                             setSelectedVerificationReport(inc);
@@ -680,23 +619,23 @@ export function OperationalReportCenter({
                             setSelectedProgressReport(inc);
                           }
                         }}
-                        type="button"
                         aria-label={`Tindak lanjut laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
-                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-[#1D5AA6] hover:bg-[#123B6D] text-white shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="min-h-[44px] px-3.5 bg-[#1D5AA6] hover:bg-[#123B6D] text-white shadow-2xs font-semibold"
                       >
-                        <Wrench className="w-3.5 h-3.5" />
+                        <Wrench className="w-3.5 h-3.5 mr-1.5" />
                         Tindak Lanjut
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => onSelectIncident(inc)}
-                      type="button"
                       aria-label={`Lihat detail laporan ${inc.maintenanceTicket?.ticketId || inc.id}`}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-2xs transition-colors min-h-[40px] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      className="min-h-[44px] px-3.5 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700"
                     >
-                      <Eye className="w-3.5 h-3.5 text-slate-500" />
-                      Lihat Detail
-                    </button>
+                      <Eye className="w-3.5 h-3.5 mr-1.5 text-slate-500" />
+                      Detail
+                    </Button>
                   </div>
                 </div>
               );

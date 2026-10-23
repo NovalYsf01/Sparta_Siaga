@@ -17,6 +17,14 @@ import { toast } from "sonner";
 import { IncidentRecord, DisasterType, IncidentStatus } from "@/types/incident";
 import { getStandardizedOperationalStatus } from "@/lib/operational-status";
 import { getReportSourceInfo } from "@/lib/display-formatters";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface ActiveIncidentsTableProps {
   incidents: IncidentRecord[];
@@ -244,50 +252,77 @@ export function ActiveIncidentsTable({
                   <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">
                     Jenis Kejadian
                   </label>
-                  <select
+                  <Select
                     value={filterType}
-                    onChange={(e) => setFilterType(e.target.value as DisasterType | "all")}
-                    className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                    onValueChange={(val) => {
+                      if (val) setFilterType(val as DisasterType | "all");
+                    }}
                   >
-                    <option value="all">Semua Jenis</option>
-                    <option value="earthquake">Gempa Bumi</option>
-                    <option value="flood">Banjir</option>
-                    <option value="other">Lainnya</option>
-                  </select>
+                    <SelectTrigger
+                      aria-label="Filter jenis kejadian"
+                      className="w-full h-8 text-xs bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    >
+                      <SelectValue placeholder="Semua Jenis" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Jenis</SelectItem>
+                      <SelectItem value="earthquake">Gempa Bumi</SelectItem>
+                      <SelectItem value="flood">Banjir</SelectItem>
+                      <SelectItem value="other">Lainnya</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">
                     Status Penanganan
                   </label>
-                  <select
+                  <Select
                     value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value as IncidentStatus | "all")}
-                    className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                    onValueChange={(val) => {
+                      if (val) setFilterStatus(val as IncidentStatus | "all");
+                    }}
                   >
-                    <option value="all">Semua Status</option>
-                    <option value="verifying">Verifikasi</option>
-                    <option value="investigating">Investigasi</option>
-                    <option value="in_maintenance">Dalam Penanganan</option>
-                  </select>
+                    <SelectTrigger
+                      aria-label="Filter status penanganan"
+                      className="w-full h-8 text-xs bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    >
+                      <SelectValue placeholder="Semua Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="verifying">Verifikasi</SelectItem>
+                      <SelectItem value="investigating">Investigasi</SelectItem>
+                      <SelectItem value="in_maintenance">Dalam Penanganan</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 block">
                     Cabang
                   </label>
-                  <select
+                  <Select
                     value={filterBranch}
-                    onChange={(e) => setFilterBranch(e.target.value)}
-                    className="w-full text-xs p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-500"
+                    onValueChange={(val) => {
+                      if (val) setFilterBranch(val);
+                    }}
                   >
-                    <option value="all">Semua Cabang</option>
-                    {availableBranches.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      aria-label="Filter cabang"
+                      className="w-full h-8 text-xs bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+                    >
+                      <SelectValue placeholder="Semua Cabang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Cabang</SelectItem>
+                      {availableBranches.map((b) => (
+                        <SelectItem key={b} value={b}>
+                          {b}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -298,17 +333,12 @@ export function ActiveIncidentsTable({
       {/* DESKTOP TABLE VIEW */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-xs">
-          <thead className="bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 font-medium tracking-wide text-xs border-b border-slate-100 dark:border-slate-700">
+          <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200 dark:border-slate-700">
             <tr>
-              <th className="px-4 py-3 w-10 text-center">No</th>
-              <th className="px-4 py-3">No. Laporan</th>
-              <th className="px-4 py-3">Waktu Mulai</th>
-              <th className="px-4 py-3">Lokasi & Cabang</th>
-              <th className="px-4 py-3">Kejadian</th>
+              <th className="px-4 py-3 whitespace-nowrap">No. Laporan & Tanggal</th>
+              <th className="px-4 py-3">Lokasi Unit & Cabang</th>
+              <th className="px-4 py-3">Kejadian & Sumber</th>
               <th className="px-4 py-3">Status Penanganan</th>
-              <th className="px-4 py-3">PIC Penanggung Jawab</th>
-              <th className="px-4 py-3 min-w-[120px]">Progres Fisik</th>
-              <th className="px-4 py-3">Target Selesai</th>
               {!hideAction && (
                 <th className="px-4 py-3 text-right">Aksi</th>
               )}
@@ -317,30 +347,26 @@ export function ActiveIncidentsTable({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 text-slate-700 dark:text-slate-300">
             {filteredIncidents.length === 0 ? (
               <tr>
-                <td colSpan={hideAction ? 9 : 10} className="py-8 text-center text-slate-400">
+                <td colSpan={hideAction ? 4 : 5} className="py-8 text-center text-slate-400">
                   Tidak ada kejadian aktif yang sesuai dengan filter Anda.
                 </td>
               </tr>
             ) : (
-              filteredIncidents.map((inc, index) => {
+              filteredIncidents.map((inc) => {
                 const disaster = getDisasterBadge(inc.disasterType);
                 const handling = getHandlingStatus(inc);
                 const Icon = disaster.icon;
                 const hasPic = Boolean(inc.primaryPicUserId);
-                const picName = inc.primaryPicName || (hasPic ? "Petugas Ditugaskan" : "Belum Ditugaskan");
-                const targetDate = formatIndonesianDate(inc.maintenanceTicket?.completedAt);
-                const isOverdue = Boolean(inc.maintenanceTicket?.completedAt && new Date(inc.maintenanceTicket.completedAt) < new Date() && inc.status !== "closed" && inc.status !== "resolved");
 
                 return (
                   <tr key={inc.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3.5 text-center font-medium text-slate-400">
-                      {index + 1}
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-mono font-bold text-blue-600 dark:text-blue-400">
-                      {inc.maintenanceTicket?.ticketId || inc.id}
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
-                      {formatIndonesianDate(inc.date || inc.createdAt)}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="font-mono font-bold text-[#1D5AA6] dark:text-blue-400">
+                        {inc.maintenanceTicket?.ticketId || inc.id}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        {formatIndonesianDate(inc.date || inc.createdAt)}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -354,7 +380,7 @@ export function ActiveIncidentsTable({
                         </span>
                         <span>{inc.storeName}</span>
                       </div>
-                      <div className="text-[10px] text-slate-500">{inc.branch} • {inc.locationCity}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{inc.branch} • {inc.locationCity}</div>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <div className="flex flex-col gap-1 items-start">
@@ -370,62 +396,42 @@ export function ActiveIncidentsTable({
                         {handling.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">
-                      {picName}
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(inc.progress)}`}
-                            style={{ width: `${inc.progress ?? 0}%` }}
-                          />
-                        </div>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
-                          {inc.progress > 0 ? `${inc.progress}%` : "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-600 dark:text-slate-400">
-                      <span>{targetDate}</span>
-                      {isOverdue && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400 border border-red-200 dark:border-red-800 block mt-0.5 w-fit">
-                          Melewati Target
-                        </span>
-                      )}
-                    </td>
                     {!hideAction && (
                       <td className="px-4 py-3.5 whitespace-nowrap text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {!hasPic && canClaim && !isHO && (
-                            <button
-                              type="button"
+                            <Button
+                              size="sm"
                               onClick={() => handleClaim(inc.id)}
                               disabled={claimingId === inc.id}
-                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold shadow-xs disabled:opacity-50"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs text-[11px]"
                             >
                               {claimingId === inc.id ? "Memproses..." : "Mulai Menangani"}
-                            </button>
+                            </Button>
                           )}
-                          <button
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => onSelectIncident(inc)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-[11px] font-medium transition-colors"
+                            className="text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 text-[11px]"
                           >
-                            <Eye className="w-3.5 h-3.5" />
+                            <Eye className="w-3.5 h-3.5 mr-1" />
                             <span>{isBMM && (inc.status === "pending_bm_approval" || inc.status === "pending_final_approval") ? "Review & Approval" : "Detail"}</span>
-                          </button>
+                          </Button>
                           {onDeleteIncident && (
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
                               onClick={() => {
                                 if (confirm(`Hapus laporan ${inc.id} (${inc.storeName})? Tindakan ini tidak dapat dibatalkan.`)) {
                                   onDeleteIncident(inc.id);
                                 }
                               }}
-                              className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                              className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                               title="Hapus Laporan"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -450,9 +456,6 @@ export function ActiveIncidentsTable({
             const handling = getHandlingStatus(inc);
             const Icon = disaster.icon;
             const hasPic = Boolean(inc.primaryPicUserId);
-            const picName = inc.primaryPicName || (hasPic ? "Petugas Ditugaskan" : "Belum Ditugaskan");
-            const targetDate = formatIndonesianDate(inc.maintenanceTicket?.completedAt);
-            const isOverdue = Boolean(inc.maintenanceTicket?.completedAt && new Date(inc.maintenanceTicket.completedAt) < new Date() && inc.status !== "closed" && inc.status !== "resolved");
 
             return (
               <div
@@ -494,55 +497,27 @@ export function ActiveIncidentsTable({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px] p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">PIC Penanggung Jawab:</span>
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">{picName}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 text-[10px] block">Target Selesai:</span>
-                    <span className="font-medium text-slate-600 dark:text-slate-300 truncate block">
-                      {targetDate}
-                      {isOverdue && <strong className="text-red-500 ml-1 text-[10px]">(Melewati Target)</strong>}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="space-y-1 pt-0.5">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="text-slate-400">Progress Milestone</span>
-                    <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {inc.progress > 0 ? `${inc.progress}%` : "—"}
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${getProgressBarColor(inc.progress)}`}
-                      style={{ width: `${inc.progress ?? 0}%` }}
-                    />
-                  </div>
-                </div>
-
                 {/* Mobile Action Buttons */}
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
                   {!hasPic && canClaim && !isHO && (
-                    <button
-                      type="button"
+                    <Button
+                      size="sm"
                       onClick={() => handleClaim(inc.id)}
                       disabled={claimingId === inc.id}
                       className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors min-h-[44px] shadow-xs disabled:opacity-50"
                     >
                       <span>{claimingId === inc.id ? "..." : "Mulai Menangani"}</span>
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => onSelectIncident(inc)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors min-h-[44px] flex-1"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition-colors min-h-[44px] flex-1 border-slate-200 dark:border-slate-700"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     <span>{isBMM && (inc.status === "pending_bm_approval" || inc.status === "pending_final_approval") ? "Review & Approval" : "Lihat Detail"}</span>
-                  </button>
+                  </Button>
                 </div>
               </div>
             );

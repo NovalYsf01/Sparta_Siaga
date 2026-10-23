@@ -63,10 +63,243 @@ export function isInIndonesiaMonitoringArea(latitude: number, longitude: number,
  */
 export function getCanonicalEventKey(source: "BMKG" | "USGS", dateTimeStr?: string, timestamp?: number): string {
   if (dateTimeStr) {
-    const clean = dateTimeStr.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-");
-    return `${source.toLowerCase()}-${clean}`;
+    const clean = dateTimeStr.replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+    if (clean) return `${source.toLowerCase()}-${clean}`;
   }
-  return `${source.toLowerCase()}-${timestamp || Date.now()}`;
+  if (timestamp && Number.isFinite(timestamp) && timestamp > 0) {
+    return `${source.toLowerCase()}-${timestamp}`;
+  }
+  throw new Error(`Cannot generate canonical event key for ${source} without valid dateTimeStr or timestamp`);
+}
+
+/**
+ * Validate and parse BMKG timestamp.
+ * Rejects invalid, unparseable, or far-future timestamps.
+ * NEVER substitutes the current time.
+ */
+export function parseBmkgTimestamp(dateTimeStr?: string, tanggal?: string, jam?: string): number | null {
+  if (dateTimeStr) {
+    const ts = Date.parse(dateTimeStr);
+    if (Number.isFinite(ts) && ts > 0) {
+      if (ts > Date.now() + 15 * 60 * 1000) return null;
+      return ts;
+    }
+  }
+
+  if (tanggal && jam) {
+    const monthMap: Record<string, string> = {
+      jan: "01", feb: "02", mar: "03", apr: "04", mei: "05", jun: "06",
+      jul: "07", agu: "08", agt: "08", sep: "09", okt: "10", nov: "11", des: "12",
+      aug: "08", oct: "10", dec: "12",
+    };
+    const dateMatch = tanggal.trim().match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/);
+    const timeMatch = jam.trim().match(/^(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\s*(WIB|WITA|WIT|UTC|Z))?/i);
+    if (dateMatch && timeMatch) {
+      const day = dateMatch[1].padStart(2, "0");
+      const monthStr = dateMatch[2].toLowerCase().substring(0, 3);
+      const month = monthMap[monthStr];
+      const year = dateMatch[3];
+      const hour = timeMatch[1].padStart(2, "0");
+      const minute = timeMatch[2].padStart(2, "0");
+      const second = timeMatch[3].padStart(2, "0");
+      const tz = (timeMatch[4] || "WIB").toUpperCase();
+      const tzOffset = tz === "WIT" ? "+09:00" : tz === "WITA" ? "+08:00" : (tz === "UTC" || tz === "Z") ? "+00:00" : "+07:00";
+      if (month) {
+        const iso = `${year}-${month}-${day}T${hour}:${minute}:${second}${tzOffset}`;
+        const ts = Date.parse(iso);
+        if (Number.isFinite(ts) && ts > 0) {
+          if (ts > Date.now() + 15 * 60 * 1000) return null;
+          return ts;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Validate and parse coordinates.
+ * Ensures finite, within [-90, 90] & [-180, 180], and inside Indonesia monitoring footprint.
+ */
+export function parseBmkgCoordinates(coordStr?: string, lintang?: string, bujur?: string): { lat: number; lon: number } | null {
+  let lat: number | null = null;
+  let lon: number | null = null;
+
+  if (coordStr) {
+    const parts = coordStr.split(",");
+    if (parts.length === 2) {
+      const pLat = parseFloat(parts[0].trim());
+      const pLon = parseFloat(parts[1].trim());
+      if (Number.isFinite(pLat) && Number.isFinite(pLon)) {
+        lat = pLat;
+        lon = pLon;
+      }
+    }
+  }
+
+  if ((lat === null || lon === null) && lintang && bujur) {
+    const latMatch = lintang.match(/(\d+(?:\.\d+)?)/);
+    const lonMatch = bujur.match(/(\d+(?:\.\d+)?)/);
+    if (latMatch && lonMatch) {
+      const latVal = parseFloat(latMatch[1]);
+      const lonVal = parseFloat(lonMatch[1]);
+      if (Number.isFinite(latVal) && Number.isFinite(lonVal)) {
+        lat = lintang.toLowerCase().includes("ls") ? -latVal : latVal;
+        lon = bujur.toLowerCase().includes("bb") ? -lonVal : lonVal;
+      }
+    }
+  }
+
+  if (lat === null || lon === null) return null;
+
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  if (!isInIndonesiaMonitoringArea(lat, lon)) return null;
+
+  return { lat, lon };
+}
+
+/**
+ * Validate magnitude.
+ * Must be a positive finite number <= 10.0.
+ */
+export function parseMagnitude(magVal: unknown): number | null {
+  if (magVal === undefined || magVal === null || magVal === "") return null;
+  const num = typeof magVal === "number" ? magVal : parseFloat(String(magVal));
+  if (!Number.isFinite(num)) return null;
+  if (num <= 0 || num > 10.0) return null;
+  return Math.round(num * 10) / 10;
+}
+
+/**
+ * Validate and parse depth in km.
+ * Must be a non-negative finite number <= 1000 km.
+ */
+export function parseDepthToKm(depthStr?: string | number): number | null {
+  if (depthStr === undefined || depthStr === null || depthStr === "") return 10;
+  if (typeof depthStr === "number") {
+    if (!Number.isFinite(depthStr) || depthStr < 0 || depthStr > 1000) return null;
+    return Math.round(depthStr);
+  }
+  const match = String(depthStr).match(/(\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const num = parseFloat(match[1]);
+  if (!Number.isFinite(num) || num < 0 || num > 1000) return null;
+  return Math.round(num);
+}
+
+/**
+ * Validate and parse a raw BMKG record (autogempa, gempaterkini, or gempadirasakan).
+ * Rejects invalid, incomplete, or out-of-bounds events.
+ */
+export function validateAndParseBmkgRecord(g: any): Earthquake | null {
+  if (!g || typeof g !== "object") return null;
+
+  const timestamp = parseBmkgTimestamp(g.DateTime, g.Tanggal, g.Jam);
+  if (timestamp === null) return null;
+
+  const coords = parseBmkgCoordinates(g.Coordinates, g.Lintang, g.Bujur);
+  if (!coords) return null;
+
+  const mag = parseMagnitude(g.Magnitude);
+  if (mag === null) return null;
+
+  const depthKm = parseDepthToKm(g.Kedalaman);
+  if (depthKm === null) return null;
+
+  const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
+  const hasTsunami = (g.Potensi || "").toLowerCase().includes("tsunami") && 
+                     !(g.Potensi || "").toLowerCase().includes("tidak berpotensi");
+
+  const canonicalId = getCanonicalEventKey("BMKG", g.DateTime, timestamp);
+  const timeStr = (g.Tanggal && g.Jam)
+    ? `${g.Tanggal} ${g.Jam}`
+    : new Date(timestamp).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB";
+
+  return {
+    id: canonicalId,
+    canonicalEventKey: canonicalId,
+    source: "BMKG",
+    sourcePrimary: "BMKG",
+    informationType: "official_event",
+    verificationStatus: "official",
+    title: `M ${mag} - ${g.Wilayah || "Indonesia"}`,
+    place: g.Wilayah,
+    magnitude: mag,
+    depth: g.Kedalaman || `${depthKm} km`,
+    depthKm,
+    latitude: coords.lat,
+    longitude: coords.lon,
+    time: timeStr,
+    timestamp,
+    potensiTsunami: hasTsunami,
+    potensiText: g.Potensi || (hasTsunami ? "Berpotensi Tsunami" : undefined),
+    feltArea: g.Dirasakan || undefined,
+    felt: g.Dirasakan || undefined,
+    shakemapUrl: g.Shakemap ? `https://data.bmkg.go.id/DataMKG/TEWS/${g.Shakemap}` : undefined,
+    isSignificant: mag >= 5.5,
+    priorityRadiusKm,
+    monitoringRadiusKm,
+  };
+}
+
+/**
+ * Validate and parse a raw USGS GeoJSON feature.
+ * Rejects invalid coordinates, non-Indonesian regions, or corrupt fields.
+ */
+export function validateAndParseUsgsFeature(feat: any): Earthquake | null {
+  if (!feat || !feat.geometry || !Array.isArray(feat.geometry.coordinates)) return null;
+  const [lon, lat, rawDepth] = feat.geometry.coordinates;
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    return null;
+  }
+
+  const place = feat.properties?.place || "";
+  if (!isInIndonesiaMonitoringArea(lat, lon, place)) {
+    return null;
+  }
+
+  const mag = parseMagnitude(feat.properties?.mag);
+  if (mag === null) return null;
+
+  const depthKm = parseDepthToKm(rawDepth);
+  if (depthKm === null) return null;
+
+  const usgsTimestamp = feat.properties?.time;
+  if (!Number.isFinite(usgsTimestamp) || usgsTimestamp <= 0 || usgsTimestamp > Date.now() + 15 * 60 * 1000) {
+    return null;
+  }
+
+  const featId = feat.id || feat.properties?.code;
+  if (!featId) return null;
+
+  const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
+  const isTsunami = feat.properties?.tsunami === 1;
+  const canonicalId = `usgs-${featId}`;
+
+  return {
+    id: canonicalId,
+    canonicalEventKey: canonicalId,
+    source: "USGS",
+    sourcePrimary: "USGS",
+    informationType: "official_event",
+    verificationStatus: "official_external",
+    title: feat.properties?.title || `M ${mag} - ${place || "Indonesia"}`,
+    place,
+    magnitude: mag,
+    depth: `${depthKm} km`,
+    depthKm,
+    latitude: lat,
+    longitude: lon,
+    time: new Date(usgsTimestamp).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" }) + " WIB",
+    timestamp: usgsTimestamp,
+    potensiTsunami: isTsunami,
+    potensiText: isTsunami ? "Peringatan Tsunami Global Aktif" : undefined,
+    isSignificant: mag >= 6.0,
+    priorityRadiusKm,
+    monitoringRadiusKm,
+  };
 }
 
 /**
@@ -109,7 +342,19 @@ export function correlateEarthquakes(rawList: Earthquake[]): Earthquake[] {
     if (match) {
       if (match.source !== "BMKG" && eq.source === "BMKG") {
         const idx = canonicalList.indexOf(match);
-        canonicalList[idx] = eq;
+        canonicalList[idx] = {
+          ...eq,
+          feltArea: eq.feltArea || match.feltArea,
+          felt: eq.felt || match.felt,
+          shakemapUrl: eq.shakemapUrl || match.shakemapUrl,
+          potensiText: eq.potensiText || match.potensiText,
+        };
+      } else {
+        if (!match.shakemapUrl && eq.shakemapUrl) match.shakemapUrl = eq.shakemapUrl;
+        if (!match.feltArea && eq.feltArea) match.feltArea = eq.feltArea;
+        if (!match.felt && eq.felt) match.felt = eq.felt;
+        if (!match.potensiText && eq.potensiText) match.potensiText = eq.potensiText;
+        if (eq.potensiTsunami && !match.potensiTsunami) match.potensiTsunami = true;
       }
     } else {
       canonicalList.push(eq);
@@ -129,8 +374,40 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
 
   const earthquakes: Earthquake[] = [];
   let latestBmkgEarthquake: Earthquake | undefined;
+  let bmkgSuccessCount = 0;
 
   bmkgHealth.lastAttemptAt = new Date().toISOString();
+
+  // Helper to upsert BMKG earthquake with enrichment across feeds
+  const upsertBmkgEarthquake = (eq: Earthquake) => {
+    const existing = earthquakes.find((e) => {
+      if (e.id === eq.id || (e.canonicalEventKey && eq.canonicalEventKey && e.canonicalEventKey === eq.canonicalEventKey)) {
+        return true;
+      }
+      const timeDelta = Math.abs(e.timestamp - eq.timestamp);
+      const latDelta = Math.abs(e.latitude - eq.latitude);
+      const lonDelta = Math.abs(e.longitude - eq.longitude);
+      return (
+        timeDelta <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxTimeDeltaMs &&
+        latDelta <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxCoordDiffDeg &&
+        lonDelta <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxCoordDiffDeg
+      );
+    });
+
+    if (existing) {
+      if (!existing.potensiText && eq.potensiText) existing.potensiText = eq.potensiText;
+      if (!existing.potensiTsunami && eq.potensiTsunami) existing.potensiTsunami = true;
+      if (!existing.feltArea && eq.feltArea) {
+        existing.feltArea = eq.feltArea;
+        existing.felt = eq.felt;
+      }
+      if (!existing.shakemapUrl && eq.shakemapUrl) existing.shakemapUrl = eq.shakemapUrl;
+      return existing;
+    } else {
+      earthquakes.push(eq);
+      return eq;
+    }
+  };
 
   // 1. Fetch BMKG AutoGempa (Gempa M5.0+ terbaru / berpotensi tsunami)
   try {
@@ -141,58 +418,17 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
 
     if (bmkgAutoRes.ok) {
       const data = await bmkgAutoRes.json();
-      const g = data?.Infogempa?.gempa;
-      if (g) {
-        const coords = parseBmkgCoordinates(g.Coordinates, g.Lintang, g.Bujur);
-        if (coords) {
-          const depthKm = parseDepthToKm(g.Kedalaman);
-          const mag = parseFloat(g.Magnitude) || 0;
-          const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
-          const hasTsunami = (g.Potensi || "").toLowerCase().includes("tsunami") && 
-                             !(g.Potensi || "").toLowerCase().includes("tidak berpotensi");
-          const timestamp = g.DateTime ? new Date(g.DateTime).getTime() : Date.now();
-          const canonicalId = getCanonicalEventKey("BMKG", g.DateTime, timestamp);
-
-          latestBmkgEarthquake = {
-            id: canonicalId,
-            source: "BMKG",
-            informationType: "official_event",
-            verificationStatus: "official",
-            title: `M ${g.Magnitude} - ${g.Wilayah}`,
-            magnitude: mag,
-            depth: g.Kedalaman || `${depthKm} km`,
-            depthKm,
-            latitude: coords.lat,
-            longitude: coords.lon,
-            time: `${g.Tanggal} ${g.Jam}`,
-            timestamp,
-            potensiTsunami: hasTsunami,
-            potensiText: g.Potensi,
-            feltArea: g.Dirasakan,
-            shakemapUrl: g.Shakemap ? `https://data.bmkg.go.id/DataMKG/TEWS/${g.Shakemap}` : undefined,
-            isSignificant: true,
-            priorityRadiusKm,
-            monitoringRadiusKm,
-          };
-
-          earthquakes.push(latestBmkgEarthquake);
-          bmkgHealth.status = "healthy";
-          bmkgHealth.lastSuccessAt = new Date().toISOString();
-          bmkgHealth.freshness = "live";
-          bmkgHealth.error = undefined;
-        }
+      const parsed = validateAndParseBmkgRecord(data?.Infogempa?.gempa);
+      if (parsed) {
+        latestBmkgEarthquake = upsertBmkgEarthquake(parsed);
+        bmkgSuccessCount++;
       }
-    } else {
-      bmkgHealth.status = "degraded";
-      bmkgHealth.error = "Non-200 response";
     }
   } catch (err: any) {
     console.error("[Disaster Service] Error fetching BMKG autogempa:", err);
-    bmkgHealth.status = "degraded";
-    bmkgHealth.error = err.message || "Fetch failed";
   }
 
-  // 2. Fetch BMKG 15 Gempa Terkini
+  // 2. Fetch BMKG 15 Gempa Terkini (M >= 5.0)
   try {
     const bmkgListRes = await fetch("https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json", {
       next: { revalidate: 60 },
@@ -203,66 +439,62 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
       const listData = await bmkgListRes.json();
       const list = listData?.Infogempa?.gempa;
       if (Array.isArray(list)) {
+        let validInList = 0;
         for (const item of list) {
-          const coords = parseBmkgCoordinates(item.Coordinates, item.Lintang, item.Bujur);
-          if (!coords) continue;
-
-          const depthKm = parseDepthToKm(item.Kedalaman);
-          const mag = parseFloat(item.Magnitude) || 0;
-          const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
-          const hasTsunami = (item.Potensi || "").toLowerCase().includes("tsunami") && 
-                             !(item.Potensi || "").toLowerCase().includes("tidak berpotensi");
-          const itemTimestamp = item.DateTime ? new Date(item.DateTime).getTime() : Date.now();
-
-          // Canonical Dedup: BMKG AutoGempa vs BMKG Terkini (Requirement 6)
-          // Match by DateTime string or timestamp delta <= 90s + coord delta <= 0.15 deg
-          const existingBmkg = earthquakes.find((e) => {
-            if (item.DateTime && e.id === getCanonicalEventKey("BMKG", item.DateTime, itemTimestamp)) {
-              return true;
-            }
-            const timeDelta = Math.abs(e.timestamp - itemTimestamp);
-            const latDelta = Math.abs(e.latitude - coords.lat);
-            const lonDelta = Math.abs(e.longitude - coords.lon);
-            return timeDelta <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxTimeDeltaMs &&
-                   latDelta <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxCoordDiffDeg &&
-                   lonDelta <= CANONICAL_CORRELATION_THRESHOLDS.bmkgMaxCoordDiffDeg;
-          });
-
-          if (existingBmkg) {
-            // Already represented by canonical event — enrich missing details
-            if (!existingBmkg.potensiText && item.Potensi) existingBmkg.potensiText = item.Potensi;
-          } else {
-            const canonicalId = getCanonicalEventKey("BMKG", item.DateTime, itemTimestamp);
-            earthquakes.push({
-              id: canonicalId,
-              source: "BMKG",
-              informationType: "official_event",
-              verificationStatus: "official",
-              title: `M ${item.Magnitude} - ${item.Wilayah}`,
-              magnitude: mag,
-              depth: item.Kedalaman || `${depthKm} km`,
-              depthKm,
-              latitude: coords.lat,
-              longitude: coords.lon,
-              time: `${item.Tanggal} ${item.Jam}`,
-              timestamp: itemTimestamp,
-              potensiTsunami: hasTsunami,
-              potensiText: item.Potensi,
-              isSignificant: mag >= 5.5,
-              priorityRadiusKm,
-              monitoringRadiusKm,
-            });
+          const parsed = validateAndParseBmkgRecord(item);
+          if (parsed) {
+            upsertBmkgEarthquake(parsed);
+            validInList++;
           }
         }
+        if (validInList > 0) bmkgSuccessCount++;
       }
     }
   } catch (err) {
     console.error("[Disaster Service] Error fetching BMKG gempaterkini:", err);
   }
 
+  // 3. Fetch BMKG 15 Gempa Dirasakan (Includes smaller felt earthquakes M < 5.0)
+  try {
+    const bmkgFeltRes = await fetch("https://data.bmkg.go.id/DataMKG/TEWS/gempadirasakan.json", {
+      next: { revalidate: 60 },
+      headers: { "User-Agent": "SpartaSiaga/1.0" },
+    });
+
+    if (bmkgFeltRes.ok) {
+      const feltData = await bmkgFeltRes.json();
+      const list = feltData?.Infogempa?.gempa;
+      if (Array.isArray(list)) {
+        let validInFelt = 0;
+        for (const item of list) {
+          const parsed = validateAndParseBmkgRecord(item);
+          if (parsed) {
+            upsertBmkgEarthquake(parsed);
+            validInFelt++;
+          }
+        }
+        if (validInFelt > 0) bmkgSuccessCount++;
+      }
+    }
+  } catch (err) {
+    console.error("[Disaster Service] Error fetching BMKG gempadirasakan:", err);
+  }
+
+  // Update BMKG Health based on all sub-feeds
+  if (bmkgSuccessCount > 0) {
+    bmkgHealth.status = "healthy";
+    bmkgHealth.lastSuccessAt = new Date().toISOString();
+    bmkgHealth.freshness = "live";
+    bmkgHealth.error = undefined;
+  } else {
+    bmkgHealth.status = "degraded";
+    bmkgHealth.error = "All BMKG feeds failed or empty";
+    bmkgHealth.freshness = cachedDisasters ? "stale" : "unavailable";
+  }
+
   usgsHealth.lastAttemptAt = new Date().toISOString();
 
-  // 3. Fetch USGS Real-time Feed (M4.5+ in the past 7 days to cover full 72h window)
+  // 4. Fetch USGS Real-time Feed (M4.5+ in the past 7 days to cover full 72h window)
   try {
     const usgsRes = await fetch(
       "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson",
@@ -277,57 +509,31 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
       const features = geojson?.features || [];
 
       for (const feat of features) {
-        const [lon, lat, depth] = feat.geometry.coordinates;
-        // Keep ONLY Indonesian operational monitoring zones, never global M6.5+.
-        const inRegion = isInIndonesiaMonitoringArea(lat, lon, feat.properties.place || "");
-        const mag = feat.properties.mag || 0;
-        const depthKm = Math.round(depth);
-        const usgsTimestamp = feat.properties.time;
+        const parsed = validateAndParseUsgsFeature(feat);
+        if (!parsed) continue;
 
-        if (inRegion) {
-          const { priorityRadiusKm, monitoringRadiusKm } = calculateSpartaMonitoringZone(mag, depthKm);
+        // CANONICAL CORRELATION: USGS vs BMKG (Requirement 6)
+        const matchingBmkg = earthquakes.find((e) => {
+          if (e.source !== "BMKG") return false;
+          const timeDeltaMin = Math.abs(e.timestamp - parsed.timestamp) / (60 * 1000);
+          if (timeDeltaMin > CANONICAL_CORRELATION_THRESHOLDS.usgsMaxTimeDeltaMinutes) return false;
 
-          // CANONICAL CORRELATION: USGS vs BMKG (Requirement 6)
-          const matchingBmkg = earthquakes.find((e) => {
-            if (e.source !== "BMKG") return false;
-            const timeDeltaMin = Math.abs(e.timestamp - usgsTimestamp) / (60 * 1000);
-            if (timeDeltaMin > CANONICAL_CORRELATION_THRESHOLDS.usgsMaxTimeDeltaMinutes) return false;
+          const distKm = calculateHaversineDistance(parsed.latitude, parsed.longitude, e.latitude, e.longitude);
+          if (distKm > CANONICAL_CORRELATION_THRESHOLDS.usgsMaxDistanceKm) return false;
 
-            const distKm = calculateHaversineDistance(lat, lon, e.latitude, e.longitude);
-            if (distKm > CANONICAL_CORRELATION_THRESHOLDS.usgsMaxDistanceKm) return false;
+          const magDiff = Math.abs(e.magnitude - parsed.magnitude);
+          if (magDiff > CANONICAL_CORRELATION_THRESHOLDS.usgsMaxMagnitudeDiff) return false;
 
-            const magDiff = Math.abs(e.magnitude - mag);
-            if (magDiff > CANONICAL_CORRELATION_THRESHOLDS.usgsMaxMagnitudeDiff) return false;
+          return true;
+        });
 
-            return true;
-          });
-
-          if (matchingBmkg) {
-            // Strong match -> Associate to canonical BMKG event, do not create duplicate
-            matchingBmkg.verificationStatus = "official";
-          } else {
-            // Ambiguous or independent event -> Keep separate
-            earthquakes.push({
-              id: `usgs-${feat.id}`,
-              source: "USGS",
-              informationType: "official_event",
-              verificationStatus: "official_external",
-              title: feat.properties.title || `M ${mag} - ${feat.properties.place}`,
-              magnitude: mag,
-              depth: `${depthKm} km`,
-              depthKm,
-              latitude: lat,
-              longitude: lon,
-              time: new Date(feat.properties.time).toLocaleString("id-ID", {
-                timeZone: "Asia/Jakarta",
-              }),
-              timestamp: usgsTimestamp,
-              potensiTsunami: feat.properties.tsunami === 1,
-              potensiText: feat.properties.tsunami === 1 ? "Peringatan Tsunami Global Aktif" : undefined,
-              isSignificant: mag >= 6.0,
-              priorityRadiusKm,
-              monitoringRadiusKm,
-            });
+        if (matchingBmkg) {
+          // Strong match -> Associate to canonical BMKG event, do not create duplicate
+          matchingBmkg.verificationStatus = "official";
+        } else {
+          // Ambiguous or independent event -> Keep separate
+          if (!earthquakes.some((e) => e.id === parsed.id)) {
+            earthquakes.push(parsed);
           }
         }
       }
@@ -338,14 +544,16 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
     } else {
       usgsHealth.status = "degraded";
       usgsHealth.error = "Non-200 response";
+      usgsHealth.freshness = cachedDisasters ? "stale" : "unavailable";
     }
   } catch (err: any) {
     console.error("[Disaster Service] Error fetching USGS feed:", err);
     usgsHealth.status = "degraded";
     usgsHealth.error = err.message || "Fetch failed";
+    usgsHealth.freshness = cachedDisasters ? "stale" : "unavailable";
   }
 
-  // 4. Merge persistent historical earthquakes from database (ensures past 72h events are preserved)
+  // 5. Merge persistent historical earthquakes from database (ensures past 72h events are preserved)
   try {
     const dbEvents = await dbGetRecentEarthquakeEvents(72);
     for (const dbe of dbEvents) {
@@ -401,12 +609,12 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
   const activeEarthquakes = canonicalEarthquakes.filter((eq) => now - eq.timestamp <= activeWindowMs);
 
   const response: DisasterFeedResponse = {
-    latestBmkgEarthquake: latestBmkgEarthquake || canonicalEarthquakes[0],
+    latestBmkgEarthquake: latestBmkgEarthquake || canonicalEarthquakes.find((e) => e.source === "BMKG") || canonicalEarthquakes[0],
     recentEarthquakes: canonicalEarthquakes, // all historical/provider context
     activeEarthquakes, // strictly <= 72 hours for operational map and auto-reports
     lastUpdated: new Date().toISOString(),
     totalActive: activeEarthquakes.length,
-    dataFreshness: "fresh",
+    dataFreshness: (bmkgHealth.status === "healthy" || usgsHealth.status === "healthy") ? "fresh" : "stale",
     sourcesHealth: [bmkgHealth, usgsHealth],
   };
 
@@ -414,33 +622,4 @@ export async function fetchDisasterFeed(forceRefresh: boolean = false): Promise<
   lastFetchTime = now;
 
   return response;
-}
-
-function parseBmkgCoordinates(coordStr?: string, lintang?: string, bujur?: string): { lat: number; lon: number } | null {
-  if (coordStr) {
-    const parts = coordStr.split(",");
-    if (parts.length === 2) {
-      const lat = parseFloat(parts[0].trim());
-      const lon = parseFloat(parts[1].trim());
-      if (!isNaN(lat) && !isNaN(lon)) return { lat, lon };
-    }
-  }
-
-  if (lintang && bujur) {
-    const latVal = parseFloat(lintang.replace(/[^0-9.]/g, ""));
-    const lonVal = parseFloat(bujur.replace(/[^0-9.]/g, ""));
-    if (!isNaN(latVal) && !isNaN(lonVal)) {
-      const finalLat = lintang.toLowerCase().includes("ls") ? -latVal : latVal;
-      const finalLon = bujur.toLowerCase().includes("bb") ? -lonVal : lonVal;
-      return { lat: finalLat, lon: finalLon };
-    }
-  }
-
-  return null;
-}
-
-function parseDepthToKm(depthStr?: string): number {
-  if (!depthStr) return 10;
-  const num = parseInt(depthStr.replace(/[^0-9]/g, ""), 10);
-  return isNaN(num) ? 10 : num;
 }

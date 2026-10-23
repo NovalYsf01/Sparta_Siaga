@@ -39,6 +39,14 @@ import { checkClientPermission } from "@/lib/client-permissions";
 import { UserIdentity } from "@/lib/identity";
 import { AppDialog } from "@/components/shared/app-dialog";
 import { CameraCapture } from "./camera-capture";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface StoreVerificationModalProps {
   incident: IncidentRecord | null;
@@ -398,8 +406,9 @@ export function StoreVerificationModal({
              ========================================================================= */
           <form
             onSubmit={handleSubmitBmDecision}
-            className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0"
+            className="flex flex-col flex-1 min-h-0 overflow-hidden"
           >
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto overscroll-contain touch-pan-y flex-1 min-h-0">
             {submitError && (
               <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -430,7 +439,7 @@ export function StoreVerificationModal({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-slate-400 block text-[11px]">Pemeriksa:</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
@@ -501,7 +510,7 @@ export function StoreVerificationModal({
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                 Pilihan Keputusan BnM Manajer:
               </label>
-              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setBmDecision("approved")}
@@ -628,19 +637,23 @@ export function StoreVerificationModal({
               />
             </div>
 
-            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-              <button
+            </div>
+
+            {/* Sticky Action Footer */}
+            <div className="sticky bottom-0 z-20 shrink-0 px-4 py-3 sm:px-6 sm:py-3.5 border-t border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs flex items-center justify-end gap-2">
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="min-h-[44px] px-4 font-semibold text-slate-600 dark:text-slate-300"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={isSubmitting}
-                className={`px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm flex items-center gap-1.5 transition-all ${
+                className={`min-h-[44px] px-4 font-bold text-white shadow-xs flex items-center gap-1.5 transition-all ${
                   bmDecision === "approved"
                     ? "bg-red-600 hover:bg-red-700"
                     : bmDecision === "safe"
@@ -650,7 +663,7 @@ export function StoreVerificationModal({
                     : "bg-slate-800 hover:bg-slate-900"
                 }`}
               >
-                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}
                 <span>
                   {bmDecision === "approved"
                     ? "Setujui Penanganan Kerusakan"
@@ -660,8 +673,8 @@ export function StoreVerificationModal({
                     ? "Kirim Permintaan Klarifikasi"
                     : "Tolak Laporan Tidak Valid"}
                 </span>
-                {!isSubmitting && <ArrowRight className="w-3.5 h-3.5" />}
-              </button>
+                {!isSubmitting && <ArrowRight className="w-3.5 h-3.5 ml-1" />}
+              </Button>
             </div>
           </form>
         ) : (
@@ -670,8 +683,9 @@ export function StoreVerificationModal({
              ========================================================================= */
           <form
             onSubmit={handleSubmitInspection}
-            className="p-6 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0"
+            className="flex flex-col flex-1 min-h-0 overflow-hidden"
           >
+            <div className="p-4 sm:p-6 space-y-4 overflow-y-auto overscroll-contain touch-pan-y flex-1 min-h-0">
             {submitError && (
               <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -705,7 +719,7 @@ export function StoreVerificationModal({
                 <span className="font-bold text-slate-700 dark:text-slate-300">Identitas Laporan & TKP</span>
                 <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{incident.id}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                 <div>
                   <span className="text-slate-400 block">Lokasi:</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
@@ -744,7 +758,7 @@ export function StoreVerificationModal({
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                 Pilih Jalur Pemeriksaan:
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   type="button"
                   onClick={() => setInspectionMethod("kunjungan_langsung")}
@@ -780,7 +794,7 @@ export function StoreVerificationModal({
                     }`}
                   />
                   <div>
-                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Informasi Awal — Belum Terverifikasi</div>
+                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200">Informasi Awal - Belum Terverifikasi</div>
                     <div className="text-[10px] text-slate-500 dark:text-slate-400">Via WhatsApp / Telepon / Toko</div>
                   </div>
                 </button>
@@ -793,7 +807,7 @@ export function StoreVerificationModal({
                 <span className="text-[11px] font-bold text-amber-900 dark:text-amber-200 block">
                   Identitas Sumber Informasi Lapangan:
                 </span>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
                       Nama Petugas Lokasi (Wajib):
@@ -822,16 +836,25 @@ export function StoreVerificationModal({
                     <label className="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
                       Saluran Komunikasi:
                     </label>
-                    <select
+                    <Select
                       value={officerChannel}
-                      onChange={(e) => setOfficerChannel(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      onValueChange={(val) => {
+                        if (val) setOfficerChannel(val);
+                      }}
                     >
-                      <option value="WhatsApp">WhatsApp</option>
-                      <option value="Telepon Langsung">Telepon Langsung</option>
-                      <option value="Email Perusahaan">Email Perusahaan</option>
-                      <option value="Portal Internal SPARTA">Portal Internal SPARTA</option>
-                    </select>
+                      <SelectTrigger
+                        aria-label="Saluran Komunikasi"
+                        className="w-full h-8 px-2.5 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                      >
+                        <SelectValue placeholder="Pilih Saluran" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                        <SelectItem value="Telepon Langsung">Telepon Langsung</SelectItem>
+                        <SelectItem value="Email Perusahaan">Email Perusahaan</SelectItem>
+                        <SelectItem value="Portal Internal SPARTA">Portal Internal SPARTA</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
@@ -854,7 +877,7 @@ export function StoreVerificationModal({
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                 Kondisi Lapangan:
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setSelectedCondition("damaged")}
@@ -1025,25 +1048,28 @@ export function StoreVerificationModal({
               <span className="text-[10px] text-slate-400">Cabang: {incident.branch}</span>
             </div>
 
-            {/* Actions */}
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
-              <button
+            </div>
+
+            {/* Sticky Action Footer */}
+            <div className="sticky bottom-0 z-20 shrink-0 px-4 py-3 sm:px-6 sm:py-3.5 border-t border-slate-100 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs flex items-center justify-end gap-2">
+              <Button
                 type="button"
+                variant="ghost"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="min-h-[44px] px-4 font-semibold text-slate-600 dark:text-slate-300"
               >
                 Batal
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition-all"
+                className="min-h-[44px] px-5 font-bold text-white bg-[#1D5AA6] hover:bg-[#123B6D] shadow-xs flex items-center gap-1.5 transition-all"
               >
-                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />}
                 <span>Kirim Hasil Pemeriksaan</span>
-                {!isSubmitting && <ArrowRight className="w-3.5 h-3.5" />}
-              </button>
+                {!isSubmitting && <ArrowRight className="w-3.5 h-3.5 ml-1" />}
+              </Button>
             </div>
           </form>
         )}
