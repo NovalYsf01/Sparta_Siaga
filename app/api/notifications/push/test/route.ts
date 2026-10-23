@@ -67,13 +67,25 @@ export async function POST(request: Request) {
     }
 
     const outcomes: PushDeliveryOutcome[] = [];
+    const customUrl = typeof body.url === "string" && body.url.startsWith("/") && !body.url.startsWith("//")
+      ? body.url
+      : (typeof body.disasterId === "string" && body.disasterId.trim()
+          ? `/monitoring?disasterId=${encodeURIComponent(body.disasterId.trim())}`
+          : "/monitoring");
+
+    const isEarthquakeTest = Boolean(body.disasterId || body.isEarthquake);
+
     const testPayload = {
-      title: "🔔 SPARTA SIAGA — Test Web Push",
-      body: `Pengujian Web Push real-time untuk ${sessionUser.name} (${new Date().toLocaleTimeString("id-ID")}).`,
+      title: body.title || (isEarthquakeTest ? "⚠️ [SIMULASI GEMPA] Peringatan Gempa Terdeteksi" : "🔔 SPARTA SIAGA — Test Web Push"),
+      body: body.body || (isEarthquakeTest 
+        ? `Simulasi pengujian deep-link gempa untuk ${sessionUser.name} (${new Date().toLocaleTimeString("id-ID")}).` 
+        : `Pengujian Web Push real-time untuk ${sessionUser.name} (${new Date().toLocaleTimeString("id-ID")}).`),
       icon: "/icons/icon-192x192.png",
       badge: "/icons/icon-192x192.png",
-      tag: `test-push-${Date.now()}`,
-      url: "/monitoring",
+      tag: body.tag || (isEarthquakeTest ? `earthquake-test-${Date.now()}` : `test-push-${Date.now()}`),
+      url: customUrl,
+      disasterType: (body.disasterType || (isEarthquakeTest ? "earthquake" : undefined)) as any,
+      eventId: body.disasterId || undefined,
       urgency: 'high' as const,
       timestamp: new Date().toISOString(),
     };
@@ -88,13 +100,15 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: deliveredCount > 0,
       pushSent: true,
-      testType: "live_web_push_dispatch",
+      testType: isEarthquakeTest ? "earthquake_deeplink_dispatch" : "generic_monitoring_dispatch",
+      targetUrl: customUrl,
+      targetedSubscriptionsCount: subsRes.rows.length,
       attempted: outcomes.length,
       delivered: deliveredCount,
       failed: outcomes.length - deliveredCount,
       outcomes,
       message: deliveredCount > 0
-        ? `Berhasil mengirim ${deliveredCount} test push notification.`
+        ? `Berhasil mengirim ${deliveredCount} test push notification ke ${subsRes.rows.length} subscription terdaftar.`
         : "Gagal mengirim test push notification ke perangkat terdaftar.",
     });
   } catch (err: unknown) {

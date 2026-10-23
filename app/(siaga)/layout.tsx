@@ -539,6 +539,50 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     const floodInterval = setInterval(fetchFloodFeeds, 180000);
     const radarInterval = setInterval(fetchRadarFeeds, 300000);
 
+    // 4. Realtime Web Push broadcast from Service Worker
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "SPARTA_PUSH_RECEIVED") {
+        const payload = event.data.data;
+        const alertKey = payload.eventId
+          ? `${payload.disasterType || "earthquake"}:${payload.eventId}`
+          : (payload.tag || payload.title);
+
+        if (seenNotificationIdsRef.current.has(alertKey)) return;
+        seenNotificationIdsRef.current.add(alertKey);
+
+        playEmergencyChime();
+        triggerDesktopPopup({
+          id: payload.eventId || payload.tag || `push-${Date.now()}`,
+          tag: payload.tag,
+          title: payload.title,
+          body: payload.body,
+          disasterType: payload.disasterType || "earthquake",
+          ticketNumber: payload.ticketNumber,
+          branch: payload.branch,
+          source: payload.eventId?.includes("usgs") ? "USGS" : "BMKG",
+          forceBypassBranchFilter: true,
+          suppressNativeNotification: true, // OS-level notification already handled by Service Worker push event!
+          timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+          onClickDetail: () => {
+            if (payload.url && payload.url.startsWith("/")) {
+              router.push(payload.url);
+            } else {
+              setIsNotificationCenterOpen(true);
+            }
+          },
+          onClickMap: () => {
+            if (payload.url && payload.url.startsWith("/")) {
+              router.push(payload.url);
+            }
+          },
+        });
+      }
+    };
+
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", handleSwMessage);
+    }
+
     return () => {
       clearTimeout(fastTimer);
       clearTimeout(floodTimer);
@@ -546,8 +590,11 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       clearInterval(fastInterval);
       clearInterval(floodInterval);
       clearInterval(radarInterval);
+      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+      }
     };
-  }, [playEmergencyChime]);
+  }, [playEmergencyChime, router]);
 
   // Risk metrics calculation (Requirement 7: Danger / Monitor counts in focus context)
   const { dangerCount, warningCount, affectedStores } = useMemo(() => {
@@ -583,12 +630,12 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     return Array.from(branches).sort();
   }, [rawStores]);
 
-  const handleSelectStore = (store: Store | null) => {
+  const handleSelectStore = useCallback((store: Store | null) => {
     setSelectedStore(store);
     if (store) {
       setFlyToTarget({ lat: store.latitude, lng: store.longitude, zoom: 15 });
     }
-  };
+  }, []);
 
   const handleFlyToLocation = useCallback(async (loc: {
     kode_toko?: string;
@@ -645,7 +692,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     }
   }, [computedStores, router]);
 
-  const handleFocusDisaster = (eqOrLat: Earthquake | number, maybeLng?: number) => {
+  const handleFocusDisaster = useCallback((eqOrLat: Earthquake | number, maybeLng?: number) => {
     setIncidentOnly(true);
     if (typeof eqOrLat === "number") {
       setFlyToTarget({ lat: eqOrLat, lng: maybeLng ?? 0, zoom: 10 });
@@ -653,26 +700,26 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
       setSelectedEarthquake(eqOrLat); // Requirement 7: Activates Event Focus Mode!
       setFlyToTarget({ lat: eqOrLat.latitude, lng: eqOrLat.longitude, zoom: 10 });
     }
-  };
+  }, []);
 
   const clearEventFocus = useCallback(() => {
     setSelectedEarthquake(null);
     setSelectedCategory(null);
   }, []);
 
-  const handleResetView = () => {
+  const handleResetView = useCallback(() => {
     setSelectedEarthquake(null);
     setFlyToTarget({ lat: -2.548926, lng: 118.0148634, zoom: 5 });
-  };
+  }, []);
 
   // Workflow Handlers
-  const handleOpenReportModal = () => {
+  const handleOpenReportModal = useCallback(() => {
     setIsManualModalOpen(true);
-  };
+  }, []);
 
-  const handleSelectIncidentForDetail = (inc: IncidentRecord) => {
+  const handleSelectIncidentForDetail = useCallback((inc: IncidentRecord) => {
     setSelectedReadOnlyIncident(inc);
-  };
+  }, []);
 
   // Inspection and BnM approval are persisted by dedicated backend endpoints.
   // Refresh the authoritative report instead of writing an incomplete local
@@ -749,7 +796,7 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     handleUpdateIncidents(updated);
   };
 
-  const contextValue = {
+  const contextValue = useMemo(() => ({
     rawStores, computedStores, disasterData, loading, isRefreshing,
     activeRole, setActiveRole, activeLayer, setActiveLayer,
     incidents, activeIncidents, archivedIncidents, incidentStats,
@@ -762,7 +809,20 @@ export default function SiagaLayout({ children }: { children: React.ReactNode })
     setIsAffectedSheetOpen,
     mapTimeFilter, setMapTimeFilter,
     selectedEarthquake, setSelectedEarthquake, clearEventFocus,
-  };
+  }), [
+    rawStores, computedStores, disasterData, loading, isRefreshing,
+    activeRole, setActiveRole, activeLayer, setActiveLayer,
+    incidents, activeIncidents, archivedIncidents, incidentStats,
+    handleUpdateIncidents, handleSelectIncidentForDetail, handleOpenReportModal, refreshIncidents,
+    incidentOnly, setIncidentOnly, statusFilter, setStatusFilter,
+    basemap, setBasemap, theme, handleToggleTheme,
+    showRadar, setShowRadar, radarData, selectedStore, setSelectedStore,
+    handleSelectStore, flyToTarget, setFlyToTarget, dangerCount, warningCount,
+    handleResetView, handleFocusDisaster, selectedCategory, setSelectedCategory,
+    setIsAffectedSheetOpen,
+    mapTimeFilter, setMapTimeFilter,
+    selectedEarthquake, setSelectedEarthquake, clearEventFocus,
+  ]);
 
   return (
     <SiagaProvider value={contextValue}>

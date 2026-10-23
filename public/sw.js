@@ -127,6 +127,10 @@ self.addEventListener("push", (event) => {
         icon: json.icon || data.icon,
         badge: json.badge || data.badge,
         tag: json.tag || "sparta-disaster-alert",
+        eventId: json.eventId,
+        disasterType: json.disasterType,
+        ticketNumber: json.ticketNumber,
+        branch: json.branch,
         data: {
           url: typeof json.url === "string" && json.url.startsWith("/") &&
             !json.url.startsWith("//") ? json.url : "/",
@@ -152,7 +156,29 @@ self.addEventListener("push", (event) => {
     ],
   };
 
-  event.waitUntil(self.registration.showNotification(data.title, options));
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(data.title, options),
+      self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) {
+          client.postMessage({
+            type: "SPARTA_PUSH_RECEIVED",
+            data: {
+              title: data.title,
+              body: data.body,
+              tag: options.tag,
+              eventId: data.eventId,
+              disasterType: data.disasterType,
+              ticketNumber: data.ticketNumber,
+              branch: data.branch,
+              url: data.data?.url || "/",
+              timestamp: new Date().toISOString(),
+            },
+          });
+        }
+      }),
+    ])
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {

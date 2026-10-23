@@ -176,26 +176,29 @@ export interface EmergencyNotificationPayload {
   ticketNumber?: string;
   branch?: string;
   source?: string;
+  tag?: string;
   timestamp?: string;
   isSimulation?: boolean;
   onClickDetail?: () => void;
   onClickMap?: () => void;
   forceBypassBranchFilter?: boolean;
+  suppressNativeNotification?: boolean;
 }
 
 const poppedNotificationIds = new Set<string>();
 
 /**
- * Triggers dual desktop notification:
- * 1. Native OS Pop-up banner (Windows / Mac / Linux Notification Center)
- * 2. In-App floating emergency toast popup on screen
+ * Triggers dual notification:
+ * 1. Native OS Pop-up banner (via ServiceWorker or Notification API, if not already shown via push)
+ * 2. In-App floating emergency toast popup on screen (with responsive touch targets)
  * 3. Audio chime
  */
 export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void {
-  if (poppedNotificationIds.has(payload.id)) {
+  const dedupKey = payload.tag || payload.id;
+  if (poppedNotificationIds.has(dedupKey)) {
     return;
   }
-  poppedNotificationIds.add(payload.id);
+  poppedNotificationIds.add(dedupKey);
 
   // Check branch filter (Duty Officer branch assignment)
   const monitoredBranch = getUserMonitoredBranch();
@@ -205,7 +208,7 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
     payload.branch &&
     payload.branch.toUpperCase() !== monitoredBranch.toUpperCase()
   ) {
-    // Alert is for another branch; suppress intrusive popup/chime for this specific laptop
+    // Alert is for another branch; suppress intrusive popup/chime for this specific device
     console.log(`[Desktop Notification] Filtered out for branch ${payload.branch} (Monitored: ${monitoredBranch})`);
     return;
   }
@@ -213,27 +216,57 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
   // 1. Play sound chime
   playEmergencyAudioChime();
 
-  // 2. Native OS Desktop Notification (bottom-right Windows Action Center)
-  if (isNotificationSupported() && Notification.permission === "granted") {
-    try {
-      const notification = new Notification(payload.isSimulation ? `[SIMULASI] ${payload.title}` : payload.title, {
-        body: payload.body,
-        icon: "/favicon.ico",
-        tag: payload.id,
-        requireInteraction: true, // Keep banner on screen until operator clicks/dismisses
-      });
+  // 2. Native OS Desktop/Mobile Notification (only when not suppressed by Web Push receiver)
+  if (!payload.suppressNativeNotification && isNotificationSupported() && Notification.permission === "granted") {
+    const notifTitle = payload.isSimulation ? `[SIMULASI] ${payload.title}` : payload.title;
+    const notifTag = payload.tag || `earthquake-${payload.id}`;
 
-      notification.onclick = () => {
-        window.focus();
-        if (payload.onClickDetail) payload.onClickDetail();
-        notification.close();
-      };
-    } catch (err) {
-      console.warn("[Desktop Notification] Native notification error:", err);
+    // Prefer ServiceWorker showNotification for cross-platform compatibility (Android PWA + Desktop)
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then((reg) => {
+        reg.showNotification(notifTitle, {
+          body: payload.body,
+          icon: "/icons/icon-192x192.png",
+          badge: "/icons/icon-192x192.png",
+          tag: notifTag,
+          requireInteraction: true,
+          data: {
+            url: payload.onClickMap ? "/monitoring" : "/",
+          },
+        }).catch(() => {
+          // Fallback to window Notification constructor
+          try {
+            new Notification(notifTitle, {
+              body: payload.body,
+              icon: "/icons/icon-192x192.png",
+              tag: notifTag,
+            });
+          } catch {
+            // Handled
+          }
+        });
+      }).catch(() => {});
+    } else {
+      try {
+        const notification = new Notification(notifTitle, {
+          body: payload.body,
+          icon: "/icons/icon-192x192.png",
+          tag: notifTag,
+          requireInteraction: true,
+        });
+
+        notification.onclick = () => {
+          window.focus();
+          if (payload.onClickDetail) payload.onClickDetail();
+          notification.close();
+        };
+      } catch {
+        // Handled
+      }
     }
   }
 
-// 3. In-App Pop-up Toast Banner (always visible inside dashboard, antislop-ui & executive layout)
+  // 3. In-App Pop-up Toast Banner (always visible inside dashboard, antislop-ui responsive layout)
   const isQuake = payload.disasterType === "earthquake" || payload.disasterType === "tsunami";
   const displayTitle = cleanDisplayTitle(payload.title);
   const displayBody = cleanDisplayText(payload.body);
@@ -244,9 +277,9 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
       <div
         role="alert"
         aria-live="assertive"
-        className="w-[calc(100vw-32px)] sm:w-[380px] max-w-[380px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col relative pointer-events-auto transition-all animate-in slide-in-from-right-5 duration-200"
+        className="w-[calc(100vw-32px)] sm:w-[400px] max-w-[400px] max-h-[85vh] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden flex flex-col relative pointer-events-auto transition-all animate-in slide-in-from-right-5 duration-200"
       >
-        {/* Header: Measured alert badge, clear category, clean X button */}
+        {/* Header: Measured alert badge, clear category, accessible 44px touch-target X button */}
         <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/40">
           <div className="flex items-center gap-2.5 min-w-0">
             <div
@@ -270,7 +303,7 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
           <button
             type="button"
             onClick={() => toast.dismiss(t)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors shrink-0"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors shrink-0"
             aria-label="Tutup notifikasi"
           >
             <X className="w-4 h-4" />
@@ -278,7 +311,7 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
         </div>
 
         {/* Content Body: Proportional typography, no panic styling */}
-        <div className="p-4 flex flex-col gap-2">
+        <div className="p-4 flex flex-col gap-2 overflow-y-auto">
           <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
             {displayTitle}
           </h4>
@@ -291,8 +324,8 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
           </div>
         </div>
 
-        {/* Footer Actions: Equal height (36px), consistent typography, distinct visual hierarchy */}
-        <div className="px-4 py-3 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+        {/* Footer Actions: Touch target >= 40px, consistent typography, distinct visual hierarchy */}
+        <div className="px-4 py-3 bg-slate-50/90 dark:bg-slate-950/60 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2 shrink-0">
           {payload.onClickMap && (
             <button
               type="button"
@@ -300,7 +333,7 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
                 toast.dismiss(t);
                 payload.onClickMap!();
               }}
-              className="h-9 min-h-[36px] px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-blue-600"
+              className="h-10 min-h-[40px] px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 focus-visible:outline-2 focus-visible:outline-blue-600"
             >
               <Map className="w-3.5 h-3.5 shrink-0" />
               <span>Lihat di Peta</span>
@@ -314,7 +347,7 @@ export function triggerDesktopPopup(payload: EmergencyNotificationPayload): void
                 toast.dismiss(t);
                 payload.onClickDetail!();
               }}
-              className="h-9 min-h-[36px] px-4 rounded-xl bg-[#1D5AA6] hover:bg-[#164785] text-white text-xs font-semibold transition-colors shadow-xs flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600"
+              className="h-10 min-h-[40px] px-4 rounded-xl bg-[#1D5AA6] hover:bg-[#164785] text-white text-xs font-semibold transition-colors shadow-xs flex items-center justify-center focus-visible:outline-2 focus-visible:outline-blue-600"
             >
               <span>Lihat Detail</span>
             </button>

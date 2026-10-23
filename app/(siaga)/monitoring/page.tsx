@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { Activity, AlertTriangle, Building2, Clock, Filter, Layers, List, Loader2, MapPin, Radio, Search, Store as StoreIcon, X } from "lucide-react";
 import { useSiaga } from "@/components/layout/siaga-context";
 type MapMode = "event" | "store" | "dc";
@@ -11,6 +12,60 @@ import { LocationListSheet } from "@/components/map/location-list-sheet";
 import { EarthquakeListModal } from "@/components/disaster/earthquake-list-modal";
 import { assessStoreRisk } from "@/lib/haversine";
 import type { Store } from "@/types/store";
+
+function MonitoringDeepLinkHandler() {
+  const searchParams = useSearchParams();
+  const { disasterData, handleFocusDisaster, setActiveLayer, computedStores, handleSelectStore } = useSiaga();
+  const handledDisasterIdRef = React.useRef<string | null>(null);
+  const handledStoreIdRef = React.useRef<string | null>(null);
+
+  const disasterId = searchParams.get("disasterId");
+  const storeId = searchParams.get("storeId");
+
+  // Reset tracking refs if query parameter is removed
+  useEffect(() => {
+    if (!disasterId) handledDisasterIdRef.current = null;
+  }, [disasterId]);
+
+  useEffect(() => {
+    if (!storeId) handledStoreIdRef.current = null;
+  }, [storeId]);
+
+  // Handle earthquake deep link
+  useEffect(() => {
+    if (!disasterId || disasterId === handledDisasterIdRef.current || !disasterData) {
+      return;
+    }
+
+    const allEqs = [
+      ...(disasterData.activeEarthquakes || []),
+      ...(disasterData.recentEarthquakes || []),
+    ];
+    const target = allEqs.find((e) => e.id === disasterId || e.id.includes(disasterId));
+    if (target) {
+      handledDisasterIdRef.current = disasterId;
+      handleFocusDisaster(target);
+      setActiveLayer("earthquake");
+    }
+  }, [disasterId, disasterData, handleFocusDisaster, setActiveLayer]);
+
+  // Handle store deep link
+  useEffect(() => {
+    if (!storeId || storeId === handledStoreIdRef.current || computedStores.length === 0) {
+      return;
+    }
+
+    const targetStore = computedStores.find(
+      (s) => s.id === storeId || s.kode_toko === storeId
+    );
+    if (targetStore) {
+      handledStoreIdRef.current = storeId;
+      handleSelectStore(targetStore);
+    }
+  }, [storeId, computedStores, handleSelectStore]);
+
+  return null;
+}
 
 const MapView = dynamic(
   () => import("@/components/map/map-view").then((mod) => mod.MapView),
@@ -342,6 +397,9 @@ export default function MonitoringPage() {
 
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col bg-slate-900">
+      <Suspense fallback={null}>
+        <MonitoringDeepLinkHandler />
+      </Suspense>
       {/* 1. FLOATING TOP CONTROL OVERLAY (NASA FIRMS Inspired, Task 1 & Task 5) */}
       {/* 1. Floating Map Mode & Controls Toolbar with Safe Area & Responsive Layout */}
       <div className="absolute top-2.5 left-2.5 right-2.5 sm:top-4 sm:left-4 sm:right-4 z-[450] pointer-events-none flex flex-col sm:flex-row sm:items-center justify-between gap-2">

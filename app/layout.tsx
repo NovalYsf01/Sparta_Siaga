@@ -59,6 +59,8 @@ export default function RootLayout({
           <Toaster
           position="top-right"
           duration={4000}
+          offset={16}
+          gap={12}
           toastOptions={{
             classNames: {
               toast: "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-xl p-4 flex gap-3",
